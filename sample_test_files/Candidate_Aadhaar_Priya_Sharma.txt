@@ -1,0 +1,12 @@
+================================================================================
+UNIQUE IDENTIFICATION AUTHORITY OF INDIA (UIDAI) - AADHAAR VERIFICATION
+================================================================================
+Name: Priya Sharma
+DOB: 14/08/2003
+Gender: Female
+Aadhaar Number: 4523-8891-9901
+Aadhaar Linked Mobile: +91 98765 43210
+Aadhaar-Seeded Bank Account (NPCI Mapped): Verified Active
+
+Address: Flat 402, Green Meadows, Kothrud, Pune - 411038
+================================================================================
