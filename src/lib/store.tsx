@@ -6,15 +6,16 @@ import {
   FormSubmission, 
   LoginActivityLog, 
   UserRole, 
-  IntakeFormData, 
   SubmissionStatus, 
-  ClientApprenticeMetrics, 
-  ApprenticeRecord,
-  DBTClaimRecord,
-  SPOCEmailLog
+  IntakeFormData, 
+  ApprenticeRecord, 
+  DBTClaimRecord, 
+  ClientApprenticeMetrics,
+  SPOCEmailLog,
+  CompanyOperationsSPOC
 } from '@/types';
 import { INITIAL_PROFILES, INITIAL_SUBMISSIONS, INITIAL_LOGIN_LOGS } from './mock-data';
-import { isSupabaseConfigured, createClient } from './supabase/client';
+import { createClient, isSupabaseConfigured } from '@/lib/supabase/client';
 
 interface AuthState {
   user: UserProfile | null;
@@ -44,156 +45,99 @@ interface AuthState {
 
 const StoreContext = createContext<AuthState | null>(null);
 
-const STORAGE_KEY_USER = 'app_current_user';
-const STORAGE_KEY_SUBMISSIONS = 'app_form_submissions';
-const STORAGE_KEY_LOGS = 'app_login_logs';
-const STORAGE_KEY_PROFILES = 'app_user_profiles';
-
 export const StoreProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const [user, setUser] = useState<UserProfile | null>(null);
   const [isLoading, setIsLoading] = useState<boolean>(true);
-  const [profiles, setProfiles] = useState<UserProfile[]>(INITIAL_PROFILES);
-  const [submissions, setSubmissions] = useState<FormSubmission[]>(INITIAL_SUBMISSIONS);
-  const [loginLogs, setLoginLogs] = useState<LoginActivityLog[]>(INITIAL_LOGIN_LOGS);
+  const [profiles, setProfiles] = useState<UserProfile[]>([]);
+  const [submissions, setSubmissions] = useState<FormSubmission[]>([]);
+  const [loginLogs, setLoginLogs] = useState<LoginActivityLog[]>([]);
 
-  // Initialize from Supabase or LocalStorage
+  // Initialize ONLY from Supabase Cloud Database (0 localStorage reliance)
   useEffect(() => {
     const initData = async () => {
-      try {
-        const savedUser = localStorage.getItem(STORAGE_KEY_USER);
-        const savedSubmissions = localStorage.getItem(STORAGE_KEY_SUBMISSIONS);
-        const savedLogs = localStorage.getItem(STORAGE_KEY_LOGS);
-        const savedProfiles = localStorage.getItem(STORAGE_KEY_PROFILES);
+      // Clear any stale legacy localStorage on startup
+      if (typeof window !== 'undefined') {
+        try {
+          localStorage.removeItem('app_current_user');
+          localStorage.removeItem('app_form_submissions');
+          localStorage.removeItem('app_login_logs');
+          localStorage.removeItem('app_user_profiles');
+        } catch (e) {}
+      }
 
-        let activeSubmissions: FormSubmission[] = savedSubmissions ? JSON.parse(savedSubmissions) : INITIAL_SUBMISSIONS;
-        if (savedUser) setUser(JSON.parse(savedUser));
-        if (savedSubmissions) setSubmissions(activeSubmissions);
-        if (savedLogs) setLoginLogs(JSON.parse(savedLogs));
-        if (savedProfiles) setProfiles(JSON.parse(savedProfiles));
+      if (isSupabaseConfigured()) {
+        try {
+          const supabase = createClient();
+          
+          // 1. Fetch live form submissions
+          const { data: remoteSubs, error: subsError } = await supabase
+            .from('form_submissions')
+            .select('*')
+            .order('last_active_at', { ascending: false });
 
-        if (isSupabaseConfigured()) {
-          try {
-            const supabase = createClient();
-            
-            // 1. Fetch live form submissions
-            const { data: remoteSubs, error: subsError } = await supabase
-              .from('form_submissions')
-              .select('*')
-              .order('last_active_at', { ascending: false });
+          const activeSubmissions: FormSubmission[] = (!subsError && remoteSubs) ? remoteSubs : [];
+          setSubmissions(activeSubmissions);
 
-            if (!subsError && remoteSubs && remoteSubs.length > 0) {
-              activeSubmissions = remoteSubs;
-              setSubmissions(remoteSubs);
-              localStorage.setItem(STORAGE_KEY_SUBMISSIONS, JSON.stringify(remoteSubs));
-            }
+          // 2. Fetch live user profiles
+          const { data: remoteProfiles, error: profsError } = await supabase
+            .from('profiles')
+            .select('*');
 
-            // 2. Fetch live user profiles
-            const { data: remoteProfiles, error: profsError } = await supabase
+          if (!profsError && remoteProfiles) {
+            setProfiles(remoteProfiles);
+          }
+
+          // 3. Fetch login activity logs
+          const { data: remoteLogs, error: logsError } = await supabase
+            .from('login_activity_logs')
+            .select('*')
+            .order('created_at', { ascending: false })
+            .limit(50);
+
+          if (!logsError && remoteLogs) {
+            setLoginLogs(remoteLogs);
+          }
+
+          // 4. Check active auth session and hydrate user from DB
+          const { data: { session } } = await supabase.auth.getSession();
+          if (session?.user) {
+            const { data: profile } = await supabase
               .from('profiles')
-              .select('*');
-
-            if (!profsError && remoteProfiles && remoteProfiles.length > 0) {
-              setProfiles(remoteProfiles);
-              localStorage.setItem(STORAGE_KEY_PROFILES, JSON.stringify(remoteProfiles));
-            }
-
-            // 3. Fetch login activity logs
-            const { data: remoteLogs, error: logsError } = await supabase
-              .from('login_activity_logs')
               .select('*')
-              .order('created_at', { ascending: false })
-              .limit(50);
-
-            if (!logsError && remoteLogs && remoteLogs.length > 0) {
-              setLoginLogs(remoteLogs);
-              localStorage.setItem(STORAGE_KEY_LOGS, JSON.stringify(remoteLogs));
-            }
-
-            // 4. Hydrate active session user with live submission data
-            const { data: { session } } = await supabase.auth.getSession();
-            if (session?.user) {
-              const { data: profile } = await supabase
-                .from('profiles')
-                .select('*')
-                .eq('id', session.user.id)
-                .single();
-              
-              if (profile) {
-                const userEmail = profile.email.toLowerCase();
-                const matchedSub = activeSubmissions.find(s => 
-                  s.client_email?.toLowerCase() === userEmail || s.client_id === profile.id
-                );
-
-                if (matchedSub) {
-                  const quota = matchedSub.responses?.requiredApprenticeCount || 20;
-                  const dbtOptIn = matchedSub.responses?.dbtSchemeOptIn !== false;
-                  const metrics = recalculateUserMetrics(profile, matchedSub.candidates || [], quota, dbtOptIn);
-                  if (matchedSub.dbt_claims) metrics.dbtClaimsHistory = matchedSub.dbt_claims;
-                  if (matchedSub.spoc_logs) metrics.spocEmailLogs = matchedSub.spoc_logs;
-                  if (matchedSub.assigned_company_spoc) metrics.assignedCompanySpoc = matchedSub.assigned_company_spoc;
-
-                  profile.apprenticeMetrics = metrics;
-                  profile.company_name = matchedSub.company_name || profile.company_name;
-                }
-
-                setUser(profile);
-                localStorage.setItem(STORAGE_KEY_USER, JSON.stringify(profile));
-              }
-            } else if (savedUser) {
-              const parsedUser = JSON.parse(savedUser);
-              const userEmail = parsedUser.email?.toLowerCase();
+              .eq('id', session.user.id)
+              .single();
+            
+            if (profile) {
+              const userEmail = profile.email.toLowerCase();
               const matchedSub = activeSubmissions.find(s => 
-                s.client_email?.toLowerCase() === userEmail || s.client_id === parsedUser.id
+                s.client_email?.toLowerCase() === userEmail || s.client_id === profile.id
               );
 
               if (matchedSub) {
                 const quota = matchedSub.responses?.requiredApprenticeCount || 20;
                 const dbtOptIn = matchedSub.responses?.dbtSchemeOptIn !== false;
-                const metrics = recalculateUserMetrics(parsedUser, matchedSub.candidates || [], quota, dbtOptIn);
+                const metrics = recalculateUserMetrics(profile, matchedSub.candidates || [], quota, dbtOptIn);
                 if (matchedSub.dbt_claims) metrics.dbtClaimsHistory = matchedSub.dbt_claims;
                 if (matchedSub.spoc_logs) metrics.spocEmailLogs = matchedSub.spoc_logs;
                 if (matchedSub.assigned_company_spoc) metrics.assignedCompanySpoc = matchedSub.assigned_company_spoc;
 
-                parsedUser.apprenticeMetrics = metrics;
-                parsedUser.company_name = matchedSub.company_name || parsedUser.company_name;
-                setUser(parsedUser);
-                localStorage.setItem(STORAGE_KEY_USER, JSON.stringify(parsedUser));
+                profile.apprenticeMetrics = metrics;
+                profile.company_name = matchedSub.company_name || profile.company_name;
               }
+
+              setUser(profile);
             }
-          } catch (supaErr) {
-            console.warn('Supabase fetch notice:', supaErr);
           }
+        } catch (supaErr) {
+          console.error('Database initialization notice:', supaErr);
         }
-      } catch (e) {
-        console.warn('Initialization notice:', e);
-      } finally {
-        setIsLoading(false);
       }
+
+      setIsLoading(false);
     };
 
     initData();
   }, []);
-
-  const saveState = (
-    newUser?: UserProfile | null,
-    newSubmissions?: FormSubmission[],
-    newLogs?: LoginActivityLog[],
-    newProfiles?: UserProfile[]
-  ) => {
-    if (newUser !== undefined) {
-      if (newUser === null) localStorage.removeItem(STORAGE_KEY_USER);
-      else localStorage.setItem(STORAGE_KEY_USER, JSON.stringify(newUser));
-    }
-    if (newSubmissions !== undefined) {
-      localStorage.setItem(STORAGE_KEY_SUBMISSIONS, JSON.stringify(newSubmissions));
-    }
-    if (newLogs !== undefined) {
-      localStorage.setItem(STORAGE_KEY_LOGS, JSON.stringify(newLogs));
-    }
-    if (newProfiles !== undefined) {
-      localStorage.setItem(STORAGE_KEY_PROFILES, JSON.stringify(newProfiles));
-    }
-  };
 
   const addLoginLog = async (email: string, role: UserRole, status: 'success' | 'failed', failure_reason?: string) => {
     const newLog: LoginActivityLog = {
@@ -208,16 +152,14 @@ export const StoreProvider: React.FC<{ children: React.ReactNode }> = ({ childre
       created_at: new Date().toISOString()
     };
 
-    const updated = [newLog, ...loginLogs];
-    setLoginLogs(updated);
-    saveState(undefined, undefined, updated);
+    setLoginLogs(prev => [newLog, ...prev]);
 
     if (isSupabaseConfigured()) {
       try {
         const supabase = createClient();
         const { error: logError } = await supabase.from('login_activity_logs').insert([newLog]);
         if (logError) {
-          console.error('❌ Supabase login_activity_logs insert FAILED:', logError.message, logError.details, logError.hint);
+          console.error('❌ Supabase login_activity_logs insert FAILED:', logError.message, logError.details);
         } else {
           console.log('✅ Supabase login_activity_logs insert OK');
         }
@@ -229,38 +171,6 @@ export const StoreProvider: React.FC<{ children: React.ReactNode }> = ({ childre
 
   const login = async (email: string, role: UserRole, password?: string): Promise<{ success: boolean; error?: string; submission?: FormSubmission }> => {
     const normalizedEmail = email.trim().toLowerCase();
-
-    // Fetch live submissions from Supabase on every login attempt
-    let liveSubmissions = submissions;
-    if (isSupabaseConfigured()) {
-      try {
-        const supabase = createClient();
-        const { data: remoteSubs } = await supabase
-          .from('form_submissions')
-          .select('*')
-          .order('last_active_at', { ascending: false });
-
-        if (remoteSubs && remoteSubs.length > 0) {
-          liveSubmissions = remoteSubs;
-          setSubmissions(remoteSubs);
-          localStorage.setItem(STORAGE_KEY_SUBMISSIONS, JSON.stringify(remoteSubs));
-        }
-
-        const { data: remoteProfiles } = await supabase.from('profiles').select('*');
-        if (remoteProfiles && remoteProfiles.length > 0) {
-          setProfiles(remoteProfiles);
-          localStorage.setItem(STORAGE_KEY_PROFILES, JSON.stringify(remoteProfiles));
-        }
-
-        const { data: remoteLogs } = await supabase.from('login_activity_logs').select('*').order('created_at', { ascending: false }).limit(50);
-        if (remoteLogs && remoteLogs.length > 0) {
-          setLoginLogs(remoteLogs);
-          localStorage.setItem(STORAGE_KEY_LOGS, JSON.stringify(remoteLogs));
-        }
-      } catch (err) {
-        console.warn('Live fetch during login notice:', err);
-      }
-    }
 
     // 1. Direct Administrator Passkey Authentication
     if (role === 'admin') {
@@ -283,7 +193,22 @@ export const StoreProvider: React.FC<{ children: React.ReactNode }> = ({ childre
           last_login_at: new Date().toISOString()
         };
         setUser(adminUser);
-        saveState(adminUser, liveSubmissions);
+
+        // Fetch live submissions and logs directly from DB for Admin
+        if (isSupabaseConfigured()) {
+          try {
+            const supabase = createClient();
+            const { data: remoteSubs } = await supabase.from('form_submissions').select('*').order('last_active_at', { ascending: false });
+            if (remoteSubs) setSubmissions(remoteSubs);
+
+            const { data: remoteProfiles } = await supabase.from('profiles').select('*');
+            if (remoteProfiles) setProfiles(remoteProfiles);
+
+            const { data: remoteLogs } = await supabase.from('login_activity_logs').select('*').order('created_at', { ascending: false }).limit(50);
+            if (remoteLogs) setLoginLogs(remoteLogs);
+          } catch (e) {}
+        }
+
         await addLoginLog('admin@company.com', 'admin', 'success');
         return { success: true };
       } else {
@@ -292,8 +217,9 @@ export const StoreProvider: React.FC<{ children: React.ReactNode }> = ({ childre
       }
     }
 
-    // 2. Client Authentication via Supabase Auth (with graceful local fallback)
+    // 2. Client Authentication via Supabase Auth
     let authenticatedUser: UserProfile | null = null;
+    let liveSubmissions = submissions;
 
     if (isSupabaseConfigured() && password) {
       try {
@@ -320,28 +246,33 @@ export const StoreProvider: React.FC<{ children: React.ReactNode }> = ({ childre
             created_at: data.user.created_at,
             last_login_at: new Date().toISOString()
           };
+
+          // Fetch fresh submissions from Supabase
+          const { data: remoteSubs } = await supabase.from('form_submissions').select('*').order('last_active_at', { ascending: false });
+          if (remoteSubs) {
+            liveSubmissions = remoteSubs;
+            setSubmissions(remoteSubs);
+          }
         }
       } catch (err: any) {
-        console.warn('Supabase auth fallback:', err);
+        console.warn('Supabase auth sign in error:', err);
       }
     }
 
     if (!authenticatedUser) {
+      // Fallback check against profiles in memory/DB
       let existing = profiles.find(p => p.email.toLowerCase() === normalizedEmail);
+      if (!existing && isSupabaseConfigured()) {
+        try {
+          const supabase = createClient();
+          const { data: dbProfile } = await supabase.from('profiles').select('*').eq('email', normalizedEmail).single();
+          if (dbProfile) existing = dbProfile;
+        } catch (e) {}
+      }
+
       if (!existing) {
-        existing = {
-          id: 'client-' + Date.now(),
-          email: normalizedEmail,
-          full_name: email.split('@')[0].replace('.', ' ').replace(/\b\w/g, l => l.toUpperCase()),
-          role: 'client',
-          created_at: new Date().toISOString(),
-          last_login_at: new Date().toISOString()
-        };
-        const newProfilesList = [...profiles, existing];
-        setProfiles(newProfilesList);
-        saveState(undefined, undefined, undefined, newProfilesList);
-      } else {
-        existing.last_login_at = new Date().toISOString();
+        await addLoginLog(email, role, 'failed', 'User not found in database');
+        return { success: false, error: 'Account not found. Please click Register to create a new client account.' };
       }
       authenticatedUser = existing;
     }
@@ -365,7 +296,6 @@ export const StoreProvider: React.FC<{ children: React.ReactNode }> = ({ childre
     }
 
     setUser(authenticatedUser);
-    saveState(authenticatedUser, liveSubmissions);
     await addLoginLog(email, role, 'success');
 
     // Update last_login_at in Supabase profiles table
@@ -408,7 +338,6 @@ export const StoreProvider: React.FC<{ children: React.ReactNode }> = ({ childre
 
         if (signUpError) {
           console.error('❌ Supabase auth signUp FAILED:', signUpError.message);
-          // If user already exists, try signing in instead
           if (signUpError.message?.includes('already registered') || signUpError.message?.includes('already exists')) {
             const { data: signInData, error: signInError } = await supabase.auth.signInWithPassword({
               email: normalizedEmail,
@@ -425,7 +354,6 @@ export const StoreProvider: React.FC<{ children: React.ReactNode }> = ({ childre
           supabaseUserId = signUpData.user.id;
           console.log('✅ Supabase auth signUp OK, user ID:', supabaseUserId);
           
-          // Auto sign in to activate session immediately
           try {
             await supabase.auth.signInWithPassword({
               email: normalizedEmail,
@@ -451,10 +379,8 @@ export const StoreProvider: React.FC<{ children: React.ReactNode }> = ({ childre
       last_login_at: new Date().toISOString()
     };
 
-    const newProfilesList = [...profiles.filter(p => p.email !== normalizedEmail), newProfile];
-    setProfiles(newProfilesList);
+    setProfiles(prev => [...prev.filter(p => p.email !== normalizedEmail), newProfile]);
     setUser(newProfile);
-    saveState(newProfile, undefined, undefined, newProfilesList);
     await addLoginLog(normalizedEmail, 'client', 'success');
 
     // Direct write to Supabase profiles table
@@ -495,7 +421,6 @@ export const StoreProvider: React.FC<{ children: React.ReactNode }> = ({ childre
       }
     }
     setUser(null);
-    saveState(null);
   };
 
   const getActiveClientSubmission = (): FormSubmission | undefined => {
@@ -555,6 +480,22 @@ export const StoreProvider: React.FC<{ children: React.ReactNode }> = ({ childre
     };
   };
 
+  // Helper to persist any updated FormSubmission directly to Supabase
+  const persistSubmissionToSupabase = async (submission: FormSubmission) => {
+    if (!isSupabaseConfigured()) return;
+    try {
+      const supabase = createClient();
+      const { error: upsertError } = await supabase.from('form_submissions').upsert([submission]);
+      if (upsertError) {
+        console.error('❌ Supabase form_submissions update FAILED:', upsertError.message, upsertError.details);
+      } else {
+        console.log('✅ Supabase form_submissions updated for:', submission.id);
+      }
+    } catch (err) {
+      console.error('❌ Supabase update exception:', err);
+    }
+  };
+
   const saveSubmissionStep = async (
     responses: Partial<IntakeFormData>,
     step: number,
@@ -573,9 +514,6 @@ export const StoreProvider: React.FC<{ children: React.ReactNode }> = ({ childre
     const completionPercentage = isFinalSubmit ? 100 : Math.round((step / 4) * 100);
 
     const quotaRequired = mergedResponses.requiredApprenticeCount || 15;
-    const stipendVal = mergedResponses.stipendPerApprentice || 18500;
-    const dbtShare = mergedResponses.dbtSchemeOptIn !== false ? 4500 : 0;
-
     const candidateList: ApprenticeRecord[] = existing?.candidates || [];
 
     const updatedSubmission: FormSubmission = {
@@ -604,42 +542,10 @@ export const StoreProvider: React.FC<{ children: React.ReactNode }> = ({ childre
       const dynamicMetrics = recalculateUserMetrics(user, candidateList, quotaRequired, mergedResponses.dbtSchemeOptIn !== false);
       const updatedUser = { ...user, company_name: mergedResponses.companyName || user.company_name, apprenticeMetrics: dynamicMetrics };
       setUser(updatedUser);
-      saveState(updatedUser, updatedSubmissions);
-    } else {
-      saveState(undefined, updatedSubmissions);
     }
 
-    if (isSupabaseConfigured()) {
-      try {
-        const supabase = createClient();
-        const { error: upsertError } = await supabase.from('form_submissions').upsert([updatedSubmission]);
-        if (upsertError) {
-          console.error('❌ Supabase form_submissions upsert FAILED:', upsertError.message, upsertError.details, upsertError.hint);
-        } else {
-          console.log('✅ Supabase form_submissions upsert OK for:', submissionId);
-        }
-      } catch (err) {
-        console.error('❌ Supabase upsert exception:', err);
-      }
-    }
-
+    await persistSubmissionToSupabase(updatedSubmission);
     return updatedSubmission;
-  };
-
-  // Helper to persist any updated FormSubmission directly to Supabase
-  const persistSubmissionToSupabase = async (submission: FormSubmission) => {
-    if (!isSupabaseConfigured()) return;
-    try {
-      const supabase = createClient();
-      const { error: upsertError } = await supabase.from('form_submissions').upsert([submission]);
-      if (upsertError) {
-        console.error('❌ Supabase form_submissions update FAILED:', upsertError.message, upsertError.details);
-      } else {
-        console.log('✅ Supabase form_submissions updated for:', submission.id);
-      }
-    } catch (err) {
-      console.error('❌ Supabase update exception:', err);
-    }
   };
 
   // Assign Dedicated Company Operations SPOC
@@ -670,9 +576,6 @@ export const StoreProvider: React.FC<{ children: React.ReactNode }> = ({ childre
       const updatedMetrics = { ...user.apprenticeMetrics, assignedCompanySpoc: updatedSpoc };
       const updatedUser = { ...user, apprenticeMetrics: updatedMetrics };
       setUser(updatedUser);
-      saveState(updatedUser, updatedSubmissions);
-    } else {
-      saveState(undefined, updatedSubmissions);
     }
   };
 
@@ -723,7 +626,6 @@ export const StoreProvider: React.FC<{ children: React.ReactNode }> = ({ childre
       previewBodyHtml: `Dual SPOC Dispatch: Sent to Company Operations (${companySpocEmail}) & Client HR (${clientSpocEmail}). ${documentNames.length} compliance documents attached.`
     };
 
-    // Call Next.js API route with dual recipients
     try {
       fetch('/api/send-spoc-email', {
         method: 'POST',
@@ -780,10 +682,7 @@ export const StoreProvider: React.FC<{ children: React.ReactNode }> = ({ childre
         };
         const updatedSubmissions = submissions.map(s => s.id === currentSub.id ? updatedSub : s);
         setSubmissions(updatedSubmissions);
-        saveState(updatedUser, updatedSubmissions);
-        persistSubmissionToSupabase(updatedSub);
-      } else {
-        saveState(updatedUser);
+        await persistSubmissionToSupabase(updatedSub);
       }
     }
 
@@ -812,10 +711,7 @@ export const StoreProvider: React.FC<{ children: React.ReactNode }> = ({ childre
         };
         const updatedSubmissions = submissions.map(s => s.id === currentSub.id ? updatedSub : s);
         setSubmissions(updatedSubmissions);
-        saveState(updatedUser, updatedSubmissions);
-        persistSubmissionToSupabase(updatedSub);
-      } else {
-        saveState(updatedUser);
+        await persistSubmissionToSupabase(updatedSub);
       }
     }
   };
@@ -842,10 +738,7 @@ export const StoreProvider: React.FC<{ children: React.ReactNode }> = ({ childre
         };
         const updatedSubmissions = submissions.map(s => s.id === currentSub.id ? updatedSub : s);
         setSubmissions(updatedSubmissions);
-        saveState(updatedUser, updatedSubmissions);
-        persistSubmissionToSupabase(updatedSub);
-      } else {
-        saveState(updatedUser);
+        await persistSubmissionToSupabase(updatedSub);
       }
     }
   };
@@ -875,7 +768,6 @@ export const StoreProvider: React.FC<{ children: React.ReactNode }> = ({ childre
 
       const updatedUser = { ...user, apprenticeMetrics: updatedMetrics };
       setUser(updatedUser);
-      saveState(updatedUser);
     }
 
     return { totalDisbursed, count: candidates.length };
@@ -919,10 +811,7 @@ export const StoreProvider: React.FC<{ children: React.ReactNode }> = ({ childre
         };
         const updatedSubmissions = submissions.map(s => s.id === currentSub.id ? updatedSub : s);
         setSubmissions(updatedSubmissions);
-        saveState(updatedUser, updatedSubmissions);
-        persistSubmissionToSupabase(updatedSub);
-      } else {
-        saveState(updatedUser);
+        await persistSubmissionToSupabase(updatedSub);
       }
     }
 
@@ -949,11 +838,10 @@ export const StoreProvider: React.FC<{ children: React.ReactNode }> = ({ childre
       };
       const updatedUser = { ...user, apprenticeMetrics: updatedMetrics };
       setUser(updatedUser);
-      saveState(updatedUser);
     }
   };
 
-  const recordAbandonment = (step: number, responses: Partial<IntakeFormData>) => {
+  const recordAbandonment = async (step: number, responses: Partial<IntakeFormData>) => {
     const existing = getActiveClientSubmission();
     const submissionId = existing?.id || 'sub-' + Date.now();
 
@@ -979,8 +867,7 @@ export const StoreProvider: React.FC<{ children: React.ReactNode }> = ({ childre
     const filtered = submissions.filter(s => s.id !== submissionId);
     const updatedSubmissions = [abandonedSubmission, ...filtered];
     setSubmissions(updatedSubmissions);
-    saveState(undefined, updatedSubmissions);
-    persistSubmissionToSupabase(abandonedSubmission);
+    await persistSubmissionToSupabase(abandonedSubmission);
   };
 
   const updateSubmissionStatus = (submissionId: string, status: SubmissionStatus) => {
@@ -996,7 +883,6 @@ export const StoreProvider: React.FC<{ children: React.ReactNode }> = ({ childre
     });
 
     setSubmissions(updated);
-    saveState(undefined, updated);
 
     const target = updated.find(s => s.id === submissionId);
     if (target) {
@@ -1008,7 +894,7 @@ export const StoreProvider: React.FC<{ children: React.ReactNode }> = ({ childre
     if (!isSupabaseConfigured()) {
       return {
         success: true,
-        message: 'Local offline database active. Supabase will sync automatically when online.'
+        message: 'Supabase configuration not detected.'
       };
     }
 
@@ -1058,7 +944,7 @@ export const StoreProvider: React.FC<{ children: React.ReactNode }> = ({ childre
       if (errors.length > 0) {
         return {
           success: false,
-          message: `Sync errors: ${errors.join('; ')}. Check that Supabase tables exist — run the schema SQL in the SQL Editor.`
+          message: `Sync errors: ${errors.join('; ')}`
         };
       }
 
@@ -1075,13 +961,9 @@ export const StoreProvider: React.FC<{ children: React.ReactNode }> = ({ childre
   };
 
   const resetToDemoData = () => {
-    setProfiles(INITIAL_PROFILES);
-    setSubmissions(INITIAL_SUBMISSIONS);
-    setLoginLogs(INITIAL_LOGIN_LOGS);
-    localStorage.removeItem(STORAGE_KEY_USER);
-    localStorage.removeItem(STORAGE_KEY_SUBMISSIONS);
-    localStorage.removeItem(STORAGE_KEY_LOGS);
-    localStorage.removeItem(STORAGE_KEY_PROFILES);
+    setProfiles([]);
+    setSubmissions([]);
+    setLoginLogs([]);
     setUser(null);
   };
 
