@@ -163,9 +163,14 @@ export const StoreProvider: React.FC<{ children: React.ReactNode }> = ({ childre
     if (isSupabaseConfigured()) {
       try {
         const supabase = createClient();
-        await supabase.from('login_activity_logs').insert([newLog]);
+        const { error: logError } = await supabase.from('login_activity_logs').insert([newLog]);
+        if (logError) {
+          console.error('❌ Supabase login_activity_logs insert FAILED:', logError.message, logError.details, logError.hint);
+        } else {
+          console.log('✅ Supabase login_activity_logs insert OK');
+        }
       } catch (err) {
-        console.warn('Supabase log insert notice:', err);
+        console.error('❌ Supabase log insert exception:', err);
       }
     }
   };
@@ -263,11 +268,12 @@ export const StoreProvider: React.FC<{ children: React.ReactNode }> = ({ childre
 
   const register = async (data: { fullName: string; email: string; companyName?: string; phone?: string; password?: string }): Promise<{ success: boolean; error?: string }> => {
     const normalizedEmail = data.email.trim().toLowerCase();
+    let supabaseUserId: string | undefined;
 
     if (isSupabaseConfigured() && data.password) {
       try {
         const supabase = createClient();
-        await supabase.auth.signUp({
+        const { data: signUpData, error: signUpError } = await supabase.auth.signUp({
           email: normalizedEmail,
           password: data.password,
           options: {
@@ -279,13 +285,33 @@ export const StoreProvider: React.FC<{ children: React.ReactNode }> = ({ childre
             }
           }
         });
+
+        if (signUpError) {
+          console.error('❌ Supabase auth signUp FAILED:', signUpError.message);
+          // If user already exists, try signing in instead
+          if (signUpError.message?.includes('already registered') || signUpError.message?.includes('already exists')) {
+            const { data: signInData, error: signInError } = await supabase.auth.signInWithPassword({
+              email: normalizedEmail,
+              password: data.password
+            });
+            if (!signInError && signInData.user) {
+              supabaseUserId = signInData.user.id;
+              console.log('✅ Existing user signed in:', supabaseUserId);
+            } else {
+              console.error('❌ Supabase signIn fallback FAILED:', signInError?.message);
+            }
+          }
+        } else if (signUpData?.user) {
+          supabaseUserId = signUpData.user.id;
+          console.log('✅ Supabase auth signUp OK, user ID:', supabaseUserId);
+        }
       } catch (err: any) {
-        console.warn('Supabase signup notice:', err);
+        console.error('❌ Supabase signup exception:', err);
       }
     }
 
     const newProfile: UserProfile = {
-      id: 'client-' + Date.now(),
+      id: supabaseUserId || ('client-' + Date.now()),
       email: normalizedEmail,
       full_name: data.fullName,
       company_name: data.companyName,
@@ -431,9 +457,14 @@ export const StoreProvider: React.FC<{ children: React.ReactNode }> = ({ childre
     if (isSupabaseConfigured()) {
       try {
         const supabase = createClient();
-        await supabase.from('form_submissions').upsert([updatedSubmission]);
+        const { error: upsertError } = await supabase.from('form_submissions').upsert([updatedSubmission]);
+        if (upsertError) {
+          console.error('❌ Supabase form_submissions upsert FAILED:', upsertError.message, upsertError.details, upsertError.hint);
+        } else {
+          console.log('✅ Supabase form_submissions upsert OK for:', submissionId);
+        }
       } catch (err) {
-        console.warn('Supabase upsert notice:', err);
+        console.error('❌ Supabase upsert exception:', err);
       }
     }
 
@@ -805,12 +836,34 @@ export const StoreProvider: React.FC<{ children: React.ReactNode }> = ({ childre
 
     try {
       const supabase = createClient();
+      const errors: string[] = [];
+
       if (submissions.length > 0) {
-        await supabase.from('form_submissions').upsert(submissions);
+        const { error: subsError } = await supabase.from('form_submissions').upsert(submissions);
+        if (subsError) {
+          console.error('❌ Sync form_submissions FAILED:', subsError.message, subsError.details, subsError.hint);
+          errors.push(`Submissions: ${subsError.message}`);
+        } else {
+          console.log('✅ Synced', submissions.length, 'form_submissions');
+        }
       }
       if (loginLogs.length > 0) {
-        await supabase.from('login_activity_logs').upsert(loginLogs);
+        const { error: logsError } = await supabase.from('login_activity_logs').upsert(loginLogs);
+        if (logsError) {
+          console.error('❌ Sync login_activity_logs FAILED:', logsError.message, logsError.details, logsError.hint);
+          errors.push(`Logs: ${logsError.message}`);
+        } else {
+          console.log('✅ Synced', loginLogs.length, 'login_activity_logs');
+        }
       }
+
+      if (errors.length > 0) {
+        return {
+          success: false,
+          message: `Sync errors: ${errors.join('; ')}. Check that Supabase tables exist — run the schema SQL in the SQL Editor.`
+        };
+      }
+
       return {
         success: true,
         message: `Successfully synchronized ${submissions.length} submissions and ${loginLogs.length} audit logs to Supabase.`
