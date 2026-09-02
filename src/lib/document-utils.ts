@@ -170,59 +170,58 @@ export const generateSPOCEmailHtml = (params: {
   const { candidate, companyName, spocName, spocEmail, documentList } = params;
   
   return `
-    <div style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; max-width: 600px; margin: 0 auto; padding: 24px; background: #ffffff; border: 1px solid #e4e4e7; border-radius: 16px; color: #18181b;">
-      <div style="border-bottom: 2px solid #18181b; padding-bottom: 12px; margin-bottom: 20px;">
-        <span style="font-size: 11px; font-weight: 800; text-transform: uppercase; letter-spacing: 0.1em; color: #71717a;">Apprenticeship Compliance System</span>
-        <h2 style="font-size: 20px; font-weight: 800; color: #18181b; margin: 6px 0 0 0;">New Candidate Dossier & Documents Uploaded</h2>
+    <div style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; max-width: 600px; margin: 0 auto; padding: 24px; background: #ffffff; border: 1px solid #e4e4e7; border-radius: 12px; color: #18181b;">
+      <div style="border-bottom: 1px solid #e4e4e7; padding-bottom: 14px; margin-bottom: 20px;">
+        <h2 style="font-size: 18px; font-weight: 700; color: #18181b; margin: 0;">Candidate Onboarding Notification</h2>
       </div>
 
       <p style="font-size: 14px; line-height: 1.6; color: #3f3f46;">
-        Dear <strong>${spocName || 'SPOC / Compliance Officer'}</strong> (${spocEmail}),
+        Dear <strong>${spocName || 'SPOC'}</strong> (${spocEmail}),
       </p>
 
       <p style="font-size: 13px; line-height: 1.6; color: #52525b;">
-        A new apprentice candidate has been onboarded by <strong>${companyName || 'Enterprise Client'}</strong> with full compliance documentation (.pdf, .docx, .txt). The details have been verified and recorded on the portal.
+        A new candidate has been onboarded${companyName ? ` for <strong>${companyName}</strong>` : ''}. The details and compliance documentation have been submitted.
       </p>
 
-      <div style="background: #fafafa; border: 1px solid #e4e4e7; border-radius: 12px; padding: 16px; margin: 20px 0;">
-        <h3 style="font-size: 12px; font-weight: 800; text-transform: uppercase; color: #18181b; margin-top: 0; margin-bottom: 12px; font-family: monospace;">Candidate Summary</h3>
+      <div style="background: #fafafa; border: 1px solid #e4e4e7; border-radius: 8px; padding: 16px; margin: 20px 0;">
+        <h3 style="font-size: 12px; font-weight: 700; text-transform: uppercase; color: #18181b; margin-top: 0; margin-bottom: 12px;">Candidate Summary</h3>
         <table style="width: 100%; font-size: 12px; border-collapse: collapse;">
           <tr>
-            <td style="padding: 4px 0; color: #71717a;">Candidate Name:</td>
-            <td style="padding: 4px 0; font-weight: 700; color: #18181b;">${candidate.name}</td>
+            <td style="padding: 5px 0; color: #71717a;">Candidate Name:</td>
+            <td style="padding: 5px 0; font-weight: 600; color: #18181b;">${candidate.name}</td>
           </tr>
           <tr>
-            <td style="padding: 4px 0; color: #71717a;">Designated Role / Trade:</td>
-            <td style="padding: 4px 0; font-weight: 700; color: #18181b;">${candidate.tradeOrRole}</td>
+            <td style="padding: 5px 0; color: #71717a;">Designated Role / Trade:</td>
+            <td style="padding: 5px 0; font-weight: 600; color: #18181b;">${candidate.tradeOrRole}</td>
           </tr>
           <tr>
-            <td style="padding: 4px 0; color: #71717a;">Aadhaar Card No:</td>
-            <td style="padding: 4px 0; font-family: monospace; color: #18181b;">${candidate.aadhaarNumber || 'Verified'}</td>
+            <td style="padding: 5px 0; color: #71717a;">Aadhaar Number:</td>
+            <td style="padding: 5px 0; font-family: monospace; color: #18181b;">${candidate.aadhaarNumber || 'Submitted'}</td>
           </tr>
           <tr>
-            <td style="padding: 4px 0; color: #71717a;">Monthly Stipend:</td>
-            <td style="padding: 4px 0; font-weight: 700; color: #18181b;">₹${(candidate.stipendAmount || 18500).toLocaleString()} / month</td>
+            <td style="padding: 5px 0; color: #71717a;">Monthly Stipend:</td>
+            <td style="padding: 5px 0; font-weight: 600; color: #18181b;">₹${(candidate.stipendAmount || 18500).toLocaleString()} / month</td>
           </tr>
           <tr>
-            <td style="padding: 4px 0; color: #71717a;">Govt DBT Subsidy Share:</td>
-            <td style="padding: 4px 0; font-weight: 700; color: #10b981;">₹${(candidate.dbtEligibleAmount || 4500).toLocaleString()} / month</td>
+            <td style="padding: 5px 0; color: #71717a;">DBT Subsidy Share:</td>
+            <td style="padding: 5px 0; font-weight: 600; color: #18181b;">₹${(candidate.dbtEligibleAmount || 4500).toLocaleString()} / month</td>
           </tr>
           <tr>
-            <td style="padding: 4px 0; color: #71717a;">Joining Date:</td>
-            <td style="padding: 4px 0; font-family: monospace; color: #18181b;">${candidate.onboardingDate}</td>
+            <td style="padding: 5px 0; color: #71717a;">Joining Date:</td>
+            <td style="padding: 5px 0; font-family: monospace; color: #18181b;">${candidate.onboardingDate}</td>
           </tr>
         </table>
       </div>
 
       <div style="margin: 20px 0;">
-        <h4 style="font-size: 12px; font-weight: 800; text-transform: uppercase; color: #18181b; margin-bottom: 8px;">Uploaded Compliance Documents (${documentList.length}):</h4>
+        <h4 style="font-size: 12px; font-weight: 700; text-transform: uppercase; color: #18181b; margin-bottom: 8px;">Attached Documents (${documentList.length}):</h4>
         <ul style="margin: 0; padding-left: 20px; font-size: 12px; color: #3f3f46; line-height: 1.8;">
-          ${documentList.map(doc => `<li><strong>${doc}</strong> (Verified & Stored)</li>`).join('')}
+          ${documentList.map(doc => `<li><strong>${doc}</strong></li>`).join('')}
         </ul>
       </div>
 
-      <div style="border-top: 1px solid #e4e4e7; padding-top: 16px; margin-top: 24px; font-size: 11px; color: #a1a1aa; text-align: center;">
-        Automated Dispatch triggered by Client Dashboard · National Apprenticeship & DBT Portal
+      <div style="border-top: 1px solid #e4e4e7; padding-top: 14px; margin-top: 24px; font-size: 11px; color: #a1a1aa; text-align: center;">
+        This is an automated notification.
       </div>
     </div>
   `;
