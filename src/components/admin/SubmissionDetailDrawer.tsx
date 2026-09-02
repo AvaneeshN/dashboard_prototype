@@ -579,11 +579,11 @@ export const SubmissionDetailDrawer: React.FC<SubmissionDetailDrawerProps> = ({
                               {/* Degree */}
                               <button
                                 type="button"
-                                onClick={() => setPreviewingDoc(cand.documents?.educationDoc || { name: cand.documents?.educationFile || 'Degree Certificate.docx', type: 'docx' })}
+                                onClick={() => setPreviewingDoc(cand.documents?.educationDoc || { name: cand.documents?.educationFile || 'Degree Certificate.pdf', type: 'pdf' })}
                                 className="px-2 py-0.5 rounded-full text-[10px] font-mono bg-white hover:bg-zinc-200 border border-zinc-200 text-zinc-800 cursor-pointer flex items-center gap-1"
                               >
                                 <Eye className="w-2.5 h-2.5" />
-                                <span>Degree (.docx)</span>
+                                <span>Degree</span>
                               </button>
 
                               {/* Resume */}

@@ -99,7 +99,7 @@ export const ClientDashboard: React.FC = () => {
     phone: '',
     aadhaarNumber: '',
     tradeOrRole: '',
-    qualification: 'B.Tech / B.Sc / Diploma',
+    qualification: '',
     stipendAmount: 18500,
     dbtEligibleAmount: 4500,
     joiningDate: new Date().toISOString().split('T')[0],
@@ -282,7 +282,7 @@ export const ClientDashboard: React.FC = () => {
       phone: '',
       aadhaarNumber: '',
       tradeOrRole: '',
-      qualification: 'B.Tech / B.Sc / Diploma',
+      qualification: '',
       stipendAmount: 18500,
       dbtEligibleAmount: 4500,
       joiningDate: new Date().toISOString().split('T')[0],
@@ -325,7 +325,7 @@ export const ClientDashboard: React.FC = () => {
       phone: '',
       aadhaarNumber: '',
       tradeOrRole: defaultRole,
-      qualification: 'B.Tech / B.Sc / Diploma',
+      qualification: '',
       stipendAmount: Number(activeSubmission?.responses?.stipendPerApprentice) || 18500,
       dbtEligibleAmount: 4500,
       joiningDate: activeSubmission?.responses?.proposedJoiningDate || new Date().toISOString().split('T')[0],
@@ -1016,7 +1016,6 @@ export const ClientDashboard: React.FC = () => {
 
                                 <td className="py-3.5 px-4">
                                   <div className="text-zinc-800 font-semibold">{app.tradeOrRole}</div>
-                                  <div className="text-[10px] text-zinc-400">{app.qualification}</div>
                                 </td>
 
                                 <td className="py-3.5 px-4 font-mono text-[11px] text-zinc-600">
