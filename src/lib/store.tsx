@@ -138,6 +138,14 @@ export const StoreProvider: React.FC<{ children: React.ReactNode }> = ({ childre
                 localStorage.setItem('portal_admin_organization_spoc', JSON.stringify(systemAdminRecord.assigned_company_spoc));
               } catch (e) {}
             }
+          } else {
+            // If deleted from Supabase, clear from state and localStorage
+            setAdminSpocState(null);
+            if (typeof window !== 'undefined') {
+              try {
+                localStorage.removeItem('portal_admin_organization_spoc');
+              } catch (e) {}
+            }
           }
 
           // Filter out internal system record from client intakes registry
