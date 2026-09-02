@@ -849,7 +849,6 @@ export const ClientIntakeWizard: React.FC = () => {
                       }}
                       className="w-full px-3.5 py-2.5 rounded-2xl bg-zinc-50 border border-zinc-200 text-zinc-900 text-xs focus:outline-none focus:border-black focus:bg-white font-bold"
                     />
-                    <span className="text-[10px] text-zinc-400 mt-1 block font-mono">* Benchmark: ₹15,000 – ₹25,000</span>
                   </div>
 
                   <div>
