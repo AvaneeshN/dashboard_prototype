@@ -726,7 +726,10 @@ export const StoreProvider: React.FC<{ children: React.ReactNode }> = ({ childre
     const configuredSpocEmail = currentSub?.assigned_company_spoc?.email || user?.apprenticeMetrics?.assignedCompanySpoc?.email;
     const configuredSpocName = currentSub?.assigned_company_spoc?.name || user?.apprenticeMetrics?.assignedCompanySpoc?.name;
 
-    const targetEmail = configuredSpocEmail || targetSpocEmail || candidate.spocEmail || user?.email || 'spoc@company.com';
+    const clientEmail = targetSpocEmail || candidate.spocEmail || configuredSpocEmail;
+    const adminEmail = adminSpoc?.email;
+    const recipientList = [clientEmail, adminEmail].filter(Boolean).filter((val, idx, arr) => arr.indexOf(val) === idx);
+    const targetEmail = recipientList.length > 0 ? recipientList.join(', ') : (user?.email || 'spoc@company.com');
     const targetName = configuredSpocName || targetSpocName || candidate.spocName || 'SPOC Lead';
     const company = user?.company_name || currentSub?.company_name || 'Enterprise Client';
 

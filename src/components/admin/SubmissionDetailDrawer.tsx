@@ -42,7 +42,7 @@ export const SubmissionDetailDrawer: React.FC<SubmissionDetailDrawerProps> = ({
   onClose,
   onStatusChange
 }) => {
-  const { assignCompanySpoc } = useStore();
+  const { assignCompanySpoc, adminSpoc } = useStore();
   const [activeTab, setActiveTab] = useState<'application' | 'documents' | 'candidates' | 'dbt_claims' | 'spoc_logs'>('application');
   const [previewingDoc, setPreviewingDoc] = useState<any>(null);
 
@@ -201,85 +201,112 @@ export const SubmissionDetailDrawer: React.FC<SubmissionDetailDrawerProps> = ({
                 </div>
               </div>
 
-              {/* Dedicated Company Operations SPOC Assignment Card */}
-              <div className="p-4 rounded-2xl bg-zinc-50 border border-zinc-200 space-y-3">
-                <div className="flex items-center justify-between">
-                  <div className="flex items-center gap-2">
-                    <User className="w-4 h-4 text-zinc-700" />
-                    <div>
-                      <h4 className="text-xs font-bold text-zinc-900 uppercase font-mono">
-                        Company Operations SPOC (Assigned)
-                      </h4>
-                      <p className="text-[11px] text-zinc-500">
-                        Receives all automated candidate onboarding dossiers and document uploads.
-                      </p>
+              {/* SPOC Management & Routing Grid */}
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                {/* 1. Client Company Designated SPOC */}
+                <div className="p-4 rounded-2xl bg-zinc-50 border border-zinc-200 space-y-3 flex flex-col justify-between">
+                  <div>
+                    <div className="flex items-center justify-between mb-1.5">
+                      <div className="flex items-center gap-1.5">
+                        <User className="w-3.5 h-3.5 text-zinc-700" />
+                        <h4 className="text-xs font-bold text-zinc-900 uppercase font-mono">
+                          Client Company SPOC
+                        </h4>
+                      </div>
+                      <button
+                        type="button"
+                        onClick={() => setIsEditingSpoc(!isEditingSpoc)}
+                        className="px-2.5 py-0.5 rounded-full text-[11px] font-bold bg-white border border-zinc-200 hover:bg-zinc-100 text-zinc-800 cursor-pointer transition-all"
+                      >
+                        {isEditingSpoc ? 'Cancel' : 'Edit'}
+                      </button>
                     </div>
+                    <p className="text-[11px] text-zinc-500">
+                      Contact at {submission.company_name || 'the client company'} who receives candidate dossiers.
+                    </p>
                   </div>
 
-                  <button
-                    type="button"
-                    onClick={() => setIsEditingSpoc(!isEditingSpoc)}
-                    className="px-3 py-1 rounded-full text-xs font-bold bg-white border border-zinc-200 hover:bg-zinc-100 text-zinc-800 cursor-pointer transition-all"
-                  >
-                    {isEditingSpoc ? 'Cancel' : 'Change SPOC'}
-                  </button>
-                </div>
-
-                {isEditingSpoc ? (
-                  <div className="p-3.5 rounded-xl bg-white border border-zinc-200 space-y-2.5 text-xs">
-                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                  {isEditingSpoc ? (
+                    <div className="p-3 rounded-xl bg-white border border-zinc-200 space-y-2 text-xs">
                       <div>
-                        <label className="block text-[11px] font-bold text-zinc-600 mb-1">SPOC Full Name *</label>
+                        <label className="block text-[10px] font-bold text-zinc-600 mb-0.5">SPOC Name *</label>
                         <input
                           type="text"
                           value={companySpocState.name}
                           onChange={(e) => setCompanySpocState({ ...companySpocState, name: e.target.value })}
-                          placeholder="e.g. Rohit Kumar"
-                          className="w-full px-3 py-1.5 rounded-xl bg-zinc-50 border border-zinc-200 text-zinc-900 font-medium text-xs focus:outline-none focus:border-black"
+                          placeholder="Contact Name"
+                          className="w-full px-2.5 py-1.5 rounded-lg bg-zinc-50 border border-zinc-200 text-zinc-900 font-medium text-xs focus:outline-none focus:border-black"
                         />
                       </div>
                       <div>
-                        <label className="block text-[11px] font-bold text-zinc-600 mb-1">Company SPOC Email *</label>
+                        <label className="block text-[10px] font-bold text-zinc-600 mb-0.5">SPOC Email *</label>
                         <input
                           type="email"
                           value={companySpocState.email}
                           onChange={(e) => setCompanySpocState({ ...companySpocState, email: e.target.value })}
-                          placeholder="ops-desk@ourcompany.com"
-                          className="w-full px-3 py-1.5 rounded-xl bg-zinc-50 border border-zinc-200 text-zinc-900 font-medium text-xs focus:outline-none focus:border-black"
+                          placeholder="spoc@client.com"
+                          className="w-full px-2.5 py-1.5 rounded-lg bg-zinc-50 border border-zinc-200 text-zinc-900 font-medium text-xs focus:outline-none focus:border-black"
                         />
                       </div>
+                      <div className="pt-1 flex justify-end">
+                        <button
+                          type="button"
+                          onClick={handleSaveCompanySpoc}
+                          className="px-3 py-1 rounded-full bg-black text-white hover:bg-zinc-800 text-xs font-bold cursor-pointer transition-all"
+                        >
+                          Save Client SPOC
+                        </button>
+                      </div>
                     </div>
-                    <div className="flex items-center justify-end gap-2 pt-1">
-                      <button
-                        type="button"
-                        onClick={handleSaveCompanySpoc}
-                        className="px-4 py-1.5 rounded-full bg-black text-white hover:bg-zinc-800 text-xs font-bold cursor-pointer transition-all shadow-xs"
-                      >
-                        Save Assigned SPOC
-                      </button>
+                  ) : (
+                    <div className="p-3 rounded-xl bg-white border border-zinc-200 flex items-center justify-between text-xs font-mono">
+                      <div>
+                        <span className="font-bold text-zinc-900 block font-sans">
+                          {submission.assigned_company_spoc?.name || companySpocState.name || 'Not Configured'}
+                        </span>
+                        <span className="text-[11px] text-zinc-500">
+                          {submission.assigned_company_spoc?.email || companySpocState.email || 'No email assigned'}
+                        </span>
+                      </div>
+                      {submission.assigned_company_spoc?.email && (
+                        <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-emerald-100 text-emerald-800 font-sans">
+                          Client Lead
+                        </span>
+                      )}
                     </div>
+                  )}
+                </div>
+
+                {/* 2. Platform Operations SPOC (Admin) */}
+                <div className="p-4 rounded-2xl bg-zinc-50 border border-zinc-200 space-y-3 flex flex-col justify-between">
+                  <div>
+                    <div className="flex items-center gap-1.5 mb-1.5">
+                      <Mail className="w-3.5 h-3.5 text-zinc-700" />
+                      <h4 className="text-xs font-bold text-zinc-900 uppercase font-mono">
+                        Organization Operations SPOC
+                      </h4>
+                    </div>
+                    <p className="text-[11px] text-zinc-500">
+                      Platform lead overseeing this client's compliance dossiers and dispatches.
+                    </p>
                   </div>
-                ) : (
+
                   <div className="p-3 rounded-xl bg-white border border-zinc-200 flex items-center justify-between text-xs font-mono">
                     <div>
                       <span className="font-bold text-zinc-900 block font-sans">
-                        {submission.assigned_company_spoc?.name || companySpocState.name || 'No SPOC Assigned'}
+                        {adminSpoc?.name || 'Not Configured'}
                       </span>
                       <span className="text-[11px] text-zinc-500">
-                        {submission.assigned_company_spoc?.email || companySpocState.email || 'Click Change SPOC to assign an email'}
+                        {adminSpoc?.email || 'Set in Executive Telemetry'}
                       </span>
                     </div>
-                    {spocSaveSuccess ? (
-                      <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-emerald-100 text-emerald-800 font-sans">
-                        ✓ SPOC Assigned
-                      </span>
-                    ) : (
-                      <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-zinc-100 text-zinc-700 font-sans">
-                        Active Lead
+                    {adminSpoc?.email && (
+                      <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-zinc-900 text-white font-sans">
+                        Platform Lead
                       </span>
                     )}
                   </div>
-                )}
+                </div>
               </div>
 
               {/* TAB 1: Intake Application */}
