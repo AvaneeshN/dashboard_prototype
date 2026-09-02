@@ -40,7 +40,7 @@ import { motion, AnimatePresence } from 'framer-motion';
 type AdminTab = 'telemetry' | 'intakes' | 'security';
 
 export const AdminDashboard: React.FC = () => {
-  const { user, submissions, loginLogs, updateSubmissionStatus, syncDataToSupabase, assignCompanySpoc } = useStore();
+  const { user, submissions, loginLogs, updateSubmissionStatus, syncDataToSupabase, adminSpoc, setAdminSpoc } = useStore();
   const [activeTab, setActiveTab] = useState<AdminTab>('telemetry');
   const [searchQuery, setSearchQuery] = useState('');
   const [statusFilter, setStatusFilter] = useState<string>('all');
@@ -49,49 +49,36 @@ export const AdminDashboard: React.FC = () => {
   const [isSyncing, setIsSyncing] = useState(false);
   const [syncFeedback, setSyncFeedback] = useState<{ success: boolean; message: string } | null>(null);
 
-  // Admin SPOC State & Modal
+  // Dedicated Admin Organization SPOC State & Modal
   const [showAdminSpocModal, setShowAdminSpocModal] = useState(false);
-  const activeSubmissionWithSpoc = submissions.find(s => s.assigned_company_spoc?.email);
-  const currentAdminSpoc = activeSubmissionWithSpoc?.assigned_company_spoc || user?.apprenticeMetrics?.assignedCompanySpoc;
-  const [adminSpocName, setAdminSpocName] = useState(currentAdminSpoc?.name || '');
-  const [adminSpocEmail, setAdminSpocEmail] = useState(currentAdminSpoc?.email || '');
-  const [adminSpocPhone, setAdminSpocPhone] = useState(currentAdminSpoc?.phone || '');
+  const [adminSpocName, setAdminSpocName] = useState(adminSpoc?.name || '');
+  const [adminSpocEmail, setAdminSpocEmail] = useState(adminSpoc?.email || '');
+  const [adminSpocPhone, setAdminSpocPhone] = useState(adminSpoc?.phone || '');
 
-  // Synchronize when currentAdminSpoc arrives from Supabase
+  // Synchronize when adminSpoc changes
   useEffect(() => {
-    if (currentAdminSpoc?.email) {
-      setAdminSpocName(currentAdminSpoc.name || '');
-      setAdminSpocEmail(currentAdminSpoc.email || '');
-      setAdminSpocPhone(currentAdminSpoc.phone || '');
+    if (adminSpoc?.email) {
+      setAdminSpocName(adminSpoc.name || '');
+      setAdminSpocEmail(adminSpoc.email || '');
+      setAdminSpocPhone(adminSpoc.phone || '');
     }
-  }, [currentAdminSpoc?.email, currentAdminSpoc?.name, currentAdminSpoc?.phone]);
+  }, [adminSpoc?.email, adminSpoc?.name, adminSpoc?.phone]);
 
   const handleSaveAdminSpoc = (e: React.FormEvent) => {
     e.preventDefault();
     if (!adminSpocName.trim() || !adminSpocEmail.trim()) return;
 
-    if (submissions.length > 0) {
-      submissions.forEach(sub => {
-        assignCompanySpoc(sub.id, {
-          name: adminSpocName.trim(),
-          email: adminSpocEmail.trim().toLowerCase(),
-          phone: adminSpocPhone.trim(),
-          roleTitle: 'Organization SPOC'
-        });
-      });
-    } else {
-      assignCompanySpoc('', {
-        name: adminSpocName.trim(),
-        email: adminSpocEmail.trim().toLowerCase(),
-        phone: adminSpocPhone.trim(),
-        roleTitle: 'Organization SPOC'
-      });
-    }
+    setAdminSpoc({
+      name: adminSpocName.trim(),
+      email: adminSpocEmail.trim().toLowerCase(),
+      phone: adminSpocPhone.trim(),
+      roleTitle: 'Organization Operations SPOC'
+    });
 
     setShowAdminSpocModal(false);
     setSyncFeedback({
       success: true,
-      message: `Organization SPOC updated: ${adminSpocName.trim()} (${adminSpocEmail.trim().toLowerCase()}). All incoming dossiers will be sent to this email.`
+      message: `Organization SPOC updated: ${adminSpocName.trim()} (${adminSpocEmail.trim().toLowerCase()}).`
     });
     setTimeout(() => setSyncFeedback(null), 6000);
   };
@@ -302,7 +289,7 @@ export const AdminDashboard: React.FC = () => {
                       <span className="font-mono text-[11px] font-bold uppercase tracking-wider text-zinc-400">
                         Organization Operations SPOC
                       </span>
-                      {currentAdminSpoc?.email ? (
+                      {adminSpoc?.email ? (
                         <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-emerald-50 text-emerald-700 border border-emerald-200">
                           Active Dispatch Target
                         </span>
@@ -312,11 +299,11 @@ export const AdminDashboard: React.FC = () => {
                         </span>
                       )}
                     </div>
-                    {currentAdminSpoc?.email ? (
+                    {adminSpoc?.email ? (
                       <div className="mt-1">
-                        <span className="text-sm font-bold text-zinc-900">{currentAdminSpoc.name}</span>
-                        <span className="text-xs text-zinc-500 font-mono ml-2">({currentAdminSpoc.email})</span>
-                        {currentAdminSpoc.phone && <span className="text-xs text-zinc-400 ml-2">· {currentAdminSpoc.phone}</span>}
+                        <span className="text-sm font-bold text-zinc-900">{adminSpoc.name}</span>
+                        <span className="text-xs text-zinc-500 font-mono ml-2">({adminSpoc.email})</span>
+                        {adminSpoc.phone && <span className="text-xs text-zinc-400 ml-2">· {adminSpoc.phone}</span>}
                         <p className="text-xs text-zinc-500 mt-0.5">
                           All client candidate compliance dossiers, documents, and onboarding notifications are routed to this Operations SPOC.
                         </p>
@@ -332,14 +319,14 @@ export const AdminDashboard: React.FC = () => {
                 <button
                   type="button"
                   onClick={() => {
-                    setAdminSpocName(currentAdminSpoc?.name || '');
-                    setAdminSpocEmail(currentAdminSpoc?.email || '');
-                    setAdminSpocPhone(currentAdminSpoc?.phone || '');
+                    setAdminSpocName(adminSpoc?.name || '');
+                    setAdminSpocEmail(adminSpoc?.email || '');
+                    setAdminSpocPhone(adminSpoc?.phone || '');
                     setShowAdminSpocModal(true);
                   }}
                   className="px-4 py-2 rounded-full text-xs font-bold bg-black text-white hover:bg-zinc-800 transition-all cursor-pointer whitespace-nowrap self-start sm:self-center shrink-0 shadow-sm"
                 >
-                  {currentAdminSpoc?.email ? 'Edit SPOC' : 'Configure SPOC'}
+                  {adminSpoc?.email ? 'Edit SPOC' : 'Configure SPOC'}
                 </button>
               </div>
 
@@ -672,7 +659,7 @@ export const AdminDashboard: React.FC = () => {
               <div className="flex items-center justify-between">
                 <div>
                   <h3 className="text-base font-extrabold text-zinc-900">
-                    {currentAdminSpoc?.email ? 'Edit Organization SPOC' : 'Configure Organization SPOC'}
+                    {adminSpoc?.email ? 'Edit Organization SPOC' : 'Configure Organization SPOC'}
                   </h3>
                   <p className="text-xs text-zinc-500 mt-0.5">
                     Designate the primary operations email address to receive all candidate compliance dossiers and onboarding notifications.

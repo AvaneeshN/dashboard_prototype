@@ -41,6 +41,8 @@ interface AuthState {
   updateCNRemark: (remarkCode: string, summary: string, details: string, status: 'Clean / No Issues' | 'Action Required' | 'Resolved') => Promise<void>;
   triggerSPOCEmail: (candidate: ApprenticeRecord, targetSpocEmail?: string, targetSpocName?: string) => Promise<SPOCEmailLog>;
   assignCompanySpoc: (submissionId: string, spocData: { name: string; email: string; phone?: string; roleTitle?: string }) => void;
+  adminSpoc: CompanyOperationsSPOC | null;
+  setAdminSpoc: (spocData: { name: string; email: string; phone?: string; roleTitle?: string }) => void;
 }
 
 const StoreContext = createContext<AuthState | null>(null);
@@ -51,6 +53,30 @@ export const StoreProvider: React.FC<{ children: React.ReactNode }> = ({ childre
   const [profiles, setProfiles] = useState<UserProfile[]>([]);
   const [submissions, setSubmissions] = useState<FormSubmission[]>([]);
   const [loginLogs, setLoginLogs] = useState<LoginActivityLog[]>([]);
+
+  // Admin Operations SPOC State (Decoupled from individual client submissions)
+  const [adminSpoc, setAdminSpocState] = useState<CompanyOperationsSPOC | null>(() => {
+    if (typeof window !== 'undefined') {
+      try {
+        const saved = localStorage.getItem('portal_admin_organization_spoc');
+        if (saved) return JSON.parse(saved);
+      } catch (e) {}
+    }
+    return null;
+  });
+
+  const setAdminSpoc = (spocData: { name: string; email: string; phone?: string; roleTitle?: string }) => {
+    const updated: CompanyOperationsSPOC = {
+      ...spocData,
+      assignedAt: new Date().toISOString()
+    };
+    setAdminSpocState(updated);
+    if (typeof window !== 'undefined') {
+      try {
+        localStorage.setItem('portal_admin_organization_spoc', JSON.stringify(updated));
+      } catch (e) {}
+    }
+  };
 
   // Initialize ONLY from Supabase Cloud Database (0 localStorage reliance)
   useEffect(() => {
@@ -640,7 +666,7 @@ export const StoreProvider: React.FC<{ children: React.ReactNode }> = ({ childre
 
     setSubmissions(updatedSubmissions);
 
-    if (user) {
+    if (user && user.role === 'client') {
       const updatedMetrics = { 
         ...(user.apprenticeMetrics || recalculateUserMetrics(user, [], 20)), 
         assignedCompanySpoc: updatedSpoc 
@@ -1072,7 +1098,9 @@ export const StoreProvider: React.FC<{ children: React.ReactNode }> = ({ childre
         fileDBTClaim,
         updateCNRemark,
         triggerSPOCEmail,
-        assignCompanySpoc
+        assignCompanySpoc,
+        adminSpoc,
+        setAdminSpoc
       }}
     >
       {children}
