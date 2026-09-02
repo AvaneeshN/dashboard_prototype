@@ -332,6 +332,36 @@ export const StoreProvider: React.FC<{ children: React.ReactNode }> = ({ childre
       return '10000000-1000-4000-8000-' + Date.now().toString(16).padStart(12, '0').slice(-12);
     };
 
+    // 1. Check if email already exists in profiles table
+    if (isSupabaseConfigured()) {
+      try {
+        const supabase = createClient();
+        const { data: existingProfile } = await supabase
+          .from('profiles')
+          .select('id, email')
+          .eq('email', normalizedEmail)
+          .maybeSingle();
+
+        if (existingProfile) {
+          return { 
+            success: false, 
+            error: 'An account linked with this email address already exists. Please sign in instead.' 
+          };
+        }
+      } catch (checkErr) {
+        console.warn('Pre-registration profile check notice:', checkErr);
+      }
+    } else {
+      const localExisting = profiles.find(p => p.email.toLowerCase() === normalizedEmail);
+      if (localExisting) {
+        return { 
+          success: false, 
+          error: 'An account linked with this email address already exists. Please sign in instead.' 
+        };
+      }
+    }
+
+    // 2. Perform Supabase Auth Sign Up
     if (isSupabaseConfigured() && data.password) {
       try {
         const supabase = createClient();
@@ -350,8 +380,28 @@ export const StoreProvider: React.FC<{ children: React.ReactNode }> = ({ childre
 
         if (signUpError) {
           console.error('❌ Supabase auth signUp FAILED:', signUpError.message);
+          if (
+            signUpError.message?.toLowerCase().includes('already registered') || 
+            signUpError.message?.toLowerCase().includes('already exists') ||
+            signUpError.message?.toLowerCase().includes('user already exists')
+          ) {
+            return { 
+              success: false, 
+              error: 'An account linked with this email address already exists. Please sign in instead.' 
+            };
+          }
           return { success: false, error: signUpError.message };
-        } else if (signUpData?.user) {
+        }
+
+        // Supabase returns empty identities array when user already exists with confirm email ON
+        if (signUpData?.user && Array.isArray(signUpData.user.identities) && signUpData.user.identities.length === 0) {
+          return {
+            success: false,
+            error: 'An account linked with this email address already exists. Please sign in instead.'
+          };
+        }
+
+        if (signUpData?.user) {
           supabaseUserId = signUpData.user.id;
           console.log('✅ Supabase auth signUp OK, verification email dispatched to:', normalizedEmail);
         }
