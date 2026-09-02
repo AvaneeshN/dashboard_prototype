@@ -20,12 +20,23 @@ export interface UploadedDocument {
   uploadedAt: string;
 }
 
+export interface CompanyOperationsSPOC {
+  name: string;
+  email: string;
+  phone?: string;
+  roleTitle?: string;
+  assignedAt?: string;
+}
+
 export interface SPOCEmailLog {
   id: string;
   candidateId: string;
   candidateName: string;
   recipientEmail: string;
   recipientName?: string;
+  spocType?: 'company' | 'client' | 'dual';
+  companySpocEmail?: string;
+  clientSpocEmail?: string;
   companyName: string;
   subject: string;
   documentNames: string[];
@@ -81,6 +92,7 @@ export interface DBTClaimRecord {
 export interface ClientApprenticeMetrics {
   clientName: string;
   companyName: string;
+  assignedCompanySpoc?: CompanyOperationsSPOC;
   totalApprenticesEligible: number;
   currentOnboardedApprentices: number;
   remainingNumbersLeft: number;
@@ -193,6 +205,7 @@ export interface FormSubmission {
   client_name: string;
   client_email: string;
   company_name: string;
+  assigned_company_spoc?: CompanyOperationsSPOC;
   status: SubmissionStatus;
   current_step: number;
   total_steps: number;

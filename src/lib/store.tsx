@@ -39,6 +39,7 @@ interface AuthState {
   fileDBTClaim: (monthYear: string, amount: number) => Promise<DBTClaimRecord>;
   updateCNRemark: (remarkCode: string, summary: string, details: string, status: 'Clean / No Issues' | 'Action Required' | 'Resolved') => Promise<void>;
   triggerSPOCEmail: (candidate: ApprenticeRecord, targetSpocEmail?: string, targetSpocName?: string) => Promise<SPOCEmailLog>;
+  assignCompanySpoc: (submissionId: string, spocData: { name: string; email: string; phone?: string; roleTitle?: string }) => void;
 }
 
 const StoreContext = createContext<AuthState | null>(null);
@@ -430,15 +431,47 @@ export const StoreProvider: React.FC<{ children: React.ReactNode }> = ({ childre
     return updatedSubmission;
   };
 
-  // Trigger SPOC Email Dispatch Helper
+  // Assign Dedicated Company Operations SPOC
+  const assignCompanySpoc = (
+    submissionId: string,
+    spocData: { name: string; email: string; phone?: string; roleTitle?: string }
+  ) => {
+    const updatedSpoc = { ...spocData, assignedAt: new Date().toISOString() };
+    const updatedSubmissions = submissions.map(sub => {
+      if (sub.id === submissionId) {
+        return {
+          ...sub,
+          assigned_company_spoc: updatedSpoc,
+          last_active_at: new Date().toISOString()
+        };
+      }
+      return sub;
+    });
+
+    setSubmissions(updatedSubmissions);
+
+    if (user && user.apprenticeMetrics) {
+      const updatedMetrics = { ...user.apprenticeMetrics, assignedCompanySpoc: updatedSpoc };
+      const updatedUser = { ...user, apprenticeMetrics: updatedMetrics };
+      setUser(updatedUser);
+      saveState(updatedUser, updatedSubmissions);
+    } else {
+      saveState(undefined, updatedSubmissions);
+    }
+  };
+
+  // Trigger SPOC Email Dispatch Helper (Dual Dispatch: Company SPOC + Client SPOC)
   const triggerSPOCEmail = async (
     candidate: ApprenticeRecord,
     targetSpocEmail?: string,
     targetSpocName?: string
   ): Promise<SPOCEmailLog> => {
     const currentSub = getActiveClientSubmission();
-    const resolvedSpocEmail = targetSpocEmail || candidate.spocEmail || currentSub?.responses?.complianceOfficerEmail || user?.email || 'spoc@company.com';
-    const resolvedSpocName = targetSpocName || candidate.spocName || currentSub?.responses?.complianceOfficerName || 'Compliance SPOC';
+    const companySpocEmail = currentSub?.assigned_company_spoc?.email || user?.apprenticeMetrics?.assignedCompanySpoc?.email || 'ops-desk@ourcompany.com';
+    const companySpocName = currentSub?.assigned_company_spoc?.name || user?.apprenticeMetrics?.assignedCompanySpoc?.name || 'Company Operations Lead';
+
+    const clientSpocEmail = targetSpocEmail || candidate.spocEmail || currentSub?.responses?.complianceOfficerEmail || user?.email || 'client-spoc@company.com';
+    const clientSpocName = targetSpocName || candidate.spocName || currentSub?.responses?.complianceOfficerName || 'Client HR SPOC';
     const company = user?.company_name || currentSub?.company_name || 'Enterprise Client';
 
     const documentNames: string[] = [];
@@ -461,17 +494,20 @@ export const StoreProvider: React.FC<{ children: React.ReactNode }> = ({ childre
       id: `spoc-log-${Date.now()}-${Math.random().toString(36).substring(2, 5)}`,
       candidateId: candidate.id,
       candidateName: candidate.name,
-      recipientEmail: resolvedSpocEmail,
-      recipientName: resolvedSpocName,
+      recipientEmail: `${companySpocEmail} & ${clientSpocEmail}`,
+      recipientName: `${companySpocName} (Company) & ${clientSpocName} (Client)`,
+      spocType: 'dual',
+      companySpocEmail,
+      clientSpocEmail,
       companyName: company,
       subject: emailSubject,
       documentNames: documentNames.length > 0 ? documentNames : ['Aadhaar Card (.pdf)', 'Degree Certificate (.docx)', 'Bank Passbook (.pdf)'],
       sentAt: new Date().toISOString(),
       status: 'Delivered',
-      previewBodyHtml: `Automated onboarding notice for ${candidate.name}. ${documentNames.length} compliance documents attached (.pdf, .docx, .txt).`
+      previewBodyHtml: `Dual SPOC Dispatch: Sent to Company Operations (${companySpocEmail}) & Client HR (${clientSpocEmail}). ${documentNames.length} compliance documents attached.`
     };
 
-    // Try calling the Next.js API route
+    // Call Next.js API route with dual recipients
     try {
       fetch('/api/send-spoc-email', {
         method: 'POST',
@@ -479,8 +515,10 @@ export const StoreProvider: React.FC<{ children: React.ReactNode }> = ({ childre
         body: JSON.stringify({
           candidate,
           companyName: company,
-          spocEmail: resolvedSpocEmail,
-          spocName: resolvedSpocName,
+          spocEmail: `${companySpocEmail}, ${clientSpocEmail}`,
+          companySpocEmail,
+          clientSpocEmail,
+          spocName: `${companySpocName} & ${clientSpocName}`,
           documentList: newLog.documentNames
         })
       }).catch(e => console.warn('Background SPOC email trigger note:', e));
@@ -809,7 +847,8 @@ export const StoreProvider: React.FC<{ children: React.ReactNode }> = ({ childre
         processMonthlyPayrollBatch,
         fileDBTClaim,
         updateCNRemark,
-        triggerSPOCEmail
+        triggerSPOCEmail,
+        assignCompanySpoc
       }}
     >
       {children}

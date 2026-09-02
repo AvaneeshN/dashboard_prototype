@@ -1,6 +1,7 @@
 'use client';
 
 import React, { useEffect, useState } from 'react';
+import { useStore } from '@/lib/store';
 import { FormSubmission, SubmissionStatus, UploadedDocument } from '@/types';
 import { DocumentViewerModal } from '@/components/ui/DocumentViewerModal';
 import { downloadDocumentFile } from '@/lib/document-utils';
@@ -41,8 +42,19 @@ export const SubmissionDetailDrawer: React.FC<SubmissionDetailDrawerProps> = ({
   onClose,
   onStatusChange
 }) => {
+  const { assignCompanySpoc } = useStore();
   const [activeTab, setActiveTab] = useState<'application' | 'documents' | 'candidates' | 'dbt_claims' | 'spoc_logs'>('application');
   const [previewingDoc, setPreviewingDoc] = useState<any>(null);
+
+  // Company SPOC Assignment Form State
+  const [isEditingSpoc, setIsEditingSpoc] = useState(false);
+  const [companySpocState, setCompanySpocState] = useState({
+    name: submission?.assigned_company_spoc?.name || 'Rohit Kumar (Lead Operations)',
+    email: submission?.assigned_company_spoc?.email || 'rohit.ops@ourcompany.com',
+    phone: submission?.assigned_company_spoc?.phone || '+91 98111 22334',
+    roleTitle: submission?.assigned_company_spoc?.roleTitle || 'Dedicated Operations SPOC'
+  });
+  const [spocSaveSuccess, setSpocSaveSuccess] = useState(false);
 
   // Close on Escape key press
   useEffect(() => {
@@ -60,6 +72,14 @@ export const SubmissionDetailDrawer: React.FC<SubmissionDetailDrawerProps> = ({
   const candidateList = submission.candidates || [];
   const dbtClaims = submission.dbt_claims || [];
   const spocLogs = submission.spoc_logs || [];
+
+  const handleSaveCompanySpoc = () => {
+    if (!companySpocState.name || !companySpocState.email) return;
+    assignCompanySpoc(submission.id, companySpocState);
+    setIsEditingSpoc(false);
+    setSpocSaveSuccess(true);
+    setTimeout(() => setSpocSaveSuccess(false), 4000);
+  };
 
   const getStatusBadge = (status: SubmissionStatus) => {
     switch (status) {
@@ -167,6 +187,87 @@ export const SubmissionDetailDrawer: React.FC<SubmissionDetailDrawerProps> = ({
                     <option value="abandoned">Abandoned</option>
                   </select>
                 </div>
+              </div>
+
+              {/* Dedicated Company Operations SPOC Assignment Card */}
+              <div className="p-4 rounded-2xl bg-zinc-50 border border-zinc-200 space-y-3">
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-2">
+                    <User className="w-4 h-4 text-zinc-700" />
+                    <div>
+                      <h4 className="text-xs font-bold text-zinc-900 uppercase font-mono">
+                        Company Operations SPOC (Assigned)
+                      </h4>
+                      <p className="text-[11px] text-zinc-500">
+                        Receives all automated candidate onboarding dossiers and document uploads.
+                      </p>
+                    </div>
+                  </div>
+
+                  <button
+                    type="button"
+                    onClick={() => setIsEditingSpoc(!isEditingSpoc)}
+                    className="px-3 py-1 rounded-full text-xs font-bold bg-white border border-zinc-200 hover:bg-zinc-100 text-zinc-800 cursor-pointer transition-all"
+                  >
+                    {isEditingSpoc ? 'Cancel' : 'Change SPOC'}
+                  </button>
+                </div>
+
+                {isEditingSpoc ? (
+                  <div className="p-3.5 rounded-xl bg-white border border-zinc-200 space-y-2.5 text-xs">
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                      <div>
+                        <label className="block text-[11px] font-bold text-zinc-600 mb-1">SPOC Full Name *</label>
+                        <input
+                          type="text"
+                          value={companySpocState.name}
+                          onChange={(e) => setCompanySpocState({ ...companySpocState, name: e.target.value })}
+                          placeholder="e.g. Rohit Kumar"
+                          className="w-full px-3 py-1.5 rounded-xl bg-zinc-50 border border-zinc-200 text-zinc-900 font-medium text-xs focus:outline-none focus:border-black"
+                        />
+                      </div>
+                      <div>
+                        <label className="block text-[11px] font-bold text-zinc-600 mb-1">Company SPOC Email *</label>
+                        <input
+                          type="email"
+                          value={companySpocState.email}
+                          onChange={(e) => setCompanySpocState({ ...companySpocState, email: e.target.value })}
+                          placeholder="ops-desk@ourcompany.com"
+                          className="w-full px-3 py-1.5 rounded-xl bg-zinc-50 border border-zinc-200 text-zinc-900 font-medium text-xs focus:outline-none focus:border-black"
+                        />
+                      </div>
+                    </div>
+                    <div className="flex items-center justify-end gap-2 pt-1">
+                      <button
+                        type="button"
+                        onClick={handleSaveCompanySpoc}
+                        className="px-4 py-1.5 rounded-full bg-black text-white hover:bg-zinc-800 text-xs font-bold cursor-pointer transition-all shadow-xs"
+                      >
+                        Save Assigned SPOC
+                      </button>
+                    </div>
+                  </div>
+                ) : (
+                  <div className="p-3 rounded-xl bg-white border border-zinc-200 flex items-center justify-between text-xs font-mono">
+                    <div>
+                      <span className="font-bold text-zinc-900 block font-sans">
+                        {submission.assigned_company_spoc?.name || companySpocState.name}
+                      </span>
+                      <span className="text-[11px] text-zinc-500">
+                        {submission.assigned_company_spoc?.email || companySpocState.email}
+                      </span>
+                    </div>
+                    {spocSaveSuccess ? (
+                      <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-emerald-100 text-emerald-800 font-sans">
+                        ✓ SPOC Assigned
+                      </span>
+                    ) : (
+                      <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-zinc-100 text-zinc-700 font-sans">
+                        Active Lead
+                      </span>
+                    )}
+                  </div>
+                )}
               </div>
 
               {/* TAB 1: Intake Application */}
