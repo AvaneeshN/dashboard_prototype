@@ -48,8 +48,19 @@ export async function POST(request: Request) {
     const resendToken = process.env.RESEND_API_KEY;
     if (resendToken) {
       try {
-        const recipients = targetRecipient.split(',').map((e: string) => e.trim()).filter(Boolean);
+        let recipients = targetRecipient.split(',').map((e: string) => e.trim()).filter(Boolean);
         
+        // In Resend sandbox mode (from onboarding@resend.dev), filter out mock domain placeholders
+        // so emails are sent directly to the verified account owner email
+        const realRecipients = recipients.filter((e: string) => 
+          !e.includes('ourcompany.com') && 
+          !e.includes('client-spoc@company.com') && 
+          !e.includes('@portal.com')
+        );
+        if (realRecipients.length > 0) {
+          recipients = realRecipients;
+        }
+
         const resendRes = await fetch('https://api.resend.com/emails', {
           method: 'POST',
           headers: {
@@ -66,12 +77,14 @@ export async function POST(request: Request) {
 
         externalApiResponse = await resendRes.json();
         if (resendRes.ok) {
+          console.log('[OK] Resend email dispatched successfully:', externalApiResponse);
           liveDeliveryStatus = `Delivered via Resend API (ID: ${externalApiResponse.id})`;
         } else {
-          liveDeliveryStatus = `Resend Notice: ${externalApiResponse.message || 'Check Resend key or verified recipient'}`;
+          console.error('[ERROR] Resend API error response:', externalApiResponse);
+          liveDeliveryStatus = `Resend Notice: ${externalApiResponse.message || 'Check Resend configuration'}`;
         }
       } catch (err: any) {
-        console.warn('Resend live dispatch attempt:', err);
+        console.error('[ERROR] Resend live dispatch attempt failed:', err);
         liveDeliveryStatus = `Resend Error: ${err.message || 'Connection failed'}`;
       }
     }
