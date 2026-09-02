@@ -597,8 +597,11 @@ export const StoreProvider: React.FC<{ children: React.ReactNode }> = ({ childre
     spocData: { name: string; email: string; phone?: string; roleTitle?: string }
   ) => {
     const updatedSpoc = { ...spocData, assignedAt: new Date().toISOString() };
-    const updatedSubmissions = submissions.map(sub => {
-      if (sub.id === submissionId) {
+    const activeSub = getActiveClientSubmission();
+    const targetId = submissionId || activeSub?.id;
+
+    let updatedSubmissions = submissions.map(sub => {
+      if (sub.id === targetId || (user && sub.client_id === user.id)) {
         return {
           ...sub,
           assigned_company_spoc: updatedSpoc,
@@ -608,65 +611,103 @@ export const StoreProvider: React.FC<{ children: React.ReactNode }> = ({ childre
       return sub;
     });
 
-    setSubmissions(updatedSubmissions);
-
-    const targetSub = updatedSubmissions.find(s => s.id === submissionId);
-    if (targetSub) {
-      persistSubmissionToSupabase(targetSub);
+    if (user && !updatedSubmissions.some(s => s.client_id === user.id || s.client_email === user.email)) {
+      const initialSub: FormSubmission = {
+        id: targetId || `sub-${Date.now()}`,
+        client_id: user.id,
+        client_name: user.full_name,
+        client_email: user.email,
+        company_name: user.company_name || '',
+        assigned_company_spoc: updatedSpoc,
+        status: 'draft',
+        current_step: 1,
+        total_steps: 4,
+        completion_percentage: 0,
+        time_spent_seconds: 0,
+        responses: {},
+        candidates: [],
+        started_at: new Date().toISOString(),
+        last_active_at: new Date().toISOString()
+      };
+      updatedSubmissions = [initialSub, ...updatedSubmissions];
+      persistSubmissionToSupabase(initialSub);
+    } else {
+      const targetSub = updatedSubmissions.find(s => s.id === targetId || (user && s.client_id === user.id));
+      if (targetSub) {
+        persistSubmissionToSupabase(targetSub);
+      }
     }
 
-    if (user && user.apprenticeMetrics) {
-      const updatedMetrics = { ...user.apprenticeMetrics, assignedCompanySpoc: updatedSpoc };
+    setSubmissions(updatedSubmissions);
+
+    if (user) {
+      const updatedMetrics = { 
+        ...(user.apprenticeMetrics || recalculateUserMetrics(user, [], 20)), 
+        assignedCompanySpoc: updatedSpoc 
+      };
       const updatedUser = { ...user, apprenticeMetrics: updatedMetrics };
       setUser(updatedUser);
     }
   };
 
-  // Trigger SPOC Email Dispatch Helper (Dual Dispatch: Company SPOC + Client SPOC)
+  // Trigger SPOC Email Dispatch Helper
   const triggerSPOCEmail = async (
     candidate: ApprenticeRecord,
     targetSpocEmail?: string,
     targetSpocName?: string
   ): Promise<SPOCEmailLog> => {
     const currentSub = getActiveClientSubmission();
-    const companySpocEmail = currentSub?.assigned_company_spoc?.email || user?.apprenticeMetrics?.assignedCompanySpoc?.email || 'ops-desk@ourcompany.com';
-    const companySpocName = currentSub?.assigned_company_spoc?.name || user?.apprenticeMetrics?.assignedCompanySpoc?.name || 'Company Operations Lead';
+    const configuredSpocEmail = currentSub?.assigned_company_spoc?.email || user?.apprenticeMetrics?.assignedCompanySpoc?.email;
+    const configuredSpocName = currentSub?.assigned_company_spoc?.name || user?.apprenticeMetrics?.assignedCompanySpoc?.name;
 
-    const clientSpocEmail = targetSpocEmail || candidate.spocEmail || currentSub?.responses?.complianceOfficerEmail || user?.email || 'client-spoc@company.com';
-    const clientSpocName = targetSpocName || candidate.spocName || currentSub?.responses?.complianceOfficerName || 'Client HR SPOC';
+    const targetEmail = configuredSpocEmail || targetSpocEmail || candidate.spocEmail || user?.email || 'spoc@company.com';
+    const targetName = configuredSpocName || targetSpocName || candidate.spocName || 'SPOC Lead';
     const company = user?.company_name || currentSub?.company_name || 'Enterprise Client';
 
-    const documentNames: string[] = [];
-    if (candidate.documents?.aadhaarDoc?.name || candidate.documents?.aadhaarFile) {
-      documentNames.push(candidate.documents?.aadhaarDoc?.name || candidate.documents?.aadhaarFile || 'Aadhaar Card');
+    const documentItems: { name: string; url?: string }[] = [];
+    if (candidate.documents?.aadhaarDoc || candidate.documents?.aadhaarFile) {
+      documentItems.push({
+        name: candidate.documents?.aadhaarDoc?.name || candidate.documents?.aadhaarFile || 'Aadhaar Card (.pdf)',
+        url: candidate.documents?.aadhaarDoc?.storageUrl
+      });
     }
-    if (candidate.documents?.educationDoc?.name || candidate.documents?.educationFile) {
-      documentNames.push(candidate.documents?.educationDoc?.name || candidate.documents?.educationFile || 'Degree Marksheet');
+    if (candidate.documents?.educationDoc || candidate.documents?.educationFile) {
+      documentItems.push({
+        name: candidate.documents?.educationDoc?.name || candidate.documents?.educationFile || 'Degree Marksheet (.pdf)',
+        url: candidate.documents?.educationDoc?.storageUrl
+      });
     }
-    if (candidate.documents?.bankProofDoc?.name || candidate.documents?.bankProofFile) {
-      documentNames.push(candidate.documents?.bankProofDoc?.name || candidate.documents?.bankProofFile || 'Bank Passbook / Cheque');
+    if (candidate.documents?.bankProofDoc || candidate.documents?.bankProofFile) {
+      documentItems.push({
+        name: candidate.documents?.bankProofDoc?.name || candidate.documents?.bankProofFile || 'Bank Passbook / Cheque (.pdf)',
+        url: candidate.documents?.bankProofDoc?.storageUrl
+      });
     }
-    if (candidate.documents?.resumeDoc?.name || candidate.documents?.resumeFile) {
-      documentNames.push(candidate.documents?.resumeDoc?.name || candidate.documents?.resumeFile || 'Candidate Resume (.docx/.pdf)');
+    if (candidate.documents?.resumeDoc || candidate.documents?.resumeFile) {
+      documentItems.push({
+        name: candidate.documents?.resumeDoc?.name || candidate.documents?.resumeFile || 'Candidate Resume (.docx)',
+        url: candidate.documents?.resumeDoc?.storageUrl
+      });
     }
 
+    const documentNames = documentItems.map(d => d.name);
     const emailSubject = `[Onboarding Dossier] New Candidate ${candidate.name} (${candidate.tradeOrRole}) - ${company}`;
 
     const newLog: SPOCEmailLog = {
       id: `spoc-log-${Date.now()}-${Math.random().toString(36).substring(2, 5)}`,
       candidateId: candidate.id,
       candidateName: candidate.name,
-      recipientEmail: `${companySpocEmail} & ${clientSpocEmail}`,
-      recipientName: `${companySpocName} (Company) & ${clientSpocName} (Client)`,
+      recipientEmail: targetEmail,
+      recipientName: targetName,
       spocType: 'dual',
-      companySpocEmail,
-      clientSpocEmail,
+      companySpocEmail: targetEmail,
+      clientSpocEmail: targetEmail,
       companyName: company,
       subject: emailSubject,
       documentNames: documentNames.length > 0 ? documentNames : ['Aadhaar Card (.pdf)', 'Degree Certificate (.docx)', 'Bank Passbook (.pdf)'],
       sentAt: new Date().toISOString(),
       status: 'Delivered',
-      previewBodyHtml: `Dual SPOC Dispatch: Sent to Company Operations (${companySpocEmail}) & Client HR (${clientSpocEmail}). ${documentNames.length} compliance documents attached.`
+      previewBodyHtml: `Candidate onboarding notification dispatched to ${targetEmail} with ${documentItems.length} compliance documents.`
     };
 
     try {
@@ -676,11 +717,9 @@ export const StoreProvider: React.FC<{ children: React.ReactNode }> = ({ childre
         body: JSON.stringify({
           candidate,
           companyName: company,
-          spocEmail: `${companySpocEmail}, ${clientSpocEmail}`,
-          companySpocEmail,
-          clientSpocEmail,
-          spocName: `${companySpocName} & ${clientSpocName}`,
-          documentList: newLog.documentNames
+          spocEmail: targetEmail,
+          spocName: targetName,
+          documentList: documentItems
         })
       }).catch(e => console.warn('Background SPOC email trigger note:', e));
     } catch (err) {

@@ -157,17 +157,72 @@ export const downloadDocumentFile = (doc: {
   setTimeout(() => URL.revokeObjectURL(url), 1000);
 };
 
+export interface SPOCEmailDocument {
+  name: string;
+  url?: string;
+  category?: string;
+}
+
 /**
  * Generates an official SPOC Email notification template
  */
 export const generateSPOCEmailHtml = (params: {
   candidate: ApprenticeRecord;
   companyName: string;
-  spocName: string;
-  spocEmail: string;
-  documentList: string[];
+  spocName?: string;
+  spocEmail?: string;
+  documentList?: (string | SPOCEmailDocument)[];
 }) => {
-  const { candidate, companyName, spocName, spocEmail, documentList } = params;
+  const { candidate, companyName, documentList = [] } = params;
+
+  // Resolve documents with storage download URLs
+  const docsToRender: SPOCEmailDocument[] = [];
+
+  if (documentList.length > 0) {
+    documentList.forEach(item => {
+      if (typeof item === 'string') {
+        let matchedUrl: string | undefined;
+        if (candidate?.documents) {
+          const allDocs = [
+            candidate.documents.aadhaarDoc,
+            candidate.documents.educationDoc,
+            candidate.documents.bankProofDoc,
+            candidate.documents.resumeDoc
+          ].filter(Boolean);
+          const found = allDocs.find(d => d?.name === item);
+          matchedUrl = found?.storageUrl;
+        }
+        docsToRender.push({ name: item, url: matchedUrl });
+      } else {
+        docsToRender.push(item);
+      }
+    });
+  } else if (candidate?.documents) {
+    if (candidate.documents.aadhaarDoc || candidate.documents.aadhaarFile) {
+      docsToRender.push({
+        name: candidate.documents.aadhaarDoc?.name || candidate.documents.aadhaarFile || 'Aadhaar Card.pdf',
+        url: candidate.documents.aadhaarDoc?.storageUrl
+      });
+    }
+    if (candidate.documents.educationDoc || candidate.documents.educationFile) {
+      docsToRender.push({
+        name: candidate.documents.educationDoc?.name || candidate.documents.educationFile || 'Degree Marksheet.pdf',
+        url: candidate.documents.educationDoc?.storageUrl
+      });
+    }
+    if (candidate.documents.bankProofDoc || candidate.documents.bankProofFile) {
+      docsToRender.push({
+        name: candidate.documents.bankProofDoc?.name || candidate.documents.bankProofFile || 'Bank Passbook.pdf',
+        url: candidate.documents.bankProofDoc?.storageUrl
+      });
+    }
+    if (candidate.documents.resumeDoc || candidate.documents.resumeFile) {
+      docsToRender.push({
+        name: candidate.documents.resumeDoc?.name || candidate.documents.resumeFile || 'Candidate Resume.docx',
+        url: candidate.documents.resumeDoc?.storageUrl
+      });
+    }
+  }
   
   return `
     <div style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; max-width: 600px; margin: 0 auto; padding: 24px; background: #ffffff; border: 1px solid #e4e4e7; border-radius: 12px; color: #18181b;">
@@ -175,12 +230,12 @@ export const generateSPOCEmailHtml = (params: {
         <h2 style="font-size: 18px; font-weight: 700; color: #18181b; margin: 0;">Candidate Onboarding Notification</h2>
       </div>
 
-      <p style="font-size: 14px; line-height: 1.6; color: #3f3f46;">
-        Dear <strong>${spocName || 'SPOC'}</strong> (${spocEmail}),
+      <p style="font-size: 14px; line-height: 1.6; color: #3f3f46; margin: 0 0 10px 0;">
+        Hello,
       </p>
 
-      <p style="font-size: 13px; line-height: 1.6; color: #52525b;">
-        A new candidate has been onboarded${companyName ? ` for <strong>${companyName}</strong>` : ''}. The details and compliance documentation have been submitted.
+      <p style="font-size: 13px; line-height: 1.6; color: #52525b; margin: 0 0 16px 0;">
+        A new candidate has been onboarded${companyName ? ` for <strong>${companyName}</strong>` : ''}. The candidate details and uploaded compliance documentation are provided below.
       </p>
 
       <div style="background: #fafafa; border: 1px solid #e4e4e7; border-radius: 8px; padding: 16px; margin: 20px 0;">
@@ -214,10 +269,22 @@ export const generateSPOCEmailHtml = (params: {
       </div>
 
       <div style="margin: 20px 0;">
-        <h4 style="font-size: 12px; font-weight: 700; text-transform: uppercase; color: #18181b; margin-bottom: 8px;">Attached Documents (${documentList.length}):</h4>
-        <ul style="margin: 0; padding-left: 20px; font-size: 12px; color: #3f3f46; line-height: 1.8;">
-          ${documentList.map(doc => `<li><strong>${doc}</strong></li>`).join('')}
-        </ul>
+        <h4 style="font-size: 12px; font-weight: 700; text-transform: uppercase; color: #18181b; margin-bottom: 10px;">Attached Compliance Documents (${docsToRender.length}):</h4>
+        <table style="width: 100%; font-size: 12px; border-collapse: collapse;">
+          ${docsToRender.map(doc => `
+            <tr>
+              <td style="padding: 8px 12px; border: 1px solid #e4e4e7; background: #fafafa; font-weight: 600; color: #18181b;">
+                ${doc.name}
+              </td>
+              <td style="padding: 8px 12px; border: 1px solid #e4e4e7; text-align: right; background: #ffffff;">
+                ${doc.url 
+                  ? `<a href="${doc.url}" target="_blank" download style="color: #2563eb; text-decoration: underline; font-weight: 600;">View / Download &rarr;</a>` 
+                  : `<span style="color: #a1a1aa;">Stored on Portal</span>`
+                }
+              </td>
+            </tr>
+          `).join('')}
+        </table>
       </div>
 
       <div style="border-top: 1px solid #e4e4e7; padding-top: 14px; margin-top: 24px; font-size: 11px; color: #a1a1aa; text-align: center;">

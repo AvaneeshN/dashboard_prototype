@@ -23,7 +23,9 @@ import {
   BarChart2,
   FileSpreadsheet,
   LayoutDashboard,
-  ArrowUpRight
+  ArrowUpRight,
+  Mail,
+  X
 } from 'lucide-react';
 import { 
   ResponsiveContainer, 
@@ -38,7 +40,7 @@ import { motion, AnimatePresence } from 'framer-motion';
 type AdminTab = 'telemetry' | 'intakes' | 'security';
 
 export const AdminDashboard: React.FC = () => {
-  const { submissions, loginLogs, updateSubmissionStatus, syncDataToSupabase } = useStore();
+  const { user, submissions, loginLogs, updateSubmissionStatus, syncDataToSupabase, assignCompanySpoc } = useStore();
   const [activeTab, setActiveTab] = useState<AdminTab>('telemetry');
   const [searchQuery, setSearchQuery] = useState('');
   const [statusFilter, setStatusFilter] = useState<string>('all');
@@ -46,6 +48,44 @@ export const AdminDashboard: React.FC = () => {
   const [logFilter, setLogFilter] = useState<'all' | 'failed' | 'success'>('all');
   const [isSyncing, setIsSyncing] = useState(false);
   const [syncFeedback, setSyncFeedback] = useState<{ success: boolean; message: string } | null>(null);
+
+  // Admin SPOC State & Modal
+  const [showAdminSpocModal, setShowAdminSpocModal] = useState(false);
+  const activeSubmissionWithSpoc = submissions.find(s => s.assigned_company_spoc?.email);
+  const currentAdminSpoc = activeSubmissionWithSpoc?.assigned_company_spoc || user?.apprenticeMetrics?.assignedCompanySpoc;
+  const [adminSpocName, setAdminSpocName] = useState(currentAdminSpoc?.name || '');
+  const [adminSpocEmail, setAdminSpocEmail] = useState(currentAdminSpoc?.email || '');
+  const [adminSpocPhone, setAdminSpocPhone] = useState(currentAdminSpoc?.phone || '');
+
+  const handleSaveAdminSpoc = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!adminSpocName.trim() || !adminSpocEmail.trim()) return;
+
+    if (submissions.length > 0) {
+      submissions.forEach(sub => {
+        assignCompanySpoc(sub.id, {
+          name: adminSpocName.trim(),
+          email: adminSpocEmail.trim().toLowerCase(),
+          phone: adminSpocPhone.trim(),
+          roleTitle: 'Organization SPOC'
+        });
+      });
+    } else {
+      assignCompanySpoc('', {
+        name: adminSpocName.trim(),
+        email: adminSpocEmail.trim().toLowerCase(),
+        phone: adminSpocPhone.trim(),
+        roleTitle: 'Organization SPOC'
+      });
+    }
+
+    setShowAdminSpocModal(false);
+    setSyncFeedback({
+      success: true,
+      message: `Organization SPOC updated: ${adminSpocName.trim()} (${adminSpocEmail.trim().toLowerCase()}). All incoming dossiers will be sent to this email.`
+    });
+    setTimeout(() => setSyncFeedback(null), 6000);
+  };
 
   const handleSupabaseSync = async () => {
     setIsSyncing(true);
@@ -242,6 +282,58 @@ export const AdminDashboard: React.FC = () => {
               transition={{ duration: 0.2 }}
               className="space-y-6"
             >
+              {/* Primary Operations SPOC Card */}
+              <div className="p-5 sm:p-6 rounded-3xl bg-white border border-zinc-200 shadow-sm flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+                <div className="flex items-start sm:items-center gap-3.5">
+                  <div className="w-10 h-10 rounded-2xl bg-zinc-100 border border-zinc-200 flex items-center justify-center shrink-0">
+                    <Mail className="w-5 h-5 text-zinc-700" />
+                  </div>
+                  <div>
+                    <div className="flex items-center gap-2">
+                      <span className="font-mono text-[11px] font-bold uppercase tracking-wider text-zinc-400">
+                        Organization Operations SPOC
+                      </span>
+                      {currentAdminSpoc?.email ? (
+                        <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-emerald-50 text-emerald-700 border border-emerald-200">
+                          Active Dispatch Target
+                        </span>
+                      ) : (
+                        <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-amber-50 text-amber-700 border border-amber-200">
+                          Configuration Needed
+                        </span>
+                      )}
+                    </div>
+                    {currentAdminSpoc?.email ? (
+                      <div className="mt-1">
+                        <span className="text-sm font-bold text-zinc-900">{currentAdminSpoc.name}</span>
+                        <span className="text-xs text-zinc-500 font-mono ml-2">({currentAdminSpoc.email})</span>
+                        {currentAdminSpoc.phone && <span className="text-xs text-zinc-400 ml-2">· {currentAdminSpoc.phone}</span>}
+                        <p className="text-xs text-zinc-500 mt-0.5">
+                          All client candidate compliance dossiers, documents, and onboarding notifications are routed to this Operations SPOC.
+                        </p>
+                      </div>
+                    ) : (
+                      <p className="text-xs text-zinc-600 mt-1">
+                        Please designate an Operations SPOC. All incoming candidate dossiers and document alerts will be dispatched to this email address.
+                      </p>
+                    )}
+                  </div>
+                </div>
+
+                <button
+                  type="button"
+                  onClick={() => {
+                    setAdminSpocName(currentAdminSpoc?.name || '');
+                    setAdminSpocEmail(currentAdminSpoc?.email || '');
+                    setAdminSpocPhone(currentAdminSpoc?.phone || '');
+                    setShowAdminSpocModal(true);
+                  }}
+                  className="px-4 py-2 rounded-full text-xs font-bold bg-black text-white hover:bg-zinc-800 transition-all cursor-pointer whitespace-nowrap self-start sm:self-center shrink-0 shadow-sm"
+                >
+                  {currentAdminSpoc?.email ? 'Edit SPOC' : 'Configure SPOC'}
+                </button>
+              </div>
+
               {/* Executive Grid Stat Row */}
               <div className="grid grid-cols-1 sm:grid-cols-4 border border-zinc-200 rounded-3xl bg-white overflow-hidden shadow-sm divide-y sm:divide-y-0 sm:divide-x divide-zinc-200">
                 <div className="p-6">
@@ -557,6 +649,99 @@ export const AdminDashboard: React.FC = () => {
           }
         }}
       />
+
+      {/* Admin SPOC Configuration Modal */}
+      <AnimatePresence>
+        {showAdminSpocModal && (
+          <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-xs">
+            <motion.div
+              initial={{ opacity: 0, scale: 0.95 }}
+              animate={{ opacity: 1, scale: 1 }}
+              exit={{ opacity: 0, scale: 0.95 }}
+              className="bg-white rounded-3xl border border-zinc-200 shadow-2xl p-6 sm:p-8 max-w-md w-full space-y-6"
+            >
+              <div className="flex items-center justify-between">
+                <div>
+                  <h3 className="text-base font-extrabold text-zinc-900">
+                    {currentAdminSpoc?.email ? 'Edit Organization SPOC' : 'Configure Organization SPOC'}
+                  </h3>
+                  <p className="text-xs text-zinc-500 mt-0.5">
+                    Designate the primary operations email address to receive all candidate compliance dossiers and onboarding notifications.
+                  </p>
+                </div>
+                <button
+                  onClick={() => setShowAdminSpocModal(false)}
+                  className="text-zinc-400 hover:text-black cursor-pointer p-1"
+                >
+                  <X className="w-5 h-5" />
+                </button>
+              </div>
+
+              <form onSubmit={handleSaveAdminSpoc} className="space-y-4">
+                <div>
+                  <label className="block text-xs font-bold text-zinc-700 mb-1">
+                    Operations SPOC Full Name <span className="text-red-500">*</span>
+                  </label>
+                  <input
+                    type="text"
+                    required
+                    value={adminSpocName}
+                    onChange={(e) => setAdminSpocName(e.target.value)}
+                    placeholder="e.g. Rahul Sharma"
+                    className="w-full px-4 py-2.5 rounded-xl border border-zinc-300 text-xs text-zinc-900 focus:outline-hidden focus:border-black transition-colors"
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-xs font-bold text-zinc-700 mb-1">
+                    Operations Notification Email <span className="text-red-500">*</span>
+                  </label>
+                  <input
+                    type="email"
+                    required
+                    value={adminSpocEmail}
+                    onChange={(e) => setAdminSpocEmail(e.target.value)}
+                    placeholder="e.g. operations@company.com"
+                    className="w-full px-4 py-2.5 rounded-xl border border-zinc-300 text-xs text-zinc-900 focus:outline-hidden focus:border-black transition-colors"
+                  />
+                  <span className="text-[11px] text-zinc-400 mt-1 block">
+                    All candidate onboarding dossiers and compliance files will be automatically delivered to this email.
+                  </span>
+                </div>
+
+                <div>
+                  <label className="block text-xs font-bold text-zinc-700 mb-1">
+                    Phone Number (Optional)
+                  </label>
+                  <input
+                    type="tel"
+                    value={adminSpocPhone}
+                    onChange={(e) => setAdminSpocPhone(e.target.value)}
+                    placeholder="e.g. +91 98765 43210"
+                    className="w-full px-4 py-2.5 rounded-xl border border-zinc-300 text-xs text-zinc-900 focus:outline-hidden focus:border-black transition-colors"
+                  />
+                </div>
+
+                <div className="flex items-center justify-end gap-3 pt-3 border-t border-zinc-200">
+                  <button
+                    type="button"
+                    onClick={() => setShowAdminSpocModal(false)}
+                    className="px-4 py-2 rounded-full text-xs font-bold text-zinc-600 hover:text-black cursor-pointer"
+                  >
+                    Cancel
+                  </button>
+                  <button
+                    type="submit"
+                    className="px-5 py-2 rounded-full text-xs font-bold bg-black text-white hover:bg-zinc-800 transition-all cursor-pointer shadow-sm"
+                  >
+                    Save Operations SPOC
+                  </button>
+                </div>
+              </form>
+            </motion.div>
+          </div>
+        )}
+      </AnimatePresence>
 
     </div>
   );
