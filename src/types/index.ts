@@ -16,6 +16,7 @@ export interface UploadedDocument {
   category: 'Aadhaar' | 'Education' | 'Bank Proof' | 'Resume' | 'COI' | 'GST' | 'Signatory Letter' | 'Cheque' | 'General';
   sizeFormatted: string;
   dataUrl?: string;
+  storageUrl?: string;
   textContent?: string;
   uploadedAt: string;
 }

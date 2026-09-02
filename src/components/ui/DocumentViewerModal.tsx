@@ -24,6 +24,7 @@ interface DocumentViewerModalProps {
     sizeFormatted?: string;
     textContent?: string;
     dataUrl?: string;
+    storageUrl?: string;
     uploadedAt?: string;
   } | null;
   onClose: () => void;

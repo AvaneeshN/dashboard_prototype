@@ -31,6 +31,7 @@ import {
   ChevronDown
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
+import { processUploadedFile } from '@/lib/document-utils';
 
 interface RoleCategory {
   category: string;
@@ -909,10 +910,15 @@ export const ClientIntakeWizard: React.FC = () => {
                         <input
                           type="file"
                           className="hidden"
-                          onChange={(e) => {
+                          onChange={async (e) => {
                             if (e.target.files?.[0]) {
-                              const name = e.target.files[0].name;
-                              updateField('companyDocs', { ...(formData.companyDocs || {}), coiFileName: name });
+                              const file = e.target.files[0];
+                              const doc = await processUploadedFile(file, 'COI');
+                              updateField('companyDocs', { 
+                                ...(formData.companyDocs || {}), 
+                                coiFileName: file.name,
+                                coiDoc: doc 
+                              });
                             }
                           }}
                         />
@@ -937,10 +943,15 @@ export const ClientIntakeWizard: React.FC = () => {
                         <input
                           type="file"
                           className="hidden"
-                          onChange={(e) => {
+                          onChange={async (e) => {
                             if (e.target.files?.[0]) {
-                              const name = e.target.files[0].name;
-                              updateField('companyDocs', { ...(formData.companyDocs || {}), gstFileName: name });
+                              const file = e.target.files[0];
+                              const doc = await processUploadedFile(file, 'GST');
+                              updateField('companyDocs', { 
+                                ...(formData.companyDocs || {}), 
+                                gstFileName: file.name,
+                                gstDoc: doc 
+                              });
                             }
                           }}
                         />
@@ -965,10 +976,15 @@ export const ClientIntakeWizard: React.FC = () => {
                         <input
                           type="file"
                           className="hidden"
-                          onChange={(e) => {
+                          onChange={async (e) => {
                             if (e.target.files?.[0]) {
-                              const name = e.target.files[0].name;
-                              updateField('companyDocs', { ...(formData.companyDocs || {}), signatoryLetterFileName: name });
+                              const file = e.target.files[0];
+                              const doc = await processUploadedFile(file, 'Signatory Letter');
+                              updateField('companyDocs', { 
+                                ...(formData.companyDocs || {}), 
+                                signatoryLetterFileName: file.name,
+                                signatoryDoc: doc 
+                              });
                             }
                           }}
                         />
@@ -993,10 +1009,15 @@ export const ClientIntakeWizard: React.FC = () => {
                         <input
                           type="file"
                           className="hidden"
-                          onChange={(e) => {
+                          onChange={async (e) => {
                             if (e.target.files?.[0]) {
-                              const name = e.target.files[0].name;
-                              updateField('companyDocs', { ...(formData.companyDocs || {}), cancelledChequeFileName: name });
+                              const file = e.target.files[0];
+                              const doc = await processUploadedFile(file, 'Cheque');
+                              updateField('companyDocs', { 
+                                ...(formData.companyDocs || {}), 
+                                cancelledChequeFileName: file.name,
+                                chequeDoc: doc 
+                              });
                             }
                           }}
                         />

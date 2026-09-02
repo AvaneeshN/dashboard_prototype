@@ -1,7 +1,42 @@
 import { UploadedDocument, ApprenticeRecord } from '@/types';
+import { createClient, isSupabaseConfigured } from '@/lib/supabase/client';
 
 /**
- * Parses any File object (.pdf, .docx, .txt, image) into an UploadedDocument structure
+ * Uploads a file to Supabase Storage and returns the public URL, or null on failure.
+ * Can be used standalone (e.g. by the intake wizard for company document uploads).
+ */
+export const uploadFileToSupabaseStorage = async (
+  file: File,
+  path: string
+): Promise<string | null> => {
+  try {
+    if (!isSupabaseConfigured()) return null;
+
+    const supabase = createClient();
+    const { error: uploadError } = await supabase.storage
+      .from('documents')
+      .upload(path, file, { cacheControl: '3600', upsert: true });
+
+    if (uploadError) {
+      console.error('Supabase Storage upload failed:', uploadError.message);
+      return null;
+    }
+
+    const { data: urlData } = supabase.storage
+      .from('documents')
+      .getPublicUrl(path);
+
+    return urlData?.publicUrl || null;
+  } catch (err) {
+    console.error('Supabase Storage upload error:', err);
+    return null;
+  }
+};
+
+/**
+ * Parses any File object (.pdf, .docx, .txt, image) into an UploadedDocument structure.
+ * When Supabase is configured, the file is also uploaded to the `documents` bucket
+ * and the public URL is stored in `storageUrl`.
  */
 export const processUploadedFile = async (
   file: File,
@@ -41,23 +76,49 @@ export const processUploadedFile = async (
     console.warn('File read notice:', err);
   }
 
+  const docId = `doc-${Date.now()}-${Math.random().toString(36).substring(2, 6)}`;
+
+  // Attempt Supabase Storage upload
+  let storageUrl: string | undefined;
+  if (isSupabaseConfigured()) {
+    try {
+      const sanitizedFileName = file.name.replace(/\s+/g, '_');
+      const storagePath = `${category}/${docId}_${sanitizedFileName}`;
+      const publicUrl = await uploadFileToSupabaseStorage(file, storagePath);
+      if (publicUrl) {
+        storageUrl = publicUrl;
+      }
+    } catch (err) {
+      console.error('Supabase Storage upload failed, falling back to dataUrl:', err);
+    }
+  }
+
+  // If file is large (>= 500KB) and we have a storageUrl, drop the dataUrl to save JSONB space
+  const FILE_SIZE_THRESHOLD_KB = 500;
+  if (storageUrl && sizeInKb >= FILE_SIZE_THRESHOLD_KB) {
+    dataUrl = '';
+  }
+
   return {
-    id: `doc-${Date.now()}-${Math.random().toString(36).substring(2, 6)}`,
+    id: docId,
     name: file.name,
     type: docType,
     category,
     sizeFormatted,
     dataUrl,
+    storageUrl,
     textContent: textContent || `[Uploaded file: ${file.name} (${sizeFormatted})]`,
     uploadedAt: new Date().toISOString()
   };
 };
 
 /**
- * Triggers a 1-click browser download of an UploadedDocument
+ * Triggers a 1-click browser download of an UploadedDocument.
+ * Prefers storageUrl (opens in new tab), then dataUrl download, then text content blob.
  */
 export const downloadDocumentFile = (doc: {
   name: string;
+  storageUrl?: string;
   dataUrl?: string;
   textContent?: string;
   type?: string;
@@ -66,6 +127,13 @@ export const downloadDocumentFile = (doc: {
 
   const fileName = doc.name || 'document.pdf';
 
+  // 1. If a Supabase Storage URL exists, open it in a new tab
+  if (doc.storageUrl) {
+    window.open(doc.storageUrl, '_blank');
+    return;
+  }
+
+  // 2. Fall back to dataUrl-based download
   if (doc.dataUrl && doc.dataUrl.startsWith('data:')) {
     const link = document.createElement('a');
     link.href = doc.dataUrl;
@@ -76,7 +144,7 @@ export const downloadDocumentFile = (doc: {
     return;
   }
 
-  // Fallback blob generation from text content or placeholder
+  // 3. Fallback blob generation from text content or placeholder
   const content = doc.textContent || `Document: ${fileName}\nStatus: Verified\nTimestamp: ${new Date().toLocaleString()}`;
   const blob = new Blob([content], { type: 'text/plain;charset=utf-8' });
   const url = URL.createObjectURL(blob);
