@@ -29,8 +29,8 @@ export const AuthGateway: React.FC = () => {
   const [authAction, setAuthAction] = useState<'signin' | 'register'>('signin');
   const [sweepDirection, setSweepDirection] = useState<number>(1);
   
-  const [email, setEmail] = useState('alex@novatech.io');
-  const [password, setPassword] = useState('password123');
+  const [email, setEmail] = useState('');
+  const [password, setPassword] = useState('');
   const [fullName, setFullName] = useState('');
   const [companyName, setCompanyName] = useState('');
   const [phone, setPhone] = useState('');
@@ -50,8 +50,8 @@ export const AuthGateway: React.FC = () => {
       setEmail('admin@company.com');
       setPassword('admin123');
     } else {
-      setEmail('alex@novatech.io');
-      setPassword('password123');
+      setEmail('');
+      setPassword('');
     }
   };
 
@@ -424,32 +424,27 @@ export const AuthGateway: React.FC = () => {
                   </div>
 
                   {portalType === 'client' ? (
-                    <div className="flex flex-wrap gap-1.5">
-                      <button
-                        type="button"
-                        onClick={() => {
-                          setEmail('alex@novatech.io');
-                          setPassword('password123');
-                        }}
-                        className="px-3 py-1 rounded-full bg-zinc-100 hover:bg-zinc-200 text-zinc-800 text-[11px] font-semibold border border-zinc-200 transition-all cursor-pointer flex items-center gap-1"
-                      >
-                        <span>NovaTech (Alex)</span>
-                      </button>
-
-                      {submissions.filter(s => s.client_email && s.client_email !== 'alex@novatech.io').slice(0, 2).map(s => (
-                        <button
-                          key={s.id}
-                          type="button"
-                          onClick={() => {
-                            setEmail(s.client_email);
-                            setPassword('password123');
-                          }}
-                          className="px-3 py-1 rounded-full bg-zinc-100 hover:bg-zinc-200 text-zinc-800 text-[11px] font-semibold border border-zinc-200 transition-all cursor-pointer truncate max-w-[160px]"
-                        >
-                          <span>{s.company_name || s.client_name}</span>
-                        </button>
-                      ))}
-                    </div>
+                    submissions.length > 0 ? (
+                      <div className="flex flex-wrap gap-1.5">
+                        {submissions.map(s => (
+                          <button
+                            key={s.id}
+                            type="button"
+                            onClick={() => {
+                              setEmail(s.client_email);
+                              setPassword('password123');
+                            }}
+                            className="px-3 py-1 rounded-full bg-zinc-100 hover:bg-zinc-200 text-zinc-800 text-[11px] font-semibold border border-zinc-200 transition-all cursor-pointer truncate max-w-[180px]"
+                          >
+                            <span>{s.company_name || s.client_name}</span>
+                          </button>
+                        ))}
+                      </div>
+                    ) : (
+                      <p className="text-[11px] text-zinc-400 italic">
+                        No client accounts registered yet. Use <strong className="text-zinc-600 font-medium">Register ↗</strong> above to create a fresh account.
+                      </p>
+                    )
                   ) : (
                     <div className="flex items-center gap-2">
                       <button
