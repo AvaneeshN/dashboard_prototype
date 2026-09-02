@@ -1299,6 +1299,44 @@ export const ClientDashboard: React.FC = () => {
                         </div>
                       )}
                     </div>
+
+                    {/* Monthly Stipend & Joining Date (Pre-filled from Intake with edit option) */}
+                    <div>
+                      <div className="flex items-center justify-between mb-1">
+                        <label className="block font-bold text-zinc-700 text-xs">Monthly Stipend (₹) *</label>
+                        {activeSubmission?.responses?.stipendPerApprentice && (
+                          <span className="text-[10px] text-zinc-400 font-mono">Intake default</span>
+                        )}
+                      </div>
+                      <input
+                        type="number"
+                        required
+                        step={500}
+                        min={1000}
+                        value={candidateForm.stipendAmount ?? ''}
+                        onChange={(e) => {
+                          const val = e.target.value === '' ? '' : parseInt(e.target.value, 10) || 0;
+                          setCandidateForm({ ...candidateForm, stipendAmount: val as number });
+                        }}
+                        className="w-full px-3 py-2 rounded-2xl bg-zinc-50 border border-zinc-200 text-zinc-900 text-xs focus:outline-none focus:border-black font-bold"
+                      />
+                    </div>
+
+                    <div>
+                      <div className="flex items-center justify-between mb-1">
+                        <label className="block font-bold text-zinc-700 text-xs">Joining Date *</label>
+                        {activeSubmission?.responses?.proposedJoiningDate && (
+                          <span className="text-[10px] text-zinc-400 font-mono">Intake default</span>
+                        )}
+                      </div>
+                      <input
+                        type="date"
+                        required
+                        value={candidateForm.joiningDate}
+                        onChange={(e) => setCandidateForm({ ...candidateForm, joiningDate: e.target.value })}
+                        className="w-full px-3 py-2 rounded-2xl bg-zinc-50 border border-zinc-200 text-zinc-900 text-xs focus:outline-none focus:border-black font-bold"
+                      />
+                    </div>
                   </div>
                 </div>
 
