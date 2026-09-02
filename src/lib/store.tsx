@@ -505,6 +505,22 @@ export const StoreProvider: React.FC<{ children: React.ReactNode }> = ({ childre
     return updatedSubmission;
   };
 
+  // Helper to persist any updated FormSubmission directly to Supabase
+  const persistSubmissionToSupabase = async (submission: FormSubmission) => {
+    if (!isSupabaseConfigured()) return;
+    try {
+      const supabase = createClient();
+      const { error: upsertError } = await supabase.from('form_submissions').upsert([submission]);
+      if (upsertError) {
+        console.error('❌ Supabase form_submissions update FAILED:', upsertError.message, upsertError.details);
+      } else {
+        console.log('✅ Supabase form_submissions updated for:', submission.id);
+      }
+    } catch (err) {
+      console.error('❌ Supabase update exception:', err);
+    }
+  };
+
   // Assign Dedicated Company Operations SPOC
   const assignCompanySpoc = (
     submissionId: string,
@@ -523,6 +539,11 @@ export const StoreProvider: React.FC<{ children: React.ReactNode }> = ({ childre
     });
 
     setSubmissions(updatedSubmissions);
+
+    const targetSub = updatedSubmissions.find(s => s.id === submissionId);
+    if (targetSub) {
+      persistSubmissionToSupabase(targetSub);
+    }
 
     if (user && user.apprenticeMetrics) {
       const updatedMetrics = { ...user.apprenticeMetrics, assignedCompanySpoc: updatedSpoc };
@@ -639,6 +660,7 @@ export const StoreProvider: React.FC<{ children: React.ReactNode }> = ({ childre
         const updatedSubmissions = submissions.map(s => s.id === currentSub.id ? updatedSub : s);
         setSubmissions(updatedSubmissions);
         saveState(updatedUser, updatedSubmissions);
+        persistSubmissionToSupabase(updatedSub);
       } else {
         saveState(updatedUser);
       }
@@ -670,6 +692,7 @@ export const StoreProvider: React.FC<{ children: React.ReactNode }> = ({ childre
         const updatedSubmissions = submissions.map(s => s.id === currentSub.id ? updatedSub : s);
         setSubmissions(updatedSubmissions);
         saveState(updatedUser, updatedSubmissions);
+        persistSubmissionToSupabase(updatedSub);
       } else {
         saveState(updatedUser);
       }
@@ -699,6 +722,7 @@ export const StoreProvider: React.FC<{ children: React.ReactNode }> = ({ childre
         const updatedSubmissions = submissions.map(s => s.id === currentSub.id ? updatedSub : s);
         setSubmissions(updatedSubmissions);
         saveState(updatedUser, updatedSubmissions);
+        persistSubmissionToSupabase(updatedSub);
       } else {
         saveState(updatedUser);
       }
@@ -769,11 +793,13 @@ export const StoreProvider: React.FC<{ children: React.ReactNode }> = ({ childre
       if (currentSub) {
         const updatedSub: FormSubmission = {
           ...currentSub,
-          dbt_claims: updatedHistory
+          dbt_claims: updatedHistory,
+          last_active_at: new Date().toISOString()
         };
         const updatedSubmissions = submissions.map(s => s.id === currentSub.id ? updatedSub : s);
         setSubmissions(updatedSubmissions);
         saveState(updatedUser, updatedSubmissions);
+        persistSubmissionToSupabase(updatedSub);
       } else {
         saveState(updatedUser);
       }
@@ -833,6 +859,7 @@ export const StoreProvider: React.FC<{ children: React.ReactNode }> = ({ childre
     const updatedSubmissions = [abandonedSubmission, ...filtered];
     setSubmissions(updatedSubmissions);
     saveState(undefined, updatedSubmissions);
+    persistSubmissionToSupabase(abandonedSubmission);
   };
 
   const updateSubmissionStatus = (submissionId: string, status: SubmissionStatus) => {
@@ -850,13 +877,9 @@ export const StoreProvider: React.FC<{ children: React.ReactNode }> = ({ childre
     setSubmissions(updated);
     saveState(undefined, updated);
 
-    if (isSupabaseConfigured()) {
-      try {
-        const supabase = createClient();
-        supabase.from('form_submissions').update({ status }).eq('id', submissionId).then();
-      } catch (err) {
-        console.warn('Supabase status update error:', err);
-      }
+    const target = updated.find(s => s.id === submissionId);
+    if (target) {
+      persistSubmissionToSupabase(target);
     }
   };
 
