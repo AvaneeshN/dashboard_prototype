@@ -478,6 +478,7 @@ export const AdminDashboard: React.FC = () => {
                       <tr>
                         <th className="py-3 px-4">Client Profile</th>
                         <th className="py-3 px-4">Status</th>
+                        <th className="py-3 px-4">Designated SPOC</th>
                         <th className="py-3 px-4">Progress</th>
                         <th className="py-3 px-4">Session Time</th>
                         <th className="py-3 px-4">Last Active</th>
@@ -499,6 +500,17 @@ export const AdminDashboard: React.FC = () => {
 
                             <td className="py-3.5 px-4">
                               {getStatusBadge(sub.status)}
+                            </td>
+
+                            <td className="py-3.5 px-4">
+                              {sub.assigned_company_spoc?.email ? (
+                                <div>
+                                  <span className="font-bold text-zinc-900 block text-xs">{sub.assigned_company_spoc.name}</span>
+                                  <span className="text-[10px] text-zinc-500 font-mono">{sub.assigned_company_spoc.email}</span>
+                                </div>
+                              ) : (
+                                <span className="text-[10px] font-mono text-zinc-400 italic">Not configured</span>
+                              )}
                             </td>
 
                             <td className="py-3.5 px-4 font-mono text-zinc-600 font-bold">
@@ -525,7 +537,7 @@ export const AdminDashboard: React.FC = () => {
                         ))
                       ) : (
                         <tr>
-                          <td colSpan={6} className="py-10 text-center text-zinc-400 text-xs">
+                          <td colSpan={7} className="py-10 text-center text-zinc-400 text-xs">
                             No intake applications found. Newly submitted client applications will appear here in real-time.
                           </td>
                         </tr>

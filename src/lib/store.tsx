@@ -65,7 +65,7 @@ export const StoreProvider: React.FC<{ children: React.ReactNode }> = ({ childre
     return null;
   });
 
-  const setAdminSpoc = (spocData: { name: string; email: string; phone?: string; roleTitle?: string }) => {
+  const setAdminSpoc = async (spocData: { name: string; email: string; phone?: string; roleTitle?: string }) => {
     const updated: CompanyOperationsSPOC = {
       ...spocData,
       assignedAt: new Date().toISOString()
@@ -75,6 +75,32 @@ export const StoreProvider: React.FC<{ children: React.ReactNode }> = ({ childre
       try {
         localStorage.setItem('portal_admin_organization_spoc', JSON.stringify(updated));
       } catch (e) {}
+    }
+
+    if (isSupabaseConfigured()) {
+      try {
+        const supabase = createClient();
+        const adminConfigRecord: FormSubmission = {
+          id: 'system_admin_config',
+          client_id: 'system-admin',
+          client_name: 'Platform Operations Admin',
+          client_email: spocData.email,
+          company_name: 'Platform Organization',
+          assigned_company_spoc: updated,
+          status: 'approved',
+          current_step: 4,
+          total_steps: 4,
+          completion_percentage: 100,
+          time_spent_seconds: 0,
+          responses: {},
+          candidates: [],
+          started_at: new Date().toISOString(),
+          last_active_at: new Date().toISOString()
+        };
+        await supabase.from('form_submissions').upsert([adminConfigRecord]);
+      } catch (err) {
+        console.error('[ERROR] Failed to persist admin SPOC to Supabase:', err);
+      }
     }
   };
 
@@ -101,7 +127,21 @@ export const StoreProvider: React.FC<{ children: React.ReactNode }> = ({ childre
             .select('*')
             .order('last_active_at', { ascending: false });
 
-          const activeSubmissions: FormSubmission[] = (!subsError && remoteSubs) ? remoteSubs : [];
+          const allRemoteSubs: FormSubmission[] = (!subsError && remoteSubs) ? remoteSubs : [];
+
+          // Hydrate Admin Organization SPOC directly from Supabase DB
+          const systemAdminRecord = allRemoteSubs.find(s => s.id === 'system_admin_config');
+          if (systemAdminRecord?.assigned_company_spoc) {
+            setAdminSpocState(systemAdminRecord.assigned_company_spoc);
+            if (typeof window !== 'undefined') {
+              try {
+                localStorage.setItem('portal_admin_organization_spoc', JSON.stringify(systemAdminRecord.assigned_company_spoc));
+              } catch (e) {}
+            }
+          }
+
+          // Filter out internal system record from client intakes registry
+          const activeSubmissions = allRemoteSubs.filter(s => s.id !== 'system_admin_config');
           setSubmissions(activeSubmissions);
 
           // 2. Fetch live user profiles
