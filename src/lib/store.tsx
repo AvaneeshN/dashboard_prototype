@@ -21,7 +21,7 @@ interface AuthState {
   isLoading: boolean;
   submissions: FormSubmission[];
   loginLogs: LoginActivityLog[];
-  login: (email: string, role: UserRole, password?: string) => Promise<{ success: boolean; error?: string }>;
+  login: (email: string, role: UserRole, password?: string) => Promise<{ success: boolean; error?: string; submission?: FormSubmission }>;
   register: (data: { fullName: string; email: string; companyName?: string; phone?: string; password?: string }) => Promise<{ success: boolean; error?: string }>;
   logout: () => void;
   saveSubmissionStep: (responses: Partial<IntakeFormData>, step: number, isFinalSubmit?: boolean) => Promise<FormSubmission>;
@@ -65,8 +65,9 @@ export const StoreProvider: React.FC<{ children: React.ReactNode }> = ({ childre
         const savedLogs = localStorage.getItem(STORAGE_KEY_LOGS);
         const savedProfiles = localStorage.getItem(STORAGE_KEY_PROFILES);
 
+        let activeSubmissions: FormSubmission[] = savedSubmissions ? JSON.parse(savedSubmissions) : INITIAL_SUBMISSIONS;
         if (savedUser) setUser(JSON.parse(savedUser));
-        if (savedSubmissions) setSubmissions(JSON.parse(savedSubmissions));
+        if (savedSubmissions) setSubmissions(activeSubmissions);
         if (savedLogs) setLoginLogs(JSON.parse(savedLogs));
         if (savedProfiles) setProfiles(JSON.parse(savedProfiles));
 
@@ -74,20 +75,19 @@ export const StoreProvider: React.FC<{ children: React.ReactNode }> = ({ childre
           try {
             const supabase = createClient();
             
-            const { data: { session } } = await supabase.auth.getSession();
-            if (session?.user) {
-              const { data: profile } = await supabase
-                .from('profiles')
-                .select('*')
-                .eq('id', session.user.id)
-                .single();
-              
-              if (profile) {
-                setUser(profile);
-                localStorage.setItem(STORAGE_KEY_USER, JSON.stringify(profile));
-              }
+            // 1. Fetch live form submissions
+            const { data: remoteSubs, error: subsError } = await supabase
+              .from('form_submissions')
+              .select('*')
+              .order('last_active_at', { ascending: false });
+
+            if (!subsError && remoteSubs && remoteSubs.length > 0) {
+              activeSubmissions = remoteSubs;
+              setSubmissions(remoteSubs);
+              localStorage.setItem(STORAGE_KEY_SUBMISSIONS, JSON.stringify(remoteSubs));
             }
 
+            // 2. Fetch live user profiles
             const { data: remoteProfiles, error: profsError } = await supabase
               .from('profiles')
               .select('*');
@@ -97,16 +97,7 @@ export const StoreProvider: React.FC<{ children: React.ReactNode }> = ({ childre
               localStorage.setItem(STORAGE_KEY_PROFILES, JSON.stringify(remoteProfiles));
             }
 
-            const { data: remoteSubs, error: subsError } = await supabase
-              .from('form_submissions')
-              .select('*')
-              .order('last_active_at', { ascending: false });
-
-            if (!subsError && remoteSubs && remoteSubs.length > 0) {
-              setSubmissions(remoteSubs);
-              localStorage.setItem(STORAGE_KEY_SUBMISSIONS, JSON.stringify(remoteSubs));
-            }
-
+            // 3. Fetch login activity logs
             const { data: remoteLogs, error: logsError } = await supabase
               .from('login_activity_logs')
               .select('*')
@@ -116,6 +107,58 @@ export const StoreProvider: React.FC<{ children: React.ReactNode }> = ({ childre
             if (!logsError && remoteLogs && remoteLogs.length > 0) {
               setLoginLogs(remoteLogs);
               localStorage.setItem(STORAGE_KEY_LOGS, JSON.stringify(remoteLogs));
+            }
+
+            // 4. Hydrate active session user with live submission data
+            const { data: { session } } = await supabase.auth.getSession();
+            if (session?.user) {
+              const { data: profile } = await supabase
+                .from('profiles')
+                .select('*')
+                .eq('id', session.user.id)
+                .single();
+              
+              if (profile) {
+                const userEmail = profile.email.toLowerCase();
+                const matchedSub = activeSubmissions.find(s => 
+                  s.client_email?.toLowerCase() === userEmail || s.client_id === profile.id
+                );
+
+                if (matchedSub) {
+                  const quota = matchedSub.responses?.requiredApprenticeCount || 20;
+                  const dbtOptIn = matchedSub.responses?.dbtSchemeOptIn !== false;
+                  const metrics = recalculateUserMetrics(profile, matchedSub.candidates || [], quota, dbtOptIn);
+                  if (matchedSub.dbt_claims) metrics.dbtClaimsHistory = matchedSub.dbt_claims;
+                  if (matchedSub.spoc_logs) metrics.spocEmailLogs = matchedSub.spoc_logs;
+                  if (matchedSub.assigned_company_spoc) metrics.assignedCompanySpoc = matchedSub.assigned_company_spoc;
+
+                  profile.apprenticeMetrics = metrics;
+                  profile.company_name = matchedSub.company_name || profile.company_name;
+                }
+
+                setUser(profile);
+                localStorage.setItem(STORAGE_KEY_USER, JSON.stringify(profile));
+              }
+            } else if (savedUser) {
+              const parsedUser = JSON.parse(savedUser);
+              const userEmail = parsedUser.email?.toLowerCase();
+              const matchedSub = activeSubmissions.find(s => 
+                s.client_email?.toLowerCase() === userEmail || s.client_id === parsedUser.id
+              );
+
+              if (matchedSub) {
+                const quota = matchedSub.responses?.requiredApprenticeCount || 20;
+                const dbtOptIn = matchedSub.responses?.dbtSchemeOptIn !== false;
+                const metrics = recalculateUserMetrics(parsedUser, matchedSub.candidates || [], quota, dbtOptIn);
+                if (matchedSub.dbt_claims) metrics.dbtClaimsHistory = matchedSub.dbt_claims;
+                if (matchedSub.spoc_logs) metrics.spocEmailLogs = matchedSub.spoc_logs;
+                if (matchedSub.assigned_company_spoc) metrics.assignedCompanySpoc = matchedSub.assigned_company_spoc;
+
+                parsedUser.apprenticeMetrics = metrics;
+                parsedUser.company_name = matchedSub.company_name || parsedUser.company_name;
+                setUser(parsedUser);
+                localStorage.setItem(STORAGE_KEY_USER, JSON.stringify(parsedUser));
+              }
             }
           } catch (supaErr) {
             console.warn('Supabase fetch notice:', supaErr);
@@ -184,8 +227,40 @@ export const StoreProvider: React.FC<{ children: React.ReactNode }> = ({ childre
     }
   };
 
-  const login = async (email: string, role: UserRole, password?: string): Promise<{ success: boolean; error?: string }> => {
+  const login = async (email: string, role: UserRole, password?: string): Promise<{ success: boolean; error?: string; submission?: FormSubmission }> => {
     const normalizedEmail = email.trim().toLowerCase();
+
+    // Fetch live submissions from Supabase on every login attempt
+    let liveSubmissions = submissions;
+    if (isSupabaseConfigured()) {
+      try {
+        const supabase = createClient();
+        const { data: remoteSubs } = await supabase
+          .from('form_submissions')
+          .select('*')
+          .order('last_active_at', { ascending: false });
+
+        if (remoteSubs && remoteSubs.length > 0) {
+          liveSubmissions = remoteSubs;
+          setSubmissions(remoteSubs);
+          localStorage.setItem(STORAGE_KEY_SUBMISSIONS, JSON.stringify(remoteSubs));
+        }
+
+        const { data: remoteProfiles } = await supabase.from('profiles').select('*');
+        if (remoteProfiles && remoteProfiles.length > 0) {
+          setProfiles(remoteProfiles);
+          localStorage.setItem(STORAGE_KEY_PROFILES, JSON.stringify(remoteProfiles));
+        }
+
+        const { data: remoteLogs } = await supabase.from('login_activity_logs').select('*').order('created_at', { ascending: false }).limit(50);
+        if (remoteLogs && remoteLogs.length > 0) {
+          setLoginLogs(remoteLogs);
+          localStorage.setItem(STORAGE_KEY_LOGS, JSON.stringify(remoteLogs));
+        }
+      } catch (err) {
+        console.warn('Live fetch during login notice:', err);
+      }
+    }
 
     // 1. Direct Administrator Passkey Authentication
     if (role === 'admin') {
@@ -208,7 +283,7 @@ export const StoreProvider: React.FC<{ children: React.ReactNode }> = ({ childre
           last_login_at: new Date().toISOString()
         };
         setUser(adminUser);
-        saveState(adminUser);
+        saveState(adminUser, liveSubmissions);
         await addLoginLog('admin@company.com', 'admin', 'success');
         return { success: true };
       } else {
@@ -218,6 +293,8 @@ export const StoreProvider: React.FC<{ children: React.ReactNode }> = ({ childre
     }
 
     // 2. Client Authentication via Supabase Auth (with graceful local fallback)
+    let authenticatedUser: UserProfile | null = null;
+
     if (isSupabaseConfigured() && password) {
       try {
         const supabase = createClient();
@@ -233,46 +310,73 @@ export const StoreProvider: React.FC<{ children: React.ReactNode }> = ({ childre
             .eq('id', data.user.id)
             .single();
 
-          const activeUser: UserProfile = profile || {
+          authenticatedUser = profile || {
             id: data.user.id,
             email: normalizedEmail,
             full_name: data.user.user_metadata?.full_name || email.split('@')[0],
+            company_name: data.user.user_metadata?.company_name || '',
+            phone: data.user.user_metadata?.phone || '',
             role,
             created_at: data.user.created_at,
             last_login_at: new Date().toISOString()
           };
-
-          setUser(activeUser);
-          saveState(activeUser);
-          await addLoginLog(normalizedEmail, role, 'success');
-          return { success: true };
         }
       } catch (err: any) {
         console.warn('Supabase auth fallback:', err);
       }
     }
 
-    let existing = profiles.find(p => p.email.toLowerCase() === normalizedEmail);
-    if (!existing) {
-      existing = {
-        id: 'client-' + Date.now(),
-        email: normalizedEmail,
-        full_name: email.split('@')[0].replace('.', ' ').replace(/\b\w/g, l => l.toUpperCase()),
-        role: 'client',
-        created_at: new Date().toISOString(),
-        last_login_at: new Date().toISOString()
-      };
-      const newProfilesList = [...profiles, existing];
-      setProfiles(newProfilesList);
-      saveState(undefined, undefined, undefined, newProfilesList);
-    } else {
-      existing.last_login_at = new Date().toISOString();
+    if (!authenticatedUser) {
+      let existing = profiles.find(p => p.email.toLowerCase() === normalizedEmail);
+      if (!existing) {
+        existing = {
+          id: 'client-' + Date.now(),
+          email: normalizedEmail,
+          full_name: email.split('@')[0].replace('.', ' ').replace(/\b\w/g, l => l.toUpperCase()),
+          role: 'client',
+          created_at: new Date().toISOString(),
+          last_login_at: new Date().toISOString()
+        };
+        const newProfilesList = [...profiles, existing];
+        setProfiles(newProfilesList);
+        saveState(undefined, undefined, undefined, newProfilesList);
+      } else {
+        existing.last_login_at = new Date().toISOString();
+      }
+      authenticatedUser = existing;
     }
 
-    setUser(existing);
-    saveState(existing);
+    // Match client submission from live database
+    const matchedSub = liveSubmissions.find(s => 
+      s.client_email?.toLowerCase() === normalizedEmail || 
+      (authenticatedUser && s.client_id === authenticatedUser.id)
+    );
+
+    if (matchedSub && authenticatedUser) {
+      const quota = matchedSub.responses?.requiredApprenticeCount || 20;
+      const dbtOptIn = matchedSub.responses?.dbtSchemeOptIn !== false;
+      const metrics = recalculateUserMetrics(authenticatedUser, matchedSub.candidates || [], quota, dbtOptIn);
+      if (matchedSub.dbt_claims) metrics.dbtClaimsHistory = matchedSub.dbt_claims;
+      if (matchedSub.spoc_logs) metrics.spocEmailLogs = matchedSub.spoc_logs;
+      if (matchedSub.assigned_company_spoc) metrics.assignedCompanySpoc = matchedSub.assigned_company_spoc;
+
+      authenticatedUser.apprenticeMetrics = metrics;
+      authenticatedUser.company_name = matchedSub.company_name || authenticatedUser.company_name;
+    }
+
+    setUser(authenticatedUser);
+    saveState(authenticatedUser, liveSubmissions);
     await addLoginLog(email, role, 'success');
-    return { success: true };
+
+    // Update last_login_at in Supabase profiles table
+    if (isSupabaseConfigured() && authenticatedUser) {
+      try {
+        const supabase = createClient();
+        await supabase.from('profiles').update({ last_login_at: new Date().toISOString() }).eq('id', authenticatedUser.id);
+      } catch (e) {}
+    }
+
+    return { success: true, submission: matchedSub };
   };
 
   const register = async (data: { fullName: string; email: string; companyName?: string; phone?: string; password?: string }): Promise<{ success: boolean; error?: string }> => {

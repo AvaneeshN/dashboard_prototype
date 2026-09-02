@@ -119,19 +119,19 @@ export const AuthGateway: React.FC = () => {
 
         const res = await login(email.trim().toLowerCase(), 'client', password);
         if (res.success) {
-          const normalized = email.trim().toLowerCase();
-          const existingSub = submissions.find(s => s.client_email.toLowerCase() === normalized && s.status === 'submitted');
+          const sub = res.submission;
+          const isSubmitted = sub && (sub.status === 'submitted' || sub.status === 'under_review' || sub.status === 'approved');
           
-          if (existingSub) {
-            setSuccessMsg('Authenticated. Loading your dashboard...');
+          if (isSubmitted) {
+            setSuccessMsg('Authenticated. Loading your quota dashboard...');
             setTimeout(() => {
               router.push('/client');
-            }, 400);
+            }, 300);
           } else {
-            setSuccessMsg('Authenticated. Opening your intake form...');
+            setSuccessMsg('Authenticated. Loading your intake form...');
             setTimeout(() => {
               router.push('/client?view=intake');
-            }, 400);
+            }, 300);
           }
         } else {
           setErrorMsg(res.error || 'Invalid credentials or user not found. Please register if new.');
