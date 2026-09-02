@@ -102,10 +102,10 @@ export const AuthGateway: React.FC = () => {
         });
 
         if (res.success) {
-          setSuccessMsg('Registration successful. Opening candidate intake form...');
-          setTimeout(() => {
-            router.push('/client?view=intake');
-          }, 400);
+          setErrorMsg(null);
+          setSuccessMsg(`📧 Verification email sent to ${email.trim().toLowerCase()}! Please check your inbox and click the verification link, then sign in below.`);
+          setAuthAction('signin');
+          setPassword('');
         } else {
           setErrorMsg(res.error || 'Registration failed.');
         }

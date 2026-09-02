@@ -23,7 +23,7 @@ interface AuthState {
   submissions: FormSubmission[];
   loginLogs: LoginActivityLog[];
   login: (email: string, role: UserRole, password?: string) => Promise<{ success: boolean; error?: string; submission?: FormSubmission }>;
-  register: (data: { fullName: string; email: string; companyName?: string; phone?: string; password?: string }) => Promise<{ success: boolean; error?: string }>;
+  register: (data: { fullName: string; email: string; companyName?: string; phone?: string; password?: string }) => Promise<{ success: boolean; error?: string; requiresVerification?: boolean }>;
   logout: () => void;
   saveSubmissionStep: (responses: Partial<IntakeFormData>, step: number, isFinalSubmit?: boolean) => Promise<FormSubmission>;
   recordAbandonment: (step: number, responses: Partial<IntakeFormData>) => void;
@@ -229,7 +229,19 @@ export const StoreProvider: React.FC<{ children: React.ReactNode }> = ({ childre
           password
         });
 
-        if (!error && data.user) {
+        if (error) {
+          if (error.message?.toLowerCase().includes('email not confirmed') || error.message?.toLowerCase().includes('not confirmed')) {
+            await addLoginLog(email, role, 'failed', 'Email verification pending');
+            return { 
+              success: false, 
+              error: 'Email verification required. Please check your inbox and click the confirmation link sent by Supabase, then sign in.' 
+            };
+          }
+          await addLoginLog(email, role, 'failed', error.message);
+          return { success: false, error: error.message || 'Invalid email or password.' };
+        }
+
+        if (data.user) {
           const { data: profile } = await supabase
             .from('profiles')
             .select('*')
@@ -309,7 +321,7 @@ export const StoreProvider: React.FC<{ children: React.ReactNode }> = ({ childre
     return { success: true, submission: matchedSub };
   };
 
-  const register = async (data: { fullName: string; email: string; companyName?: string; phone?: string; password?: string }): Promise<{ success: boolean; error?: string }> => {
+  const register = async (data: { fullName: string; email: string; companyName?: string; phone?: string; password?: string }): Promise<{ success: boolean; error?: string; requiresVerification?: boolean }> => {
     const normalizedEmail = data.email.trim().toLowerCase();
     let supabaseUserId: string | undefined;
 
@@ -338,31 +350,14 @@ export const StoreProvider: React.FC<{ children: React.ReactNode }> = ({ childre
 
         if (signUpError) {
           console.error('❌ Supabase auth signUp FAILED:', signUpError.message);
-          if (signUpError.message?.includes('already registered') || signUpError.message?.includes('already exists')) {
-            const { data: signInData, error: signInError } = await supabase.auth.signInWithPassword({
-              email: normalizedEmail,
-              password: data.password
-            });
-            if (!signInError && signInData.user) {
-              supabaseUserId = signInData.user.id;
-              console.log('✅ Existing user signed in:', supabaseUserId);
-            } else {
-              console.error('❌ Supabase signIn fallback FAILED:', signInError?.message);
-            }
-          }
+          return { success: false, error: signUpError.message };
         } else if (signUpData?.user) {
           supabaseUserId = signUpData.user.id;
-          console.log('✅ Supabase auth signUp OK, user ID:', supabaseUserId);
-          
-          try {
-            await supabase.auth.signInWithPassword({
-              email: normalizedEmail,
-              password: data.password
-            });
-          } catch (e) {}
+          console.log('✅ Supabase auth signUp OK, verification email dispatched to:', normalizedEmail);
         }
       } catch (err: any) {
         console.error('❌ Supabase signup exception:', err);
+        return { success: false, error: err.message || 'Registration failed.' };
       }
     }
 
@@ -380,8 +375,6 @@ export const StoreProvider: React.FC<{ children: React.ReactNode }> = ({ childre
     };
 
     setProfiles(prev => [...prev.filter(p => p.email !== normalizedEmail), newProfile]);
-    setUser(newProfile);
-    await addLoginLog(normalizedEmail, 'client', 'success');
 
     // Direct write to Supabase profiles table
     if (isSupabaseConfigured()) {
@@ -408,7 +401,7 @@ export const StoreProvider: React.FC<{ children: React.ReactNode }> = ({ childre
       }
     }
 
-    return { success: true };
+    return { success: true, requiresVerification: true };
   };
 
   const logout = () => {
