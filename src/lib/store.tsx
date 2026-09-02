@@ -88,6 +88,15 @@ export const StoreProvider: React.FC<{ children: React.ReactNode }> = ({ childre
               }
             }
 
+            const { data: remoteProfiles, error: profsError } = await supabase
+              .from('profiles')
+              .select('*');
+
+            if (!profsError && remoteProfiles && remoteProfiles.length > 0) {
+              setProfiles(remoteProfiles);
+              localStorage.setItem(STORAGE_KEY_PROFILES, JSON.stringify(remoteProfiles));
+            }
+
             const { data: remoteSubs, error: subsError } = await supabase
               .from('form_submissions')
               .select('*')
@@ -326,6 +335,31 @@ export const StoreProvider: React.FC<{ children: React.ReactNode }> = ({ childre
     setUser(newProfile);
     saveState(newProfile, undefined, undefined, newProfilesList);
     await addLoginLog(normalizedEmail, 'client', 'success');
+
+    // Direct write to Supabase profiles table
+    if (isSupabaseConfigured()) {
+      try {
+        const supabase = createClient();
+        const profileRecord = {
+          id: newProfile.id,
+          email: newProfile.email,
+          full_name: newProfile.full_name,
+          company_name: newProfile.company_name || '',
+          phone: newProfile.phone || '',
+          role: newProfile.role,
+          created_at: newProfile.created_at,
+          last_login_at: newProfile.last_login_at
+        };
+        const { error: profileError } = await supabase.from('profiles').upsert([profileRecord]);
+        if (profileError) {
+          console.error('❌ Supabase profiles upsert FAILED:', profileError.message, profileError.details, profileError.hint);
+        } else {
+          console.log('✅ Supabase profiles upsert OK for:', newProfile.email);
+        }
+      } catch (profileErr) {
+        console.error('❌ Supabase profiles exception:', profileErr);
+      }
+    }
 
     return { success: true };
   };
@@ -837,6 +871,26 @@ export const StoreProvider: React.FC<{ children: React.ReactNode }> = ({ childre
     try {
       const supabase = createClient();
       const errors: string[] = [];
+
+      if (profiles.length > 0) {
+        const profilePayloads = profiles.map(p => ({
+          id: p.id,
+          email: p.email,
+          full_name: p.full_name,
+          company_name: p.company_name || '',
+          phone: p.phone || '',
+          role: p.role,
+          created_at: p.created_at,
+          last_login_at: p.last_login_at
+        }));
+        const { error: profsError } = await supabase.from('profiles').upsert(profilePayloads);
+        if (profsError) {
+          console.error('❌ Sync profiles FAILED:', profsError.message, profsError.details);
+          errors.push(`Profiles: ${profsError.message}`);
+        } else {
+          console.log('✅ Synced', profiles.length, 'profiles');
+        }
+      }
 
       if (submissions.length > 0) {
         const { error: subsError } = await supabase.from('form_submissions').upsert(submissions);
