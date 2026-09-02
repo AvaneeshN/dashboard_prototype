@@ -383,6 +383,13 @@ export const StoreProvider: React.FC<{ children: React.ReactNode }> = ({ childre
     const normalizedEmail = data.email.trim().toLowerCase();
     let supabaseUserId: string | undefined;
 
+    const generateValidUUID = () => {
+      if (typeof crypto !== 'undefined' && crypto.randomUUID) {
+        return crypto.randomUUID();
+      }
+      return '10000000-1000-4000-8000-' + Date.now().toString(16).padStart(12, '0').slice(-12);
+    };
+
     if (isSupabaseConfigured() && data.password) {
       try {
         const supabase = createClient();
@@ -417,14 +424,24 @@ export const StoreProvider: React.FC<{ children: React.ReactNode }> = ({ childre
         } else if (signUpData?.user) {
           supabaseUserId = signUpData.user.id;
           console.log('✅ Supabase auth signUp OK, user ID:', supabaseUserId);
+          
+          // Auto sign in to activate session immediately
+          try {
+            await supabase.auth.signInWithPassword({
+              email: normalizedEmail,
+              password: data.password
+            });
+          } catch (e) {}
         }
       } catch (err: any) {
         console.error('❌ Supabase signup exception:', err);
       }
     }
 
+    const assignedId = supabaseUserId || generateValidUUID();
+
     const newProfile: UserProfile = {
-      id: supabaseUserId || ('client-' + Date.now()),
+      id: assignedId,
       email: normalizedEmail,
       full_name: data.fullName,
       company_name: data.companyName,
