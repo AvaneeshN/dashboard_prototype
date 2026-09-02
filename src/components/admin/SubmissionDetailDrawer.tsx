@@ -49,12 +49,24 @@ export const SubmissionDetailDrawer: React.FC<SubmissionDetailDrawerProps> = ({
   // Company SPOC Assignment Form State
   const [isEditingSpoc, setIsEditingSpoc] = useState(false);
   const [companySpocState, setCompanySpocState] = useState({
-    name: submission?.assigned_company_spoc?.name || 'Rohit Kumar (Lead Operations)',
-    email: submission?.assigned_company_spoc?.email || 'rohit.ops@ourcompany.com',
-    phone: submission?.assigned_company_spoc?.phone || '+91 98111 22334',
+    name: submission?.assigned_company_spoc?.name || '',
+    email: submission?.assigned_company_spoc?.email || '',
+    phone: submission?.assigned_company_spoc?.phone || '',
     roleTitle: submission?.assigned_company_spoc?.roleTitle || 'Dedicated Operations SPOC'
   });
   const [spocSaveSuccess, setSpocSaveSuccess] = useState(false);
+
+  // Synchronize SPOC state when submission changes
+  useEffect(() => {
+    if (submission) {
+      setCompanySpocState({
+        name: submission.assigned_company_spoc?.name || '',
+        email: submission.assigned_company_spoc?.email || '',
+        phone: submission.assigned_company_spoc?.phone || '',
+        roleTitle: submission.assigned_company_spoc?.roleTitle || 'Dedicated Operations SPOC'
+      });
+    }
+  }, [submission?.id, submission?.assigned_company_spoc?.email, submission?.assigned_company_spoc?.name]);
 
   // Close on Escape key press
   useEffect(() => {
@@ -251,10 +263,10 @@ export const SubmissionDetailDrawer: React.FC<SubmissionDetailDrawerProps> = ({
                   <div className="p-3 rounded-xl bg-white border border-zinc-200 flex items-center justify-between text-xs font-mono">
                     <div>
                       <span className="font-bold text-zinc-900 block font-sans">
-                        {submission.assigned_company_spoc?.name || companySpocState.name}
+                        {submission.assigned_company_spoc?.name || companySpocState.name || 'No SPOC Assigned'}
                       </span>
                       <span className="text-[11px] text-zinc-500">
-                        {submission.assigned_company_spoc?.email || companySpocState.email}
+                        {submission.assigned_company_spoc?.email || companySpocState.email || 'Click Change SPOC to assign an email'}
                       </span>
                     </div>
                     {spocSaveSuccess ? (

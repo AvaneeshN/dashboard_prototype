@@ -127,16 +127,19 @@ export const ClientDashboard: React.FC = () => {
     }
   }, [hasSubmittedIntake]);
 
-  // Pre-fill SPOC Email from submission or user
+  // Pre-fill SPOC Email prioritizing the designated configured SPOC
   useEffect(() => {
-    const spocEmailDefault = activeSubmission?.responses?.complianceOfficerEmail || user?.email || 'spoc@novatech.io';
-    const spocNameDefault = activeSubmission?.responses?.complianceOfficerName || user?.full_name || 'Compliance SPOC';
-    setCandidateForm(prev => ({
-      ...prev,
-      spocEmail: prev.spocEmail || spocEmailDefault,
-      spocName: prev.spocName || spocNameDefault
-    }));
-  }, [activeSubmission, user]);
+    const designatedEmail = currentSpoc?.email || activeSubmission?.assigned_company_spoc?.email || user?.apprenticeMetrics?.assignedCompanySpoc?.email || activeSubmission?.responses?.complianceOfficerEmail || user?.email || '';
+    const designatedName = currentSpoc?.name || activeSubmission?.assigned_company_spoc?.name || user?.apprenticeMetrics?.assignedCompanySpoc?.name || activeSubmission?.responses?.complianceOfficerName || user?.full_name || 'Designated SPOC';
+    
+    if (designatedEmail) {
+      setCandidateForm(prev => ({
+        ...prev,
+        spocEmail: designatedEmail,
+        spocName: designatedName
+      }));
+    }
+  }, [currentSpoc?.email, currentSpoc?.name, activeSubmission?.assigned_company_spoc?.email, user?.apprenticeMetrics?.assignedCompanySpoc?.email, activeSubmission?.responses?.complianceOfficerEmail, user?.email]);
 
   const defaultEmptyMetrics = {
     clientName: user?.full_name || 'Client Workspace',
@@ -290,18 +293,52 @@ export const ClientDashboard: React.FC = () => {
     setShowDBTClaimModal(false);
   };
 
+  // Open Add Candidate Modal with Current SPOC Pre-filled
+  const handleOpenAddModal = () => {
+    const designatedEmail = currentSpoc?.email || activeSubmission?.assigned_company_spoc?.email || user?.apprenticeMetrics?.assignedCompanySpoc?.email || activeSubmission?.responses?.complianceOfficerEmail || user?.email || '';
+    const designatedName = currentSpoc?.name || activeSubmission?.assigned_company_spoc?.name || user?.apprenticeMetrics?.assignedCompanySpoc?.name || activeSubmission?.responses?.complianceOfficerName || user?.full_name || 'Designated SPOC';
+
+    setCandidateDocs({});
+    setCandidateForm({
+      name: '',
+      email: '',
+      phone: '',
+      aadhaarNumber: '',
+      tradeOrRole: '',
+      qualification: 'B.Tech / B.Sc / Diploma',
+      stipendAmount: 18500,
+      dbtEligibleAmount: 4500,
+      joiningDate: new Date().toISOString().split('T')[0],
+      bankAccountNumber: '',
+      ifscCode: 'HDFC0001824',
+      spocEmail: designatedEmail,
+      spocName: designatedName
+    });
+    setShowAddModal(true);
+  };
+
   // Handle Save SPOC Contact
   const handleSaveSpoc = (e: React.FormEvent) => {
     e.preventDefault();
     if (!spocNameInput.trim() || !spocEmailInput.trim()) return;
+    const cleanEmail = spocEmailInput.trim().toLowerCase();
+    const cleanName = spocNameInput.trim();
+
     assignCompanySpoc(activeSubmission?.id || '', {
-      name: spocNameInput.trim(),
-      email: spocEmailInput.trim().toLowerCase(),
+      name: cleanName,
+      email: cleanEmail,
       phone: spocPhoneInput.trim(),
       roleTitle: 'Designated SPOC'
     });
+
+    setCandidateForm(prev => ({
+      ...prev,
+      spocEmail: cleanEmail,
+      spocName: cleanName
+    }));
+
     setShowSpocModal(false);
-    setClaimSuccessAlert(`Designated SPOC updated: ${spocNameInput.trim()} (${spocEmailInput.trim().toLowerCase()}). All onboarding documents will be dispatched to this address.`);
+    setClaimSuccessAlert(`Designated SPOC updated: ${cleanName} (${cleanEmail}). All onboarding documents will be dispatched to this address.`);
     setTimeout(() => setClaimSuccessAlert(null), 6000);
   };
 
@@ -529,7 +566,7 @@ export const ClientDashboard: React.FC = () => {
                       <div className="mt-3 pt-2 border-t border-zinc-100 flex items-center justify-between text-xs">
                         <span className="text-zinc-500">Available to fill</span>
                         <button
-                          onClick={() => { setActiveTab('apprentices'); setShowAddModal(true); }}
+                          onClick={() => { setActiveTab('apprentices'); handleOpenAddModal(); }}
                           className="font-bold text-black hover:underline cursor-pointer flex items-center gap-1"
                         >
                           <span>+ Add Candidate</span>
@@ -629,7 +666,7 @@ export const ClientDashboard: React.FC = () => {
 
                         <div className="flex items-center gap-2 mt-5">
                           <button
-                            onClick={() => { setActiveTab('apprentices'); setShowAddModal(true); }}
+                            onClick={() => { setActiveTab('apprentices'); handleOpenAddModal(); }}
                             className="flex-1 py-3 rounded-full bg-black hover:bg-zinc-800 text-white text-xs font-bold flex items-center justify-center gap-1.5 transition-all cursor-pointer shadow-md"
                           >
                             <Plus className="w-3.5 h-3.5" />
@@ -925,7 +962,7 @@ export const ClientDashboard: React.FC = () => {
                         </select>
 
                         <button
-                          onClick={() => setShowAddModal(true)}
+                          onClick={() => handleOpenAddModal()}
                           className="px-4 py-2 rounded-full bg-black text-white hover:bg-zinc-800 text-xs font-bold transition-all cursor-pointer flex items-center gap-1 shadow-sm"
                         >
                           <Plus className="w-3.5 h-3.5" />
@@ -1315,10 +1352,15 @@ export const ClientDashboard: React.FC = () => {
                     type="email"
                     required
                     placeholder="spoc@company.com"
-                    value={candidateForm.spocEmail}
+                    value={candidateForm.spocEmail || currentSpoc?.email || ''}
                     onChange={(e) => setCandidateForm({ ...candidateForm, spocEmail: e.target.value })}
                     className="w-full px-3 py-2 rounded-xl bg-white border border-zinc-200 text-zinc-900 text-xs focus:outline-none focus:border-black font-medium"
                   />
+                  {currentSpoc?.email && (
+                    <span className="text-[10px] text-emerald-700 font-medium mt-1 block">
+                      Using Designated SPOC: {currentSpoc.email}
+                    </span>
+                  )}
                 </div>
 
                 {/* Submit Actions */}

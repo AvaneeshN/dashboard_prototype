@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useStore } from '@/lib/store';
 import { FormSubmission, SubmissionStatus } from '@/types';
 import { GlassCard } from '@/components/ui/GlassCard';
@@ -56,6 +56,15 @@ export const AdminDashboard: React.FC = () => {
   const [adminSpocName, setAdminSpocName] = useState(currentAdminSpoc?.name || '');
   const [adminSpocEmail, setAdminSpocEmail] = useState(currentAdminSpoc?.email || '');
   const [adminSpocPhone, setAdminSpocPhone] = useState(currentAdminSpoc?.phone || '');
+
+  // Synchronize when currentAdminSpoc arrives from Supabase
+  useEffect(() => {
+    if (currentAdminSpoc?.email) {
+      setAdminSpocName(currentAdminSpoc.name || '');
+      setAdminSpocEmail(currentAdminSpoc.email || '');
+      setAdminSpocPhone(currentAdminSpoc.phone || '');
+    }
+  }, [currentAdminSpoc?.email, currentAdminSpoc?.name, currentAdminSpoc?.phone]);
 
   const handleSaveAdminSpoc = (e: React.FormEvent) => {
     e.preventDefault();
