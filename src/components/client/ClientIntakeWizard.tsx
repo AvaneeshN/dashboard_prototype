@@ -28,7 +28,8 @@ import {
   Search,
   X,
   Briefcase,
-  ChevronDown
+  ChevronDown,
+  AlertCircle
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { processUploadedFile } from '@/lib/document-utils';
@@ -157,16 +158,23 @@ export const ClientIntakeWizard: React.FC = () => {
   const [isSubmitted, setIsSubmitted] = useState(false);
   const [activeFile, setActiveFile] = useState<string | null>(null);
 
+  // Anti-glitch and race-condition refs
+  const isInitializedRef = React.useRef(false);
+  const saveTimerRef = React.useRef<NodeJS.Timeout | null>(null);
+  const [validationErrors, setValidationErrors] = useState<{ field: string; sectionNumber: number; sectionName: string }[]>([]);
+
   // Role Search & Custom Role State
   const [roleSearchQuery, setRoleSearchQuery] = useState('');
   const [selectedCategory, setSelectedCategory] = useState<string>('All');
   const [customRoleInput, setCustomRoleInput] = useState('');
   const [showRoleSelectorModal, setShowRoleSelectorModal] = useState(false);
 
-  // Initialize from active submission or current user
+  // Initialize from active submission or current user ONCE on mount
   useEffect(() => {
+    if (isInitializedRef.current) return;
     const existing = getActiveClientSubmission();
     if (existing) {
+      isInitializedRef.current = true;
       if (existing.status === 'submitted' || existing.status === 'approved' || existing.status === 'under_review') {
         setIsSubmitted(true);
       }
@@ -183,6 +191,7 @@ export const ClientIntakeWizard: React.FC = () => {
         setActiveFile(existing.responses.attachedDocsName);
       }
     } else if (user) {
+      isInitializedRef.current = true;
       setFormData(prev => ({
         ...prev,
         companyName: user.company_name || '',
@@ -191,7 +200,7 @@ export const ClientIntakeWizard: React.FC = () => {
         contactPhone: user.phone || ''
       }));
     }
-  }, [user]);
+  }, [user, getActiveClientSubmission]);
 
   // Record abandonment on unload
   useEffect(() => {
@@ -202,18 +211,29 @@ export const ClientIntakeWizard: React.FC = () => {
     };
     window.addEventListener('beforeunload', handleBeforeUnload);
     return () => window.removeEventListener('beforeunload', handleBeforeUnload);
-  }, [currentSection, formData, isSubmitted]);
+  }, [currentSection, formData, isSubmitted, recordAbandonment]);
 
+  // Smooth, glitch-free debounced field update
   const updateField = (field: keyof IntakeFormData, value: any) => {
-    const updated = { ...formData, [field]: value };
-    setFormData(updated);
-    
-    setIsSaving(true);
-    setTimeout(() => {
-      saveSubmissionStep(updated, currentSection, false);
-      setIsSaving(false);
-      setLastSavedTime(new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' }));
-    }, 350);
+    setFormData(prev => {
+      const updated = { ...prev, [field]: value };
+      
+      if (saveTimerRef.current) {
+        clearTimeout(saveTimerRef.current);
+      }
+      
+      setIsSaving(true);
+      saveTimerRef.current = setTimeout(() => {
+        saveSubmissionStep(updated, currentSection, false);
+        setIsSaving(false);
+        setLastSavedTime(new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' }));
+      }, 700);
+
+      return updated;
+    });
+
+    // Clear validation error when user fills the field
+    setValidationErrors(prev => prev.filter(e => e.field.toLowerCase() !== (field as string).toLowerCase()));
   };
 
   // Toggle or add role
@@ -276,22 +296,102 @@ export const ClientIntakeWizard: React.FC = () => {
     }
   };
 
+  // Validate Mandatory Fields across sections
+  const validateMandatoryFields = (data: IntakeFormData, maxSectionToCheck?: number) => {
+    const errors: { field: string; sectionNumber: number; sectionName: string }[] = [];
+
+    // Section 1 Mandatory Fields
+    if (!data.companyName?.trim()) {
+      errors.push({ field: 'Company Legal Name', sectionNumber: 1, sectionName: 'Requirements & Quota' });
+    }
+    if (!data.contactName?.trim()) {
+      errors.push({ field: 'Contact Person Full Name', sectionNumber: 1, sectionName: 'Requirements & Quota' });
+    }
+    if (!data.contactEmail?.trim()) {
+      errors.push({ field: 'Work Email Address', sectionNumber: 1, sectionName: 'Requirements & Quota' });
+    }
+    if (!data.contactPhone?.trim()) {
+      errors.push({ field: 'Direct Contact Phone', sectionNumber: 1, sectionName: 'Requirements & Quota' });
+    }
+    if (!data.requiredApprenticeCount || Number(data.requiredApprenticeCount) < 1) {
+      errors.push({ field: 'Total Apprentice Quota Required', sectionNumber: 1, sectionName: 'Requirements & Quota' });
+    }
+    if (!data.tradesRequired || data.tradesRequired.length === 0) {
+      errors.push({ field: 'Apprentice Roles / Specializations (select at least 1)', sectionNumber: 1, sectionName: 'Requirements & Quota' });
+    }
+
+    // Section 2 Mandatory Fields
+    if (!maxSectionToCheck || maxSectionToCheck >= 2) {
+      if (!data.stipendPerApprentice || Number(data.stipendPerApprentice) < 1000) {
+        errors.push({ field: 'Monthly Stipend per Apprentice', sectionNumber: 2, sectionName: 'Payroll & Stipends' });
+      }
+      if (!data.trainingLocations?.trim()) {
+        errors.push({ field: 'Primary Training Locations', sectionNumber: 2, sectionName: 'Payroll & Stipends' });
+      }
+      if (!data.proposedJoiningDate?.trim()) {
+        errors.push({ field: 'Proposed Start Date', sectionNumber: 2, sectionName: 'Payroll & Stipends' });
+      }
+    }
+
+    // Section 3 Mandatory Fields
+    if (!maxSectionToCheck || maxSectionToCheck >= 3) {
+      if (!data.complianceOfficerName?.trim()) {
+        errors.push({ field: 'Authorized SPOC / Compliance Officer Name', sectionNumber: 3, sectionName: 'Contract & Compliance' });
+      }
+      if (!data.complianceOfficerEmail?.trim()) {
+        errors.push({ field: 'SPOC / Compliance Officer Email', sectionNumber: 3, sectionName: 'Contract & Compliance' });
+      }
+    }
+
+    // Section 4 Mandatory Fields
+    if (!maxSectionToCheck || maxSectionToCheck >= 4) {
+      if (!data.gstinNumber?.trim()) {
+        errors.push({ field: 'Company GSTIN Number', sectionNumber: 4, sectionName: 'Verification & Submit' });
+      }
+      if (!data.agreedToTerms) {
+        errors.push({ field: 'Acceptance of Regulatory Declarations & Terms', sectionNumber: 4, sectionName: 'Verification & Submit' });
+      }
+    }
+
+    return errors;
+  };
+
   const handleNextSection = async () => {
+    const currentSectionErrors = validateMandatoryFields(formData, currentSection).filter(e => e.sectionNumber === currentSection);
+    if (currentSectionErrors.length > 0) {
+      setValidationErrors(currentSectionErrors);
+      window.scrollTo({ top: 0, behavior: 'smooth' });
+      return;
+    }
+
+    setValidationErrors([]);
     if (currentSection < 4) {
       const next = currentSection + 1;
       setCurrentSection(next);
       await saveSubmissionStep(formData, next, false);
+      window.scrollTo({ top: 0, behavior: 'smooth' });
     }
   };
 
   const handlePrevSection = () => {
+    setValidationErrors([]);
     if (currentSection > 1) {
       setCurrentSection(currentSection - 1);
+      window.scrollTo({ top: 0, behavior: 'smooth' });
     }
   };
 
   const handleFinalSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    const errors = validateMandatoryFields(formData, 4);
+    if (errors.length > 0) {
+      setValidationErrors(errors);
+      setCurrentSection(errors[0].sectionNumber);
+      window.scrollTo({ top: 0, behavior: 'smooth' });
+      return;
+    }
+
+    setValidationErrors([]);
     setIsSaving(true);
     await saveSubmissionStep(formData, 4, true);
     setIsSaving(false);
@@ -424,6 +524,29 @@ export const ClientIntakeWizard: React.FC = () => {
         </div>
       </div>
 
+      {/* Mandatory Field Notice */}
+      <div className="mb-3 px-4 py-2.5 rounded-2xl bg-zinc-50 border border-zinc-200 flex items-center justify-between text-xs text-zinc-600">
+        <div className="flex items-center gap-2">
+          <span className="text-red-500 font-bold text-sm leading-none">*</span>
+          <span>Fields marked with an asterisk (<strong>*</strong>) are mandatory and must be completed to submit.</span>
+        </div>
+      </div>
+
+      {/* Validation Errors Alert Banner */}
+      {validationErrors.length > 0 && (
+        <div className="mb-4 p-4 rounded-2xl bg-rose-50 border border-rose-200 text-rose-800 text-xs space-y-2">
+          <div className="flex items-center gap-2 font-bold text-rose-900">
+            <AlertCircle className="w-4 h-4 text-rose-600 shrink-0" />
+            <span>Please complete all mandatory fields (*) before proceeding:</span>
+          </div>
+          <ul className="list-disc pl-6 space-y-0.5 text-[11px] text-rose-700">
+            {validationErrors.map((err, idx) => (
+              <li key={idx}><strong>{err.field}</strong> in <em>{err.sectionName}</em></li>
+            ))}
+          </ul>
+        </div>
+      )}
+
       {/* Interactive Form Card */}
       <GlassCard className="p-8 bg-white border-zinc-200 shadow-xl">
         <AnimatePresence mode="wait">
@@ -516,8 +639,11 @@ export const ClientIntakeWizard: React.FC = () => {
                       type="number"
                       min={1}
                       max={500}
-                      value={formData.requiredApprenticeCount}
-                      onChange={(e) => updateField('requiredApprenticeCount', Number(e.target.value))}
+                      value={formData.requiredApprenticeCount ?? ''}
+                      onChange={(e) => {
+                        const val = e.target.value === '' ? '' : parseInt(e.target.value, 10) || 0;
+                        updateField('requiredApprenticeCount', val);
+                      }}
                       className="w-full px-3.5 py-2.5 rounded-2xl bg-zinc-50 border border-zinc-200 text-zinc-900 text-xs focus:outline-none focus:border-black focus:bg-white font-bold"
                     />
                   </div>
@@ -716,8 +842,11 @@ export const ClientIntakeWizard: React.FC = () => {
                     <input
                       type="number"
                       step={500}
-                      value={formData.stipendPerApprentice}
-                      onChange={(e) => updateField('stipendPerApprentice', Number(e.target.value))}
+                      value={formData.stipendPerApprentice ?? ''}
+                      onChange={(e) => {
+                        const val = e.target.value === '' ? '' : parseInt(e.target.value, 10) || 0;
+                        updateField('stipendPerApprentice', val);
+                      }}
                       className="w-full px-3.5 py-2.5 rounded-2xl bg-zinc-50 border border-zinc-200 text-zinc-900 text-xs focus:outline-none focus:border-black focus:bg-white font-bold"
                     />
                     <span className="text-[10px] text-zinc-400 mt-1 block font-mono">* Benchmark: ₹15,000 – ₹25,000</span>
@@ -725,10 +854,11 @@ export const ClientIntakeWizard: React.FC = () => {
 
                   <div>
                     <label className="block text-xs font-bold text-zinc-700 mb-1">
-                      Target Joining Date
+                      Target Joining Date *
                     </label>
                     <input
                       type="date"
+                      required
                       value={formData.proposedJoiningDate}
                       onChange={(e) => updateField('proposedJoiningDate', e.target.value)}
                       className="w-full px-3.5 py-2.5 rounded-2xl bg-zinc-50 border border-zinc-200 text-zinc-900 text-xs focus:outline-none focus:border-black focus:bg-white font-bold"
@@ -804,10 +934,11 @@ export const ClientIntakeWizard: React.FC = () => {
 
                   <div>
                     <label className="block text-xs font-bold text-zinc-700 mb-1">
-                      Compliance Officer Full Name
+                      Compliance Officer Full Name *
                     </label>
                     <input
                       type="text"
+                      required
                       value={formData.complianceOfficerName}
                       onChange={(e) => updateField('complianceOfficerName', e.target.value)}
                       placeholder="e.g. Vikas Malhotra"
@@ -817,7 +948,7 @@ export const ClientIntakeWizard: React.FC = () => {
 
                   <div>
                     <label className="block text-xs font-bold text-zinc-700 mb-1">
-                      Compliance Officer Email
+                      Compliance Officer Email *
                     </label>
                     <input
                       type="email"
@@ -1058,7 +1189,7 @@ export const ClientIntakeWizard: React.FC = () => {
                     className="w-4 h-4 rounded text-black focus:ring-black border-zinc-300"
                   />
                   <span className="text-xs text-zinc-700 font-medium">
-                    I verify all corporate compliance documents and apprentice quota requirements are authentic.
+                    I verify all corporate compliance documents and apprentice quota requirements are authentic. <span className="text-red-500 font-bold">*</span>
                   </span>
                 </label>
               </div>
