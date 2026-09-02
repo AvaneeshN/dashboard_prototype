@@ -243,7 +243,7 @@ export const ClientDashboard: React.FC = () => {
     });
 
     const spocTarget = candidateForm.spocEmail || 'SPOC';
-    setClaimSuccessAlert(`📧 Candidate ${candidateForm.name} onboarded! SPOC Notification email dispatched to ${spocTarget}`);
+    setClaimSuccessAlert(`Candidate ${candidateForm.name} onboarded. SPOC notification email dispatched to ${spocTarget}.`);
     setTimeout(() => setClaimSuccessAlert(null), 6000);
 
     setShowAddModal(false);

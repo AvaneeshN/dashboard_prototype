@@ -159,12 +159,12 @@ export const StoreProvider: React.FC<{ children: React.ReactNode }> = ({ childre
         const supabase = createClient();
         const { error: logError } = await supabase.from('login_activity_logs').insert([newLog]);
         if (logError) {
-          console.error('❌ Supabase login_activity_logs insert FAILED:', logError.message, logError.details);
+          console.error('[ERROR] Supabase login_activity_logs insert FAILED:', logError.message, logError.details);
         } else {
-          console.log('✅ Supabase login_activity_logs insert OK');
+          console.log('[OK] Supabase login_activity_logs insert OK');
         }
       } catch (err) {
-        console.error('❌ Supabase log insert exception:', err);
+        console.error('[ERROR] Supabase log insert exception:', err);
       }
     }
   };
@@ -379,7 +379,7 @@ export const StoreProvider: React.FC<{ children: React.ReactNode }> = ({ childre
         });
 
         if (signUpError) {
-          console.error('❌ Supabase auth signUp FAILED:', signUpError.message);
+          console.error('[ERROR] Supabase auth signUp FAILED:', signUpError.message);
           if (
             signUpError.message?.toLowerCase().includes('already registered') || 
             signUpError.message?.toLowerCase().includes('already exists') ||
@@ -403,10 +403,10 @@ export const StoreProvider: React.FC<{ children: React.ReactNode }> = ({ childre
 
         if (signUpData?.user) {
           supabaseUserId = signUpData.user.id;
-          console.log('✅ Supabase auth signUp OK, verification email dispatched to:', normalizedEmail);
+          console.log('[OK] Supabase auth signUp OK, verification email dispatched to:', normalizedEmail);
         }
       } catch (err: any) {
-        console.error('❌ Supabase signup exception:', err);
+        console.error('[ERROR] Supabase signup exception:', err);
         return { success: false, error: err.message || 'Registration failed.' };
       }
     }
@@ -442,12 +442,12 @@ export const StoreProvider: React.FC<{ children: React.ReactNode }> = ({ childre
         };
         const { error: profileError } = await supabase.from('profiles').upsert([profileRecord]);
         if (profileError) {
-          console.error('❌ Supabase profiles upsert FAILED:', profileError.message, profileError.details, profileError.hint);
+          console.error('[ERROR] Supabase profiles upsert FAILED:', profileError.message, profileError.details, profileError.hint);
         } else {
-          console.log('✅ Supabase profiles upsert OK for:', newProfile.email);
+          console.log('[OK] Supabase profiles upsert OK for:', newProfile.email);
         }
       } catch (profileErr) {
-        console.error('❌ Supabase profiles exception:', profileErr);
+        console.error('[ERROR] Supabase profiles exception:', profileErr);
       }
     }
 
@@ -530,12 +530,12 @@ export const StoreProvider: React.FC<{ children: React.ReactNode }> = ({ childre
       const supabase = createClient();
       const { error: upsertError } = await supabase.from('form_submissions').upsert([submission]);
       if (upsertError) {
-        console.error('❌ Supabase form_submissions update FAILED:', upsertError.message, upsertError.details);
+        console.error('[ERROR] Supabase form_submissions update FAILED:', upsertError.message, upsertError.details);
       } else {
-        console.log('✅ Supabase form_submissions updated for:', submission.id);
+        console.log('[OK] Supabase form_submissions updated for:', submission.id);
       }
     } catch (err) {
-      console.error('❌ Supabase update exception:', err);
+      console.error('[ERROR] Supabase update exception:', err);
     }
   };
 
@@ -958,29 +958,29 @@ export const StoreProvider: React.FC<{ children: React.ReactNode }> = ({ childre
         }));
         const { error: profsError } = await supabase.from('profiles').upsert(profilePayloads);
         if (profsError) {
-          console.error('❌ Sync profiles FAILED:', profsError.message, profsError.details);
+          console.error('[ERROR] Sync profiles FAILED:', profsError.message, profsError.details);
           errors.push(`Profiles: ${profsError.message}`);
         } else {
-          console.log('✅ Synced', profiles.length, 'profiles');
+          console.log('[OK] Synced', profiles.length, 'profiles');
         }
       }
 
       if (submissions.length > 0) {
         const { error: subsError } = await supabase.from('form_submissions').upsert(submissions);
         if (subsError) {
-          console.error('❌ Sync form_submissions FAILED:', subsError.message, subsError.details, subsError.hint);
+          console.error('[ERROR] Sync form_submissions FAILED:', subsError.message, subsError.details, subsError.hint);
           errors.push(`Submissions: ${subsError.message}`);
         } else {
-          console.log('✅ Synced', submissions.length, 'form_submissions');
+          console.log('[OK] Synced', submissions.length, 'form_submissions');
         }
       }
       if (loginLogs.length > 0) {
         const { error: logsError } = await supabase.from('login_activity_logs').upsert(loginLogs);
         if (logsError) {
-          console.error('❌ Sync login_activity_logs FAILED:', logsError.message, logsError.details, logsError.hint);
+          console.error('[ERROR] Sync login_activity_logs FAILED:', logsError.message, logsError.details, logsError.hint);
           errors.push(`Logs: ${logsError.message}`);
         } else {
-          console.log('✅ Synced', loginLogs.length, 'login_activity_logs');
+          console.log('[OK] Synced', loginLogs.length, 'login_activity_logs');
         }
       }
 

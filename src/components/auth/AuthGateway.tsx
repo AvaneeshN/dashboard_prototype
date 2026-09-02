@@ -103,7 +103,7 @@ export const AuthGateway: React.FC = () => {
 
         if (res.success) {
           setErrorMsg(null);
-          setSuccessMsg(`📧 Verification email sent to ${email.trim().toLowerCase()}! Please check your inbox and click the verification link, then sign in below.`);
+          setSuccessMsg(`Verification email sent to ${email.trim().toLowerCase()}. Please check your inbox and click the verification link, then sign in below.`);
           setAuthAction('signin');
           setPassword('');
         } else {
