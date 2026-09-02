@@ -44,8 +44,39 @@ export async function POST(request: Request) {
     let liveDeliveryStatus = 'Simulated Local Gateway';
     let externalApiResponse: any = null;
 
-    // 1. LIVE DELIVERY VIA MSG91 EMAIL API
-    if (process.env.MSG91_AUTH_KEY) {
+    // 1. LIVE DELIVERY VIA RESEND API
+    if (process.env.RESEND_API_KEY) {
+      try {
+        const recipients = targetRecipient.split(',').map((e: string) => e.trim()).filter(Boolean);
+        
+        const resendRes = await fetch('https://api.resend.com/emails', {
+          method: 'POST',
+          headers: {
+            'Authorization': `Bearer ${process.env.RESEND_API_KEY}`,
+            'Content-Type': 'application/json'
+          },
+          body: JSON.stringify({
+            from: process.env.RESEND_FROM_EMAIL || 'onboarding@resend.dev',
+            to: recipients,
+            subject: emailSubject,
+            html: formattedHtml
+          })
+        });
+
+        externalApiResponse = await resendRes.json();
+        if (resendRes.ok) {
+          liveDeliveryStatus = `Delivered via Resend API (ID: ${externalApiResponse.id})`;
+        } else {
+          liveDeliveryStatus = `Resend Notice: ${externalApiResponse.message || 'Check Resend key or verified recipient'}`;
+        }
+      } catch (err: any) {
+        console.warn('Resend live dispatch attempt:', err);
+        liveDeliveryStatus = `Resend Error: ${err.message || 'Connection failed'}`;
+      }
+    }
+
+    // 2. LIVE DELIVERY VIA MSG91 EMAIL API
+    else if (process.env.MSG91_AUTH_KEY) {
       try {
         const recipients = targetRecipient.split(',').map((e: string) => ({
           name: spocName || 'SPOC Lead',
@@ -81,8 +112,8 @@ export async function POST(request: Request) {
       }
     }
 
-    // 2. LIVE DELIVERY VIA ZOHO ZEPTOMAIL API
-    if (process.env.ZOHO_ZEPTOMAIL_TOKEN) {
+    // 3. LIVE DELIVERY VIA ZOHO ZEPTOMAIL API
+    else if (process.env.ZOHO_ZEPTOMAIL_TOKEN) {
       try {
         const recipients = targetRecipient.split(',').map((e: string) => ({
           email_address: { address: e.trim(), name: spocName || 'SPOC' }
@@ -113,7 +144,7 @@ export async function POST(request: Request) {
       }
     }
 
-    // 2. LIVE DELIVERY VIA ZOHO MAIL SMTP (Using standard Zoho Mailbox App Password)
+    // 4. LIVE DELIVERY VIA ZOHO MAIL SMTP (Using standard Zoho Mailbox App Password)
     else if (process.env.ZOHO_SMTP_USER && process.env.ZOHO_SMTP_PASS) {
       try {
         const transporter = nodemailer.createTransport({
@@ -137,36 +168,6 @@ export async function POST(request: Request) {
       } catch (err: any) {
         console.warn('Zoho Mail SMTP dispatch attempt:', err);
         liveDeliveryStatus = `Zoho SMTP Error: ${err.message || 'Check App Password'}`;
-      }
-    }
-
-    // 3. LIVE DELIVERY VIA RESEND API
-    else if (process.env.RESEND_API_KEY) {
-      try {
-        const recipients = targetRecipient.split(',').map((e: string) => e.trim()).filter(Boolean);
-        
-        const resendRes = await fetch('https://api.resend.com/emails', {
-          method: 'POST',
-          headers: {
-            'Authorization': `Bearer ${process.env.RESEND_API_KEY}`,
-            'Content-Type': 'application/json'
-          },
-          body: JSON.stringify({
-            from: process.env.RESEND_FROM_EMAIL || 'onboarding@resend.dev',
-            to: recipients,
-            subject: emailSubject,
-            html: formattedHtml
-          })
-        });
-
-        externalApiResponse = await resendRes.json();
-        if (resendRes.ok) {
-          liveDeliveryStatus = `Delivered via Resend API (ID: ${externalApiResponse.id})`;
-        } else {
-          liveDeliveryStatus = `Resend Error: ${externalApiResponse.message || 'Check API key'}`;
-        }
-      } catch (err: any) {
-        console.warn('Resend live dispatch attempt:', err);
       }
     }
 
