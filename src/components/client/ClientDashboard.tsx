@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import { useStore } from '@/lib/store';
 import { ApprenticeRecord, UploadedDocument, SPOCEmailLog } from '@/types';
 import { GlassCard } from '@/components/ui/GlassCard';
@@ -116,6 +116,23 @@ export const ClientDashboard: React.FC = () => {
     bankProofDoc?: UploadedDocument;
     resumeDoc?: UploadedDocument;
   }>({});
+
+  // Role Selection State (from client's intake selections)
+  const [isCustomRole, setIsCustomRole] = useState(false);
+  const [customRoleText, setCustomRoleText] = useState('');
+
+  const clientChosenRoles: string[] = useMemo(() => {
+    const roles = activeSubmission?.responses?.tradesRequired;
+    if (Array.isArray(roles) && roles.length > 0) {
+      return roles;
+    }
+    return [
+      'Full-Stack Developer Trainee',
+      'Business Operations Associate',
+      'Cloud & DevOps Associate',
+      'Data & Analytics Trainee'
+    ];
+  }, [activeSubmission?.responses?.tradesRequired]);
 
   const hasSubmittedIntake = Boolean(activeSubmission && activeSubmission.status === 'submitted');
 
@@ -293,22 +310,25 @@ export const ClientDashboard: React.FC = () => {
     setShowDBTClaimModal(false);
   };
 
-  // Open Add Candidate Modal with Current SPOC Pre-filled
+  // Open Add Candidate Modal with Current SPOC & Intake Roles Pre-filled
   const handleOpenAddModal = () => {
     const designatedEmail = currentSpoc?.email || activeSubmission?.assigned_company_spoc?.email || user?.apprenticeMetrics?.assignedCompanySpoc?.email || activeSubmission?.responses?.complianceOfficerEmail || user?.email || '';
     const designatedName = currentSpoc?.name || activeSubmission?.assigned_company_spoc?.name || user?.apprenticeMetrics?.assignedCompanySpoc?.name || activeSubmission?.responses?.complianceOfficerName || user?.full_name || 'Designated SPOC';
+    const defaultRole = clientChosenRoles[0] || '';
 
     setCandidateDocs({});
+    setIsCustomRole(false);
+    setCustomRoleText('');
     setCandidateForm({
       name: '',
       email: '',
       phone: '',
       aadhaarNumber: '',
-      tradeOrRole: '',
+      tradeOrRole: defaultRole,
       qualification: 'B.Tech / B.Sc / Diploma',
-      stipendAmount: 18500,
+      stipendAmount: Number(activeSubmission?.responses?.stipendPerApprentice) || 18500,
       dbtEligibleAmount: 4500,
-      joiningDate: new Date().toISOString().split('T')[0],
+      joiningDate: activeSubmission?.responses?.proposedJoiningDate || new Date().toISOString().split('T')[0],
       bankAccountNumber: '',
       ifscCode: 'HDFC0001824',
       spocEmail: designatedEmail,
@@ -1233,16 +1253,51 @@ export const ClientDashboard: React.FC = () => {
                       />
                     </div>
 
-                    <div className="sm:col-span-2">
-                      <label className="block font-bold text-zinc-700 mb-1">Target Role / Specialization *</label>
-                      <input
-                        type="text"
-                        required
-                        placeholder="e.g. Full-Stack Developer Trainee / Operations Associate"
-                        value={candidateForm.tradeOrRole}
-                        onChange={(e) => setCandidateForm({ ...candidateForm, tradeOrRole: e.target.value })}
-                        className="w-full px-3 py-2 rounded-2xl bg-zinc-50 border border-zinc-200 text-zinc-900 text-xs focus:outline-none focus:border-black font-medium"
-                      />
+                    <div className="sm:col-span-2 space-y-1.5">
+                      <div className="flex items-center justify-between">
+                        <label className="block font-bold text-zinc-700 text-xs">Target Role / Specialization *</label>
+                        <span className="text-[10px] text-zinc-400 font-mono">From your intake selections</span>
+                      </div>
+
+                      <select
+                        value={isCustomRole ? '__other__' : candidateForm.tradeOrRole}
+                        onChange={(e) => {
+                          const val = e.target.value;
+                          if (val === '__other__') {
+                            setIsCustomRole(true);
+                            setCandidateForm({ ...candidateForm, tradeOrRole: customRoleText });
+                          } else {
+                            setIsCustomRole(false);
+                            setCandidateForm({ ...candidateForm, tradeOrRole: val });
+                          }
+                        }}
+                        className="w-full px-3 py-2.5 rounded-2xl bg-zinc-50 border border-zinc-200 text-zinc-900 text-xs focus:outline-none focus:border-black font-semibold cursor-pointer"
+                      >
+                        {clientChosenRoles.map((role) => (
+                          <option key={role} value={role}>
+                            {role}
+                          </option>
+                        ))}
+                        <option value="__other__">+ Other (Type Custom Role)</option>
+                      </select>
+
+                      {isCustomRole && (
+                        <div className="pt-1">
+                          <input
+                            type="text"
+                            required
+                            placeholder="Enter custom role title (e.g. AI Prompt Engineer / QA Analyst)"
+                            value={customRoleText}
+                            onChange={(e) => {
+                              const val = e.target.value;
+                              setCustomRoleText(val);
+                              setCandidateForm({ ...candidateForm, tradeOrRole: val });
+                            }}
+                            className="w-full px-3.5 py-2.5 rounded-2xl bg-white border border-zinc-300 text-zinc-900 text-xs focus:outline-none focus:border-black font-medium"
+                            autoFocus
+                          />
+                        </div>
+                      )}
                     </div>
                   </div>
                 </div>
