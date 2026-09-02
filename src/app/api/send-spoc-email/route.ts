@@ -45,7 +45,7 @@ export async function POST(request: Request) {
     let externalApiResponse: any = null;
 
     // 1. LIVE DELIVERY VIA RESEND API
-    const resendToken = process.env.RESEND_API_KEY || ['re', 'MRwTp4iL', 'MAicZaCm3EcANjwSr2XPN6HD'].join('_');
+    const resendToken = process.env.RESEND_API_KEY;
     if (resendToken) {
       try {
         const recipients = targetRecipient.split(',').map((e: string) => e.trim()).filter(Boolean);
