@@ -412,25 +412,59 @@ export const AuthGateway: React.FC = () => {
 
                 </form>
 
-                {/* Quick Demo Fill Buttons */}
-                <div className="mt-6 pt-4 border-t border-zinc-100 flex items-center justify-between text-xs">
-                  <span className="text-zinc-400 font-mono text-[11px]">Quick fill:</span>
-                  <div className="flex items-center gap-2">
-                    <button
-                      type="button"
-                      onClick={() => handleQuickDemo('client')}
-                      className="px-3 py-1 rounded-full bg-zinc-100 hover:bg-zinc-200 text-zinc-700 text-[11px] font-semibold border border-zinc-200 transition-all cursor-pointer"
-                    >
-                      Client
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => handleQuickDemo('admin')}
-                      className="px-3 py-1 rounded-full bg-zinc-100 hover:bg-zinc-200 text-zinc-700 text-[11px] font-semibold border border-zinc-200 transition-all cursor-pointer"
-                    >
-                      Admin
-                    </button>
+                {/* Returning Accounts Quick Select (Strictly Isolated by Role) */}
+                <div className="mt-6 pt-4 border-t border-zinc-100 space-y-2.5 text-xs">
+                  <div className="flex items-center justify-between">
+                    <span className="text-zinc-400 font-mono text-[11px]">
+                      {portalType === 'client' ? 'Saved Client Workspaces:' : 'Admin Security Access:'}
+                    </span>
+                    <span className="text-[10px] font-mono text-zinc-400 uppercase">
+                      {portalType === 'client' ? 'Client Role Only' : 'Admin Role Only'}
+                    </span>
                   </div>
+
+                  {portalType === 'client' ? (
+                    <div className="flex flex-wrap gap-1.5">
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setEmail('alex@novatech.io');
+                          setPassword('password123');
+                        }}
+                        className="px-3 py-1 rounded-full bg-zinc-100 hover:bg-zinc-200 text-zinc-800 text-[11px] font-semibold border border-zinc-200 transition-all cursor-pointer flex items-center gap-1"
+                      >
+                        <span>NovaTech (Alex)</span>
+                      </button>
+
+                      {submissions.filter(s => s.client_email && s.client_email !== 'alex@novatech.io').slice(0, 2).map(s => (
+                        <button
+                          key={s.id}
+                          type="button"
+                          onClick={() => {
+                            setEmail(s.client_email);
+                            setPassword('password123');
+                          }}
+                          className="px-3 py-1 rounded-full bg-zinc-100 hover:bg-zinc-200 text-zinc-800 text-[11px] font-semibold border border-zinc-200 transition-all cursor-pointer truncate max-w-[160px]"
+                        >
+                          <span>{s.company_name || s.client_name}</span>
+                        </button>
+                      ))}
+                    </div>
+                  ) : (
+                    <div className="flex items-center gap-2">
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setEmail('admin@company.com');
+                          setPassword('admin123');
+                        }}
+                        className="px-3.5 py-1 rounded-full bg-zinc-100 hover:bg-zinc-200 text-zinc-800 text-[11px] font-semibold border border-zinc-200 transition-all cursor-pointer flex items-center gap-1.5"
+                      >
+                        <Shield className="w-3 h-3 text-zinc-600" />
+                        <span>Fill Administrator (admin@company.com)</span>
+                      </button>
+                    </div>
+                  )}
                 </div>
 
               </div>
