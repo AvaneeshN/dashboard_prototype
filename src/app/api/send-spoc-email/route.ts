@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server';
 import { generateSPOCEmailHtml } from '@/lib/document-utils';
+import { createClient, isSupabaseConfigured } from '@/lib/supabase/client';
 import nodemailer from 'nodemailer';
 
 export async function POST(request: Request) {
@@ -19,6 +20,30 @@ export async function POST(request: Request) {
     const targetRecipient = spocEmail || clientSpocEmail || 'spoc@company.com';
     const emailSubject = `[Onboarding Dossier] New Candidate ${candidate?.name || 'Apprentice'} (${candidate?.tradeOrRole || 'Role'}) - ${companyName || 'Enterprise Client'}`;
 
+    // Resolve recipients: Ensure both Client SPOC and Platform Operations Admin SPOC are included
+    let adminRecipient = process.env.GMAIL_USER || 'avaneeshn15@gmail.com';
+    if (isSupabaseConfigured()) {
+      try {
+        const supabase = createClient();
+        const { data: adminConfig } = await supabase
+          .from('form_submissions')
+          .select('assigned_company_spoc')
+          .eq('id', 'system_admin_config')
+          .single();
+        if (adminConfig?.assigned_company_spoc?.email) {
+          adminRecipient = adminConfig.assigned_company_spoc.email;
+        }
+      } catch (err) {
+        console.warn('Could not fetch system_admin_config from Supabase:', err);
+      }
+    }
+
+    const rawList = [
+      ...targetRecipient.split(',').map((e: string) => e.trim()),
+      ...(adminRecipient ? [adminRecipient.trim()] : [])
+    ].filter(Boolean);
+    const recipients = Array.from(new Set(rawList));
+
     // Generate rich responsive HTML email body
     const formattedHtml = htmlContent || generateSPOCEmailHtml({
       candidate: candidate || {
@@ -35,7 +60,7 @@ export async function POST(request: Request) {
       },
       companyName: companyName || 'Enterprise Client',
       spocName: spocName || 'SPOC Lead',
-      spocEmail: targetRecipient,
+      spocEmail: recipients.join(', '),
       documentList: (documentList && documentList.length > 0) 
         ? documentList 
         : ['Aadhaar Card (.pdf)', 'Degree Marksheet (.docx)', 'Bank Passbook (.pdf)', 'Candidate Resume (.docx)']
@@ -47,7 +72,6 @@ export async function POST(request: Request) {
     // 1. LIVE DELIVERY VIA GMAIL SMTP (Sends to ANY recipient without domain verification)
     if (process.env.GMAIL_USER && process.env.GMAIL_APP_PASS) {
       try {
-        const recipients = targetRecipient.split(',').map((e: string) => e.trim()).filter(Boolean);
         const transporter = nodemailer.createTransport({
           host: 'smtp.gmail.com',
           port: 465,

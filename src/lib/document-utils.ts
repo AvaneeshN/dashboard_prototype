@@ -13,9 +13,22 @@ export const uploadFileToSupabaseStorage = async (
     if (!isSupabaseConfigured()) return null;
 
     const supabase = createClient();
+    const ext = file.name.split('.').pop()?.toLowerCase() || '';
+    let contentType = file.type;
+    if (ext === 'pdf') contentType = 'application/pdf';
+    else if (ext === 'docx') contentType = 'application/vnd.openxmlformats-officedocument.wordprocessingml.document';
+    else if (ext === 'doc') contentType = 'application/msword';
+    else if (ext === 'txt') contentType = 'text/plain; charset=utf-8';
+    else if (ext === 'png') contentType = 'image/png';
+    else if (ext === 'jpg' || ext === 'jpeg') contentType = 'image/jpeg';
+
     const { error: uploadError } = await supabase.storage
       .from('documents')
-      .upload(path, file, { cacheControl: '3600', upsert: true });
+      .upload(path, file, { 
+        contentType: contentType || 'application/octet-stream',
+        cacheControl: '3600', 
+        upsert: true 
+      });
 
     if (uploadError) {
       console.error('Supabase Storage upload failed:', uploadError.message);
