@@ -21,13 +21,13 @@ export const INITIAL_LOGIN_LOGS: LoginActivityLog[] = [
     status: 'success',
     ip_address: '192.168.1.1',
     user_agent: 'Console Admin Client',
-    created_at: new Date(Date.now() - 5 * 60000).toISOString()
+    created_at: new Date().toISOString()
   }
 ];
 
 export const INITIAL_FUNNEL_STEPS = [
-  { step: 1, name: 'Candidate & Quota Requirements', started: 100, completed: 95, dropOff: 5, dropOffRate: '5.0%' },
-  { step: 2, name: 'Payroll & Stipend Structure', started: 95, completed: 88, dropOff: 7, dropOffRate: '7.3%' },
-  { step: 3, name: 'Contract & Compliance Setup', started: 88, completed: 82, dropOff: 6, dropOffRate: '6.8%' },
-  { step: 4, name: 'Document Verification & Submit', started: 82, completed: 80, dropOff: 2, dropOffRate: '2.4%' }
+  { step: 1, name: 'Candidate & Quota Requirements', started: 0, completed: 0, dropOff: 0, dropOffRate: '0.0%' },
+  { step: 2, name: 'Payroll & Stipend Structure', started: 0, completed: 0, dropOff: 0, dropOffRate: '0.0%' },
+  { step: 3, name: 'Contract & Compliance Setup', started: 0, completed: 0, dropOff: 0, dropOffRate: '0.0%' },
+  { step: 4, name: 'Document Verification & Submit', started: 0, completed: 0, dropOff: 0, dropOffRate: '0.0%' }
 ];

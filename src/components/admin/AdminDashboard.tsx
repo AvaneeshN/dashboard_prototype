@@ -68,14 +68,26 @@ export const AdminDashboard: React.FC = () => {
   const failedLogins = loginLogs.filter(l => l.status === 'failed').length;
   const successLogins = loginLogs.filter(l => l.status === 'success').length;
 
-  // Funnel data for Recharts
-  const funnelChartData = INITIAL_FUNNEL_STEPS.map(s => ({
-    name: `Step ${s.step}`,
-    fullName: s.name,
-    started: s.started,
-    completed: s.completed,
-    dropOff: s.dropOff
-  }));
+  // Dynamic Total DBT Disbursed from actual submissions and claims
+  const totalDbtDisbursed = submissions.reduce((acc, sub) => {
+    const claimsTotal = (sub.dbt_claims || []).reduce((cAcc, claim) => cAcc + (claim.amountSettled || claim.amountClaimed || 0), 0);
+    const candidateDbt = (sub.candidates || []).reduce((candAcc, c) => candAcc + (c.dbtEligibleAmount || 0), 0);
+    return acc + (claimsTotal > 0 ? claimsTotal : candidateDbt);
+  }, 0);
+
+  // Dynamic Funnel data for Recharts based on real client intake progression
+  const step1Started = submissions.length;
+  const step1Completed = submissions.filter(s => (s.current_step || 1) >= 1 || s.status !== 'draft').length;
+  const step2Completed = submissions.filter(s => (s.current_step || 1) >= 2 || s.status === 'submitted' || s.status === 'under_review' || s.status === 'approved').length;
+  const step3Completed = submissions.filter(s => (s.current_step || 1) >= 3 || s.status === 'submitted' || s.status === 'under_review' || s.status === 'approved').length;
+  const step4Completed = submissions.filter(s => s.status === 'submitted' || s.status === 'under_review' || s.status === 'approved').length;
+
+  const funnelChartData = [
+    { name: 'Step 1', fullName: 'Candidate & Quota Requirements', started: step1Started, completed: step1Completed, dropOff: Math.max(step1Started - step1Completed, 0) },
+    { name: 'Step 2', fullName: 'Payroll & Stipend Structure', started: step1Completed, completed: step2Completed, dropOff: Math.max(step1Completed - step2Completed, 0) },
+    { name: 'Step 3', fullName: 'Contract & Compliance Setup', started: step2Completed, completed: step3Completed, dropOff: Math.max(step2Completed - step3Completed, 0) },
+    { name: 'Step 4', fullName: 'Document Verification & Submit', started: step3Completed, completed: step4Completed, dropOff: Math.max(step3Completed - step4Completed, 0) }
+  ];
 
   // Filter Submissions
   const filteredSubmissions = submissions.filter(sub => {
@@ -249,10 +261,12 @@ export const AdminDashboard: React.FC = () => {
                     TOTAL DBT DISBURSED
                   </span>
                   <div className="text-4xl font-extrabold text-zinc-900 tracking-tight">
-                    ₹4.5L
+                    {totalDbtDisbursed > 0 
+                      ? (totalDbtDisbursed >= 100000 ? `₹${(totalDbtDisbursed / 100000).toFixed(1)}L` : `₹${totalDbtDisbursed.toLocaleString()}`) 
+                      : '₹0'}
                   </div>
                   <div className="text-xs text-zinc-500 font-medium mt-1">
-                    August cycle settled
+                    {totalDbtDisbursed > 0 ? 'Monthly cycle settled' : 'No settlements logged yet'}
                   </div>
                 </div>
 
