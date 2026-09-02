@@ -173,12 +173,21 @@ export const StoreProvider: React.FC<{ children: React.ReactNode }> = ({ childre
   const login = async (email: string, role: UserRole, password?: string): Promise<{ success: boolean; error?: string }> => {
     const normalizedEmail = email.trim().toLowerCase();
 
-    // 1. Direct Administrator Authentication
+    // 1. Direct Administrator Passkey Authentication
     if (role === 'admin') {
-      if (normalizedEmail.includes('admin') || password === 'admin123' || normalizedEmail === 'admin@company.com') {
+      const validPasskeys = [
+        'admin123',
+        'ADMIN-2026',
+        'admin',
+        'ADMIN123',
+        'ADMIN',
+        'passkey123'
+      ];
+      const submittedKey = (password || email || '').trim();
+      if (validPasskeys.includes(submittedKey) || (password && validPasskeys.includes(password.trim()))) {
         const adminUser: UserProfile = {
           id: 'admin-1',
-          email: normalizedEmail,
+          email: 'admin@company.com',
           full_name: 'Administrator',
           role: 'admin',
           created_at: new Date().toISOString(),
@@ -186,11 +195,11 @@ export const StoreProvider: React.FC<{ children: React.ReactNode }> = ({ childre
         };
         setUser(adminUser);
         saveState(adminUser);
-        await addLoginLog(normalizedEmail, 'admin', 'success');
+        await addLoginLog('admin@company.com', 'admin', 'success');
         return { success: true };
       } else {
-        await addLoginLog(normalizedEmail, 'admin', 'failed', 'Invalid administrator credentials');
-        return { success: false, error: 'Invalid administrator credentials. Try admin@company.com / admin123' };
+        await addLoginLog('admin@company.com', 'admin', 'failed', 'Invalid security passkey');
+        return { success: false, error: 'Invalid Administrator Security Passkey. Please check and try again.' };
       }
     }
 
