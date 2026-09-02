@@ -44,7 +44,44 @@ export async function POST(request: Request) {
     let liveDeliveryStatus = 'Simulated Local Gateway';
     let externalApiResponse: any = null;
 
-    // 1. LIVE DELIVERY VIA ZOHO ZEPTOMAIL API (Recommended on Zoho)
+    // 1. LIVE DELIVERY VIA MSG91 EMAIL API
+    if (process.env.MSG91_AUTH_KEY) {
+      try {
+        const recipients = targetRecipient.split(',').map((e: string) => ({
+          name: spocName || 'SPOC Lead',
+          email: e.trim()
+        }));
+
+        const msg91Res = await fetch('https://control.msg91.com/api/v5/email/send', {
+          method: 'POST',
+          headers: {
+            'authkey': process.env.MSG91_AUTH_KEY,
+            'Content-Type': 'application/json'
+          },
+          body: JSON.stringify({
+            to: recipients,
+            from: {
+              name: companyName || 'Apprentice Portal',
+              email: process.env.MSG91_FROM_EMAIL || 'support@yourdomain.com'
+            },
+            subject: emailSubject,
+            body: formattedHtml
+          })
+        });
+
+        externalApiResponse = await msg91Res.json();
+        if (msg91Res.ok && (externalApiResponse.status === 'success' || externalApiResponse.hasError === false || !externalApiResponse.hasError)) {
+          liveDeliveryStatus = `Delivered via MSG91 (ID: ${externalApiResponse.data?.unique_id || externalApiResponse.requestId || 'OK'})`;
+        } else {
+          liveDeliveryStatus = `MSG91 Notice: ${externalApiResponse.message || 'Check MSG91 configuration'}`;
+        }
+      } catch (err: any) {
+        console.warn('MSG91 dispatch attempt:', err);
+        liveDeliveryStatus = `MSG91 Error: ${err.message || 'Connection failed'}`;
+      }
+    }
+
+    // 2. LIVE DELIVERY VIA ZOHO ZEPTOMAIL API
     if (process.env.ZOHO_ZEPTOMAIL_TOKEN) {
       try {
         const recipients = targetRecipient.split(',').map((e: string) => ({
