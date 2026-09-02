@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server';
 import { generateSPOCEmailHtml } from '@/lib/document-utils';
+import nodemailer from 'nodemailer';
 
 export async function POST(request: Request) {
   try {
@@ -43,8 +44,67 @@ export async function POST(request: Request) {
     let liveDeliveryStatus = 'Simulated Local Gateway';
     let externalApiResponse: any = null;
 
-    // 1. LIVE DELIVERY VIA RESEND (If RESEND_API_KEY is present in .env.local)
-    if (process.env.RESEND_API_KEY) {
+    // 1. LIVE DELIVERY VIA ZOHO ZEPTOMAIL API (Recommended on Zoho)
+    if (process.env.ZOHO_ZEPTOMAIL_TOKEN) {
+      try {
+        const recipients = targetRecipient.split(',').map((e: string) => ({
+          email_address: { address: e.trim(), name: spocName || 'SPOC' }
+        }));
+
+        const zohoRes = await fetch('https://api.zeptomail.in/v1.1/email', {
+          method: 'POST',
+          headers: {
+            'Authorization': process.env.ZOHO_ZEPTOMAIL_TOKEN,
+            'Content-Type': 'application/json'
+          },
+          body: JSON.stringify({
+            from: { address: process.env.ZOHO_FROM_EMAIL || 'support@yourcompany.com' },
+            to: recipients,
+            subject: emailSubject,
+            htmlbody: formattedHtml
+          })
+        });
+
+        externalApiResponse = await zohoRes.json();
+        if (zohoRes.ok) {
+          liveDeliveryStatus = `Delivered via Zoho ZeptoMail (Request ID: ${externalApiResponse.request_id || 'OK'})`;
+        } else {
+          liveDeliveryStatus = `Zoho ZeptoMail Notice: ${externalApiResponse.message || 'Check ZeptoMail token'}`;
+        }
+      } catch (err: any) {
+        console.warn('Zoho ZeptoMail dispatch attempt:', err);
+      }
+    }
+
+    // 2. LIVE DELIVERY VIA ZOHO MAIL SMTP (Using standard Zoho Mailbox App Password)
+    else if (process.env.ZOHO_SMTP_USER && process.env.ZOHO_SMTP_PASS) {
+      try {
+        const transporter = nodemailer.createTransport({
+          host: process.env.ZOHO_SMTP_HOST || 'smtp.zoho.in',
+          port: Number(process.env.ZOHO_SMTP_PORT) || 465,
+          secure: true,
+          auth: {
+            user: process.env.ZOHO_SMTP_USER,
+            pass: process.env.ZOHO_SMTP_PASS
+          }
+        });
+
+        const info = await transporter.sendMail({
+          from: `"${companyName || 'Apprenticeship Portal'}" <${process.env.ZOHO_SMTP_USER}>`,
+          to: targetRecipient,
+          subject: emailSubject,
+          html: formattedHtml
+        });
+
+        liveDeliveryStatus = `Delivered via Zoho Mail SMTP (Message ID: ${info.messageId})`;
+      } catch (err: any) {
+        console.warn('Zoho Mail SMTP dispatch attempt:', err);
+        liveDeliveryStatus = `Zoho SMTP Error: ${err.message || 'Check App Password'}`;
+      }
+    }
+
+    // 3. LIVE DELIVERY VIA RESEND API
+    else if (process.env.RESEND_API_KEY) {
       try {
         const recipients = targetRecipient.split(',').map((e: string) => e.trim()).filter(Boolean);
         
@@ -66,38 +126,10 @@ export async function POST(request: Request) {
         if (resendRes.ok) {
           liveDeliveryStatus = `Delivered via Resend API (ID: ${externalApiResponse.id})`;
         } else {
-          liveDeliveryStatus = `Resend Error: ${externalApiResponse.message || 'Check API key / verified domain'}`;
+          liveDeliveryStatus = `Resend Error: ${externalApiResponse.message || 'Check API key'}`;
         }
       } catch (err: any) {
         console.warn('Resend live dispatch attempt:', err);
-      }
-    }
-
-    // 2. LIVE DELIVERY VIA ZOHO ZEPTOMAIL (If ZOHO_ZEPTOMAIL_TOKEN is present in .env.local)
-    else if (process.env.ZOHO_ZEPTOMAIL_TOKEN) {
-      try {
-        const recipients = targetRecipient.split(',').map((e: string) => ({
-          email_address: { address: e.trim(), name: spocName || 'SPOC' }
-        }));
-
-        const zohoRes = await fetch('https://api.zeptomail.in/v1.1/email', {
-          method: 'POST',
-          headers: {
-            'Authorization': process.env.ZOHO_ZEPTOMAIL_TOKEN,
-            'Content-Type': 'application/json'
-          },
-          body: JSON.stringify({
-            from: { address: process.env.ZOHO_FROM_EMAIL || 'support@yourdomain.com' },
-            to: recipients,
-            subject: emailSubject,
-            htmlbody: formattedHtml
-          })
-        });
-
-        externalApiResponse = await zohoRes.json();
-        liveDeliveryStatus = `Delivered via Zoho ZeptoMail (Request ID: ${externalApiResponse.request_id || 'OK'})`;
-      } catch (err: any) {
-        console.warn('Zoho ZeptoMail dispatch attempt:', err);
       }
     }
 
