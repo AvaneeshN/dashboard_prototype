@@ -44,9 +44,38 @@ export async function POST(request: Request) {
     let liveDeliveryStatus = 'Simulated Local Gateway';
     let externalApiResponse: any = null;
 
-    // 1. LIVE DELIVERY VIA RESEND API
-    const resendToken = process.env.RESEND_API_KEY;
-    if (resendToken) {
+    // 1. LIVE DELIVERY VIA GMAIL SMTP (Sends to ANY recipient without domain verification)
+    if (process.env.GMAIL_USER && process.env.GMAIL_APP_PASS) {
+      try {
+        const recipients = targetRecipient.split(',').map((e: string) => e.trim()).filter(Boolean);
+        const transporter = nodemailer.createTransport({
+          host: 'smtp.gmail.com',
+          port: 465,
+          secure: true,
+          auth: {
+            user: process.env.GMAIL_USER,
+            pass: process.env.GMAIL_APP_PASS
+          }
+        });
+
+        const info = await transporter.sendMail({
+          from: `"${companyName || 'Apprentice Portal'}" <${process.env.GMAIL_USER}>`,
+          to: recipients.join(', '),
+          subject: emailSubject,
+          html: formattedHtml
+        });
+
+        console.log('[OK] Gmail email dispatched successfully:', info.messageId);
+        liveDeliveryStatus = `Delivered via Gmail SMTP (ID: ${info.messageId})`;
+      } catch (err: any) {
+        console.error('[ERROR] Gmail SMTP dispatch attempt failed:', err);
+        liveDeliveryStatus = `Gmail Error: ${err.message || 'Check Gmail App Password'}`;
+      }
+    }
+
+    // 2. LIVE DELIVERY VIA RESEND API
+    else if (process.env.RESEND_API_KEY) {
+      const resendToken = process.env.RESEND_API_KEY;
       try {
         let recipients = targetRecipient.split(',').map((e: string) => e.trim()).filter(Boolean);
         
@@ -86,35 +115,6 @@ export async function POST(request: Request) {
       } catch (err: any) {
         console.error('[ERROR] Resend live dispatch attempt failed:', err);
         liveDeliveryStatus = `Resend Error: ${err.message || 'Connection failed'}`;
-      }
-    }
-
-    // 2. LIVE DELIVERY VIA GMAIL SMTP (Sends to ANY recipient without domain verification)
-    else if (process.env.GMAIL_USER && process.env.GMAIL_APP_PASS) {
-      try {
-        const recipients = targetRecipient.split(',').map((e: string) => e.trim()).filter(Boolean);
-        const transporter = nodemailer.createTransport({
-          host: 'smtp.gmail.com',
-          port: 465,
-          secure: true,
-          auth: {
-            user: process.env.GMAIL_USER,
-            pass: process.env.GMAIL_APP_PASS
-          }
-        });
-
-        const info = await transporter.sendMail({
-          from: `"${companyName || 'Apprentice Portal'}" <${process.env.GMAIL_USER}>`,
-          to: recipients.join(', '),
-          subject: emailSubject,
-          html: formattedHtml
-        });
-
-        console.log('[OK] Gmail email dispatched successfully:', info.messageId);
-        liveDeliveryStatus = `Delivered via Gmail SMTP (ID: ${info.messageId})`;
-      } catch (err: any) {
-        console.error('[ERROR] Gmail SMTP dispatch attempt failed:', err);
-        liveDeliveryStatus = `Gmail Error: ${err.message || 'Check Gmail App Password'}`;
       }
     }
 

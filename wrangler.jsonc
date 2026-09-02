@@ -15,6 +15,7 @@
   },
   "vars": {
     "NEXT_PUBLIC_SUPABASE_URL": "https://budhnvdyzrmoubuwjonc.supabase.co",
-    "NEXT_PUBLIC_SUPABASE_ANON_KEY": "sb_publishable_bP73jhmdP0sMFLczy7HLbQ_Zk1G2TOR"
+    "NEXT_PUBLIC_SUPABASE_ANON_KEY": "sb_publishable_bP73jhmdP0sMFLczy7HLbQ_Zk1G2TOR",
+    "GMAIL_USER": "avaneeshn15@gmail.com"
   }
 }
