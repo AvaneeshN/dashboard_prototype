@@ -9,6 +9,31 @@ export type SubmissionStatus =
   | 'rejected' 
   | 'abandoned';
 
+export interface UploadedDocument {
+  id: string;
+  name: string;
+  type: 'pdf' | 'docx' | 'txt' | 'image' | 'other';
+  category: 'Aadhaar' | 'Education' | 'Bank Proof' | 'Resume' | 'COI' | 'GST' | 'Signatory Letter' | 'Cheque' | 'General';
+  sizeFormatted: string;
+  dataUrl?: string;
+  textContent?: string;
+  uploadedAt: string;
+}
+
+export interface SPOCEmailLog {
+  id: string;
+  candidateId: string;
+  candidateName: string;
+  recipientEmail: string;
+  recipientName?: string;
+  companyName: string;
+  subject: string;
+  documentNames: string[];
+  sentAt: string;
+  status: 'Delivered' | 'Pending' | 'Bounced';
+  previewBodyHtml?: string;
+}
+
 export interface ApprenticeRecord {
   id: string;
   name: string;
@@ -27,10 +52,17 @@ export interface ApprenticeRecord {
   status: 'Active' | 'Under Training' | 'Completed' | 'Terminated';
   bankAccountNumber?: string;
   ifscCode?: string;
+  spocEmail?: string;
+  spocName?: string;
   documents?: {
+    aadhaarDoc?: UploadedDocument;
+    educationDoc?: UploadedDocument;
+    bankProofDoc?: UploadedDocument;
+    resumeDoc?: UploadedDocument;
     aadhaarFile?: string;
     educationFile?: string;
     bankProofFile?: string;
+    resumeFile?: string;
   };
 }
 
@@ -80,6 +112,7 @@ export interface ClientApprenticeMetrics {
   };
   lastMonthOnboardedList: ApprenticeRecord[];
   dbtClaimsHistory?: DBTClaimRecord[];
+  spocEmailLogs?: SPOCEmailLog[];
 }
 
 export interface UserProfile {
@@ -97,9 +130,13 @@ export interface UserProfile {
 
 export interface IntakeCompanyDocs {
   coiFileName?: string;
+  coiDoc?: UploadedDocument;
   gstFileName?: string;
+  gstDoc?: UploadedDocument;
   signatoryLetterFileName?: string;
+  signatoryDoc?: UploadedDocument;
   cancelledChequeFileName?: string;
+  chequeDoc?: UploadedDocument;
   epfoRegistrationCode?: string;
 }
 
@@ -168,6 +205,7 @@ export interface FormSubmission {
   notes?: string;
   candidates?: ApprenticeRecord[];
   dbt_claims?: DBTClaimRecord[];
+  spoc_logs?: SPOCEmailLog[];
 }
 
 export interface FunnelEvent {

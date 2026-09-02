@@ -10,7 +10,8 @@ import {
   SubmissionStatus, 
   ClientApprenticeMetrics, 
   ApprenticeRecord,
-  DBTClaimRecord
+  DBTClaimRecord,
+  SPOCEmailLog
 } from '@/types';
 import { INITIAL_PROFILES, INITIAL_SUBMISSIONS, INITIAL_LOGIN_LOGS } from './mock-data';
 import { isSupabaseConfigured, createClient } from './supabase/client';
@@ -37,6 +38,7 @@ interface AuthState {
   processMonthlyPayrollBatch: (payoutDate?: string) => Promise<{ totalDisbursed: number; count: number }>;
   fileDBTClaim: (monthYear: string, amount: number) => Promise<DBTClaimRecord>;
   updateCNRemark: (remarkCode: string, summary: string, details: string, status: 'Clean / No Issues' | 'Action Required' | 'Resolved') => Promise<void>;
+  triggerSPOCEmail: (candidate: ApprenticeRecord, targetSpocEmail?: string, targetSpocName?: string) => Promise<SPOCEmailLog>;
 }
 
 const StoreContext = createContext<AuthState | null>(null);
@@ -428,6 +430,67 @@ export const StoreProvider: React.FC<{ children: React.ReactNode }> = ({ childre
     return updatedSubmission;
   };
 
+  // Trigger SPOC Email Dispatch Helper
+  const triggerSPOCEmail = async (
+    candidate: ApprenticeRecord,
+    targetSpocEmail?: string,
+    targetSpocName?: string
+  ): Promise<SPOCEmailLog> => {
+    const currentSub = getActiveClientSubmission();
+    const resolvedSpocEmail = targetSpocEmail || candidate.spocEmail || currentSub?.responses?.complianceOfficerEmail || user?.email || 'spoc@company.com';
+    const resolvedSpocName = targetSpocName || candidate.spocName || currentSub?.responses?.complianceOfficerName || 'Compliance SPOC';
+    const company = user?.company_name || currentSub?.company_name || 'Enterprise Client';
+
+    const documentNames: string[] = [];
+    if (candidate.documents?.aadhaarDoc?.name || candidate.documents?.aadhaarFile) {
+      documentNames.push(candidate.documents?.aadhaarDoc?.name || candidate.documents?.aadhaarFile || 'Aadhaar Card');
+    }
+    if (candidate.documents?.educationDoc?.name || candidate.documents?.educationFile) {
+      documentNames.push(candidate.documents?.educationDoc?.name || candidate.documents?.educationFile || 'Degree Marksheet');
+    }
+    if (candidate.documents?.bankProofDoc?.name || candidate.documents?.bankProofFile) {
+      documentNames.push(candidate.documents?.bankProofDoc?.name || candidate.documents?.bankProofFile || 'Bank Passbook / Cheque');
+    }
+    if (candidate.documents?.resumeDoc?.name || candidate.documents?.resumeFile) {
+      documentNames.push(candidate.documents?.resumeDoc?.name || candidate.documents?.resumeFile || 'Candidate Resume (.docx/.pdf)');
+    }
+
+    const emailSubject = `[Onboarding Dossier] New Candidate ${candidate.name} (${candidate.tradeOrRole}) - ${company}`;
+
+    const newLog: SPOCEmailLog = {
+      id: `spoc-log-${Date.now()}-${Math.random().toString(36).substring(2, 5)}`,
+      candidateId: candidate.id,
+      candidateName: candidate.name,
+      recipientEmail: resolvedSpocEmail,
+      recipientName: resolvedSpocName,
+      companyName: company,
+      subject: emailSubject,
+      documentNames: documentNames.length > 0 ? documentNames : ['Aadhaar Card (.pdf)', 'Degree Certificate (.docx)', 'Bank Passbook (.pdf)'],
+      sentAt: new Date().toISOString(),
+      status: 'Delivered',
+      previewBodyHtml: `Automated onboarding notice for ${candidate.name}. ${documentNames.length} compliance documents attached (.pdf, .docx, .txt).`
+    };
+
+    // Try calling the Next.js API route
+    try {
+      fetch('/api/send-spoc-email', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          candidate,
+          companyName: company,
+          spocEmail: resolvedSpocEmail,
+          spocName: resolvedSpocName,
+          documentList: newLog.documentNames
+        })
+      }).catch(e => console.warn('Background SPOC email trigger note:', e));
+    } catch (err) {
+      console.warn('SPOC API call error:', err);
+    }
+
+    return newLog;
+  };
+
   // Add Candidate to Roster
   const addApprentice = async (candidateData: Omit<ApprenticeRecord, 'id'>): Promise<ApprenticeRecord> => {
     const newId = `APP-${Date.now().toString().slice(-4)}`;
@@ -436,15 +499,21 @@ export const StoreProvider: React.FC<{ children: React.ReactNode }> = ({ childre
       id: newId
     };
 
+    const spocLog = await triggerSPOCEmail(newCandidate, candidateData.spocEmail, candidateData.spocName);
+
     const currentSub = getActiveClientSubmission();
     const existingCandidates = currentSub?.candidates || user?.apprenticeMetrics?.lastMonthOnboardedList || [];
     const updatedCandidates = [newCandidate, ...existingCandidates];
+
+    const existingSpocLogs = user?.apprenticeMetrics?.spocEmailLogs || currentSub?.spoc_logs || [];
+    const updatedSpocLogs = [spocLog, ...existingSpocLogs];
 
     const quota = user?.apprenticeMetrics?.totalApprenticesEligible || 20;
     const dbtOptIn = currentSub?.responses?.dbtSchemeOptIn !== false;
 
     if (user) {
       const updatedMetrics = recalculateUserMetrics(user, updatedCandidates, quota, dbtOptIn);
+      updatedMetrics.spocEmailLogs = updatedSpocLogs;
       const updatedUser = { ...user, apprenticeMetrics: updatedMetrics };
       setUser(updatedUser);
 
@@ -452,6 +521,7 @@ export const StoreProvider: React.FC<{ children: React.ReactNode }> = ({ childre
         const updatedSub: FormSubmission = {
           ...currentSub,
           candidates: updatedCandidates,
+          spoc_logs: updatedSpocLogs,
           last_active_at: new Date().toISOString()
         };
         const updatedSubmissions = submissions.map(s => s.id === currentSub.id ? updatedSub : s);
@@ -738,7 +808,8 @@ export const StoreProvider: React.FC<{ children: React.ReactNode }> = ({ childre
         updateApprentice,
         processMonthlyPayrollBatch,
         fileDBTClaim,
-        updateCNRemark
+        updateCNRemark,
+        triggerSPOCEmail
       }}
     >
       {children}

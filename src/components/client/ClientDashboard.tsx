@@ -2,9 +2,11 @@
 
 import React, { useState, useEffect } from 'react';
 import { useStore } from '@/lib/store';
-import { ApprenticeRecord } from '@/types';
+import { ApprenticeRecord, UploadedDocument, SPOCEmailLog } from '@/types';
 import { GlassCard } from '@/components/ui/GlassCard';
 import { ClientIntakeWizard } from './ClientIntakeWizard';
+import { DocumentViewerModal } from '@/components/ui/DocumentViewerModal';
+import { processUploadedFile, downloadDocumentFile } from '@/lib/document-utils';
 import { 
   Users, 
   UserCheck, 
@@ -35,7 +37,12 @@ import {
   Building,
   CreditCard,
   Clock,
-  Printer
+  Printer,
+  Mail,
+  Send,
+  Eye,
+  FileCheck2,
+  Paperclip
 } from 'lucide-react';
 import { 
   ResponsiveContainer, 
@@ -50,7 +57,7 @@ import {
 } from 'recharts';
 import { motion, AnimatePresence } from 'framer-motion';
 
-type ClientViewTab = 'overview' | 'payroll_dbt' | 'compliance_contracts' | 'apprentices';
+type ClientViewTab = 'overview' | 'payroll_dbt' | 'compliance_contracts' | 'apprentices' | 'spoc_logs';
 
 export const ClientDashboard: React.FC = () => {
   const { 
@@ -74,6 +81,7 @@ export const ClientDashboard: React.FC = () => {
   const [showPayrollModal, setShowPayrollModal] = useState(false);
   const [showDBTClaimModal, setShowDBTClaimModal] = useState(false);
   const [selectedContractCandidate, setSelectedContractCandidate] = useState<ApprenticeRecord | null>(null);
+  const [previewingDoc, setPreviewingDoc] = useState<any>(null);
 
   // New Candidate Form State
   const [candidateForm, setCandidateForm] = useState({
@@ -88,10 +96,17 @@ export const ClientDashboard: React.FC = () => {
     joiningDate: new Date().toISOString().split('T')[0],
     bankAccountNumber: '',
     ifscCode: 'HDFC0001824',
-    aadhaarFile: '',
-    educationFile: '',
-    bankProofFile: ''
+    spocEmail: '',
+    spocName: ''
   });
+
+  // Candidate Document State
+  const [candidateDocs, setCandidateDocs] = useState<{
+    aadhaarDoc?: UploadedDocument;
+    educationDoc?: UploadedDocument;
+    bankProofDoc?: UploadedDocument;
+    resumeDoc?: UploadedDocument;
+  }>({});
 
   const activeSubmission = getActiveClientSubmission();
   const hasSubmittedIntake = Boolean(activeSubmission && activeSubmission.status === 'submitted');
@@ -103,6 +118,17 @@ export const ClientDashboard: React.FC = () => {
       setActiveMainView('dashboard');
     }
   }, [hasSubmittedIntake]);
+
+  // Pre-fill SPOC Email from submission or user
+  useEffect(() => {
+    const spocEmailDefault = activeSubmission?.responses?.complianceOfficerEmail || user?.email || 'spoc@novatech.io';
+    const spocNameDefault = activeSubmission?.responses?.complianceOfficerName || user?.full_name || 'Compliance SPOC';
+    setCandidateForm(prev => ({
+      ...prev,
+      spocEmail: prev.spocEmail || spocEmailDefault,
+      spocName: prev.spocName || spocNameDefault
+    }));
+  }, [activeSubmission, user]);
 
   const defaultEmptyMetrics = {
     clientName: user?.full_name || 'Client Workspace',
@@ -137,7 +163,8 @@ export const ClientDashboard: React.FC = () => {
       details: 'Fill out the 4-section apprentice intake form to allocate quota and enable DBT subsidies.'
     },
     lastMonthOnboardedList: [],
-    dbtClaimsHistory: []
+    dbtClaimsHistory: [],
+    spocEmailLogs: []
   };
 
   const metrics = user?.apprenticeMetrics || defaultEmptyMetrics;
@@ -155,6 +182,8 @@ export const ClientDashboard: React.FC = () => {
   ];
 
   const candidateList = metrics.lastMonthOnboardedList || [];
+  const spocLogs = metrics.spocEmailLogs || [];
+
   const filteredApprentices = candidateList.filter(app => {
     const matchesSearch = 
       app.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
@@ -164,16 +193,29 @@ export const ClientDashboard: React.FC = () => {
     return matchesSearch && matchesStatus;
   });
 
-  // Handle Adding New Candidate
+  // Handle Document File Change
+  const handleDocFileSelect = async (
+    file: File | null,
+    category: 'Aadhaar' | 'Education' | 'Bank Proof' | 'Resume'
+  ) => {
+    if (!file) return;
+    const doc = await processUploadedFile(file, category);
+    if (category === 'Aadhaar') setCandidateDocs(prev => ({ ...prev, aadhaarDoc: doc }));
+    if (category === 'Education') setCandidateDocs(prev => ({ ...prev, educationDoc: doc }));
+    if (category === 'Bank Proof') setCandidateDocs(prev => ({ ...prev, bankProofDoc: doc }));
+    if (category === 'Resume') setCandidateDocs(prev => ({ ...prev, resumeDoc: doc }));
+  };
+
+  // Handle Adding New Candidate & Triggering SPOC Email
   const handleAddCandidateSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!candidateForm.name || !candidateForm.tradeOrRole) return;
+    if (!candidateForm.name || !candidateForm.tradeOrRole || !candidateForm.phone) return;
 
-    await addApprentice({
+    const newCandidate = await addApprentice({
       name: candidateForm.name,
       email: candidateForm.email || `${candidateForm.name.toLowerCase().replace(/\s+/g, '.')}@portal.edu`,
-      phone: candidateForm.phone || '+91 98765 00000',
-      aadhaarNumber: candidateForm.aadhaarNumber || 'XXXX-XXXX-9901',
+      phone: candidateForm.phone,
+      aadhaarNumber: candidateForm.aadhaarNumber || '4523-XXXX-9901',
       tradeOrRole: candidateForm.tradeOrRole,
       qualification: candidateForm.qualification,
       onboardingDate: candidateForm.joiningDate,
@@ -186,16 +228,26 @@ export const ClientDashboard: React.FC = () => {
       status: 'Active',
       bankAccountNumber: candidateForm.bankAccountNumber || '987654321012',
       ifscCode: candidateForm.ifscCode || 'HDFC0001824',
+      spocEmail: candidateForm.spocEmail,
+      spocName: candidateForm.spocName,
       documents: {
-        aadhaarFile: candidateForm.aadhaarFile || 'aadhaar_card_doc.pdf',
-        educationFile: candidateForm.educationFile || 'education_marksheet.pdf',
-        bankProofFile: candidateForm.bankProofFile || 'bank_passbook_doc.pdf'
+        aadhaarDoc: candidateDocs.aadhaarDoc,
+        educationDoc: candidateDocs.educationDoc,
+        bankProofDoc: candidateDocs.bankProofDoc,
+        resumeDoc: candidateDocs.resumeDoc,
+        aadhaarFile: candidateDocs.aadhaarDoc?.name || 'aadhaar_card_doc.pdf',
+        educationFile: candidateDocs.educationDoc?.name || 'degree_marksheet.pdf',
+        bankProofFile: candidateDocs.bankProofDoc?.name || 'bank_passbook_doc.pdf',
+        resumeFile: candidateDocs.resumeDoc?.name || 'candidate_resume.docx'
       }
     });
 
-    setClaimSuccessAlert(`Apprentice ${candidateForm.name} onboarded. Quota & Payroll recalculated live!`);
-    setTimeout(() => setClaimSuccessAlert(null), 5000);
+    const spocTarget = candidateForm.spocEmail || 'SPOC';
+    setClaimSuccessAlert(`📧 Candidate ${candidateForm.name} onboarded! SPOC Notification email dispatched to ${spocTarget}`);
+    setTimeout(() => setClaimSuccessAlert(null), 6000);
+
     setShowAddModal(false);
+    setCandidateDocs({});
     setCandidateForm({
       name: '',
       email: '',
@@ -208,9 +260,8 @@ export const ClientDashboard: React.FC = () => {
       joiningDate: new Date().toISOString().split('T')[0],
       bankAccountNumber: '',
       ifscCode: 'HDFC0001824',
-      aadhaarFile: '',
-      educationFile: '',
-      bankProofFile: ''
+      spocEmail: candidateForm.spocEmail,
+      spocName: candidateForm.spocName
     });
   };
 
@@ -235,7 +286,8 @@ export const ClientDashboard: React.FC = () => {
     { id: 'overview', label: 'Overview & Quota', icon: <LayoutDashboard className="w-3.5 h-3.5" /> },
     { id: 'payroll_dbt', label: 'Payroll & DBT Subsidy', icon: <DollarSign className="w-3.5 h-3.5" /> },
     { id: 'compliance_contracts', label: 'Contracts & CN Remarks', icon: <Shield className="w-3.5 h-3.5" /> },
-    { id: 'apprentices', label: `Apprentice Roster (${filteredApprentices.length})`, icon: <Users className="w-3.5 h-3.5" /> }
+    { id: 'apprentices', label: `Apprentice Roster (${filteredApprentices.length})`, icon: <Users className="w-3.5 h-3.5" /> },
+    { id: 'spoc_logs', label: `SPOC Dispatches (${spocLogs.length})`, icon: <Mail className="w-3.5 h-3.5" /> }
   ];
 
   return (
@@ -254,7 +306,7 @@ export const ClientDashboard: React.FC = () => {
             {clientDisplayName}
           </h1>
           <p className="text-xs text-zinc-500 mt-1 font-medium">
-            Apprentice Quota Allocation, Direct Benefit Transfer Subsidy & Monthly Reconciliation
+            Apprentice Quota Allocation, Multi-Format Document Verification & Automated SPOC Notification
           </p>
         </div>
 
@@ -297,9 +349,9 @@ export const ClientDashboard: React.FC = () => {
           >
             <div className="flex items-center gap-2.5">
               <CheckCircle2 className="w-4 h-4 text-emerald-400 shrink-0" />
-              <span>{claimSuccessAlert}</span>
+              <span className="font-medium">{claimSuccessAlert}</span>
             </div>
-            <span className="text-[11px] font-mono text-zinc-400">Live Sync Active</span>
+            <span className="text-[11px] font-mono text-zinc-400">Live Delivery Active</span>
           </motion.div>
         )}
       </AnimatePresence>
@@ -771,7 +823,7 @@ export const ClientDashboard: React.FC = () => {
                           APPRENTICES ONBOARD REGISTRY
                         </h3>
                         <p className="text-xs text-zinc-500 mt-0.5 font-medium">
-                          Manage candidate profiles, legal contracts, and monthly DBT eligibility.
+                          Manage candidate profiles, multi-format compliance documents (.pdf, .docx, .txt), and legal contracts.
                         </p>
                       </div>
 
@@ -816,8 +868,8 @@ export const ClientDashboard: React.FC = () => {
                             <th className="py-3 px-4">Aadhaar & Bank</th>
                             <th className="py-3 px-4">Monthly Stipend</th>
                             <th className="py-3 px-4">DBT Govt Share</th>
-                            <th className="py-3 px-4">Contract Letter</th>
-                            <th className="py-3 px-4">Status</th>
+                            <th className="py-3 px-4">Compliance Files</th>
+                            <th className="py-3 px-4">Contract</th>
                             <th className="py-3 px-4 text-right">Actions</th>
                           </tr>
                         </thead>
@@ -827,7 +879,7 @@ export const ClientDashboard: React.FC = () => {
                               <tr key={app.id} className="hover:bg-zinc-50 transition-colors">
                                 <td className="py-3.5 px-4">
                                   <div className="font-bold text-zinc-900 text-xs">{app.name}</div>
-                                  <div className="text-[10px] font-mono text-zinc-400">{app.id} · {app.email || 'Verified'}</div>
+                                  <div className="text-[10px] font-mono text-zinc-400">{app.id} · {app.phone || 'Phone Verified'}</div>
                                 </td>
 
                                 <td className="py-3.5 px-4">
@@ -848,6 +900,44 @@ export const ClientDashboard: React.FC = () => {
                                   ₹{app.dbtEligibleAmount.toLocaleString()}
                                 </td>
 
+                                {/* Compliance Files Slot */}
+                                <td className="py-3.5 px-4">
+                                  <div className="flex items-center gap-1.5 flex-wrap">
+                                    {app.documents?.aadhaarDoc || app.documents?.aadhaarFile ? (
+                                      <button
+                                        type="button"
+                                        onClick={() => setPreviewingDoc(app.documents?.aadhaarDoc || { name: app.documents?.aadhaarFile || 'Aadhaar Card.pdf', type: 'pdf' })}
+                                        className="px-2 py-0.5 rounded-full text-[10px] font-mono bg-zinc-100 hover:bg-zinc-200 text-zinc-800 border border-zinc-200 cursor-pointer"
+                                        title="View Aadhaar"
+                                      >
+                                        Aadhaar ↗
+                                      </button>
+                                    ) : null}
+
+                                    {app.documents?.educationDoc || app.documents?.educationFile ? (
+                                      <button
+                                        type="button"
+                                        onClick={() => setPreviewingDoc(app.documents?.educationDoc || { name: app.documents?.educationFile || 'Degree.docx', type: 'docx' })}
+                                        className="px-2 py-0.5 rounded-full text-[10px] font-mono bg-zinc-100 hover:bg-zinc-200 text-zinc-800 border border-zinc-200 cursor-pointer"
+                                        title="View Degree"
+                                      >
+                                        Degree ↗
+                                      </button>
+                                    ) : null}
+
+                                    {app.documents?.resumeDoc || app.documents?.resumeFile ? (
+                                      <button
+                                        type="button"
+                                        onClick={() => setPreviewingDoc(app.documents?.resumeDoc || { name: app.documents?.resumeFile || 'Resume.docx', type: 'docx' })}
+                                        className="px-2 py-0.5 rounded-full text-[10px] font-mono bg-zinc-100 hover:bg-zinc-200 text-zinc-800 border border-zinc-200 cursor-pointer"
+                                        title="View Resume"
+                                      >
+                                        Resume ↗
+                                      </button>
+                                    ) : null}
+                                  </div>
+                                </td>
+
                                 <td className="py-3.5 px-4">
                                   <button
                                     onClick={() => setSelectedContractCandidate(app)}
@@ -856,12 +946,6 @@ export const ClientDashboard: React.FC = () => {
                                     <FileSignature className="w-3 h-3" />
                                     <span>{app.contractStatus} ↗</span>
                                   </button>
-                                </td>
-
-                                <td className="py-3.5 px-4">
-                                  <span className="px-2.5 py-0.5 rounded-full text-[10px] font-bold bg-zinc-900 text-white">
-                                    {app.status}
-                                  </span>
                                 </td>
 
                                 <td className="py-3.5 px-4 text-right">
@@ -889,13 +973,79 @@ export const ClientDashboard: React.FC = () => {
                 </motion.div>
               )}
 
+              {/* TAB 5: SPOC Email Dispatches Log */}
+              {activeTab === 'spoc_logs' && (
+                <motion.div
+                  key="spoc_logs"
+                  initial={{ opacity: 0, y: 8 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  exit={{ opacity: 0, y: -8 }}
+                  transition={{ duration: 0.2 }}
+                >
+                  <GlassCard className="p-6 space-y-4">
+                    <div className="flex items-center justify-between border-b border-zinc-100 pb-3">
+                      <div>
+                        <h3 className="text-xs font-extrabold uppercase tracking-wider text-zinc-900 font-mono">
+                          SPOC EMAIL DISPATCH REGISTRY
+                        </h3>
+                        <p className="text-xs text-zinc-500 mt-0.5 font-medium">
+                          Automated email notifications triggered to designated SPOCs / Compliance Officers upon candidate onboarding.
+                        </p>
+                      </div>
+                      <span className="px-3 py-1 rounded-full text-[10px] font-bold font-mono bg-zinc-100 text-zinc-800 border border-zinc-200">
+                        {spocLogs.length} Dispatches Logged
+                      </span>
+                    </div>
+
+                    <div className="space-y-3">
+                      {spocLogs.length > 0 ? (
+                        spocLogs.map(log => (
+                          <div key={log.id} className="p-4 rounded-2xl bg-zinc-50 border border-zinc-200 text-xs space-y-2">
+                            <div className="flex items-center justify-between">
+                              <div className="flex items-center gap-2">
+                                <Mail className="w-4 h-4 text-zinc-600" />
+                                <span className="font-bold text-zinc-900">{log.subject}</span>
+                              </div>
+                              <span className="px-2.5 py-0.5 rounded-full text-[10px] font-bold bg-emerald-100 text-emerald-800">
+                                {log.status}
+                              </span>
+                            </div>
+
+                            <div className="grid grid-cols-1 sm:grid-cols-3 gap-2 text-[11px] text-zinc-500 pt-1 border-t border-zinc-200 font-mono">
+                              <div>Recipient SPOC: <strong className="text-zinc-800">{log.recipientEmail}</strong></div>
+                              <div>Candidate: <strong className="text-zinc-800">{log.candidateName}</strong></div>
+                              <div>Dispatched: <span>{new Date(log.sentAt).toLocaleString([], { dateStyle: 'short', timeStyle: 'short' })}</span></div>
+                            </div>
+
+                            {log.documentNames && log.documentNames.length > 0 && (
+                              <div className="pt-1 text-[11px] flex items-center gap-1.5 flex-wrap">
+                                <span className="text-zinc-400 font-mono">Attached Docs:</span>
+                                {log.documentNames.map((d, i) => (
+                                  <span key={i} className="px-2 py-0.5 rounded-full bg-white border border-zinc-200 text-zinc-700 font-mono text-[10px]">
+                                    {d}
+                                  </span>
+                                ))}
+                              </div>
+                            )}
+                          </div>
+                        ))
+                      ) : (
+                        <div className="py-12 text-center text-zinc-400 text-xs bg-zinc-50 rounded-2xl border border-zinc-200">
+                          No SPOC email notifications dispatched yet. Onboard a candidate to trigger automated SPOC alerts.
+                        </div>
+                      )}
+                    </div>
+                  </GlassCard>
+                </motion.div>
+              )}
+
             </AnimatePresence>
           </div>
 
         </div>
       )}
 
-      {/* MODAL 1: Add Apprentice Candidate */}
+      {/* MODAL 1: Add Apprentice Candidate with Multi-Format Documents (.pdf, .docx, .txt) & SPOC Email */}
       <AnimatePresence>
         {showAddModal && (
           <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/40 backdrop-blur-xs font-sans">
@@ -903,13 +1053,13 @@ export const ClientDashboard: React.FC = () => {
               initial={{ opacity: 0, scale: 0.95 }}
               animate={{ opacity: 1, scale: 1 }}
               exit={{ opacity: 0, scale: 0.95 }}
-              className="w-full max-w-lg bg-white rounded-3xl p-7 border border-zinc-200 shadow-2xl space-y-4 max-h-[90vh] overflow-y-auto"
+              className="w-full max-w-2xl bg-white rounded-3xl p-7 border border-zinc-200 shadow-2xl space-y-4 max-h-[92vh] overflow-y-auto"
             >
               <div className="flex items-center justify-between border-b border-zinc-100 pb-3">
                 <div className="flex items-center gap-2">
                   <span className="text-base leading-none">✦</span>
                   <h3 className="text-sm font-extrabold text-zinc-900 uppercase font-mono">
-                    Onboard New Apprentice Candidate
+                    Onboard Candidate with Compliance Documents
                   </h3>
                 </div>
                 <button onClick={() => setShowAddModal(false)} className="text-zinc-400 hover:text-black cursor-pointer">
@@ -917,123 +1067,187 @@ export const ClientDashboard: React.FC = () => {
                 </button>
               </div>
 
-              <form onSubmit={handleAddCandidateSubmit} className="space-y-3.5 text-xs">
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                  <div className="sm:col-span-2">
-                    <label className="block font-bold text-zinc-700 mb-1">Candidate Full Name *</label>
-                    <input
-                      type="text"
-                      required
-                      placeholder="e.g. Priya Sharma"
-                      value={candidateForm.name}
-                      onChange={(e) => setCandidateForm({ ...candidateForm, name: e.target.value })}
-                      className="w-full px-3 py-2 rounded-2xl bg-zinc-50 border border-zinc-200 text-zinc-900 text-xs focus:outline-none focus:border-black font-medium"
-                    />
-                  </div>
+              <form onSubmit={handleAddCandidateSubmit} className="space-y-4 text-xs">
+                {/* 1. Candidate Bio Details */}
+                <div className="space-y-2">
+                  <span className="text-[11px] font-mono font-bold uppercase tracking-wider text-zinc-400 block">
+                    1. Candidate Bio & Role Specification
+                  </span>
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                    <div>
+                      <label className="block font-bold text-zinc-700 mb-1">Candidate Full Name *</label>
+                      <input
+                        type="text"
+                        required
+                        placeholder="e.g. Priya Sharma"
+                        value={candidateForm.name}
+                        onChange={(e) => setCandidateForm({ ...candidateForm, name: e.target.value })}
+                        className="w-full px-3 py-2 rounded-2xl bg-zinc-50 border border-zinc-200 text-zinc-900 text-xs focus:outline-none focus:border-black font-medium"
+                      />
+                    </div>
 
-                  <div>
-                    <label className="block font-bold text-zinc-700 mb-1">Email Address</label>
-                    <input
-                      type="email"
-                      placeholder="priya@portal.edu"
-                      value={candidateForm.email}
-                      onChange={(e) => setCandidateForm({ ...candidateForm, email: e.target.value })}
-                      className="w-full px-3 py-2 rounded-2xl bg-zinc-50 border border-zinc-200 text-zinc-900 text-xs focus:outline-none focus:border-black font-medium"
-                    />
-                  </div>
+                    <div>
+                      <label className="block font-bold text-zinc-700 mb-1">Contact Phone *</label>
+                      <input
+                        type="tel"
+                        required
+                        placeholder="+91 98765 00000"
+                        value={candidateForm.phone}
+                        onChange={(e) => setCandidateForm({ ...candidateForm, phone: e.target.value })}
+                        className="w-full px-3 py-2 rounded-2xl bg-zinc-50 border border-zinc-200 text-zinc-900 text-xs focus:outline-none focus:border-black font-medium"
+                      />
+                    </div>
 
-                  <div>
-                    <label className="block font-bold text-zinc-700 mb-1">Contact Phone *</label>
-                    <input
-                      type="tel"
-                      required
-                      placeholder="+91 98765 00000"
-                      value={candidateForm.phone}
-                      onChange={(e) => setCandidateForm({ ...candidateForm, phone: e.target.value })}
-                      className="w-full px-3 py-2 rounded-2xl bg-zinc-50 border border-zinc-200 text-zinc-900 text-xs focus:outline-none focus:border-black font-medium"
-                    />
-                  </div>
+                    <div>
+                      <label className="block font-bold text-zinc-700 mb-1">Email Address</label>
+                      <input
+                        type="email"
+                        placeholder="priya@portal.edu"
+                        value={candidateForm.email}
+                        onChange={(e) => setCandidateForm({ ...candidateForm, email: e.target.value })}
+                        className="w-full px-3 py-2 rounded-2xl bg-zinc-50 border border-zinc-200 text-zinc-900 text-xs focus:outline-none focus:border-black font-medium"
+                      />
+                    </div>
 
-                  <div>
-                    <label className="block font-bold text-zinc-700 mb-1">Aadhaar Card Number *</label>
-                    <input
-                      type="text"
-                      required
-                      placeholder="XXXX-XXXX-9901"
-                      value={candidateForm.aadhaarNumber}
-                      onChange={(e) => setCandidateForm({ ...candidateForm, aadhaarNumber: e.target.value })}
-                      className="w-full px-3 py-2 rounded-2xl bg-zinc-50 border border-zinc-200 text-zinc-900 text-xs font-mono focus:outline-none focus:border-black"
-                    />
-                  </div>
+                    <div>
+                      <label className="block font-bold text-zinc-700 mb-1">Aadhaar Card Number *</label>
+                      <input
+                        type="text"
+                        required
+                        placeholder="XXXX-XXXX-9901"
+                        value={candidateForm.aadhaarNumber}
+                        onChange={(e) => setCandidateForm({ ...candidateForm, aadhaarNumber: e.target.value })}
+                        className="w-full px-3 py-2 rounded-2xl bg-zinc-50 border border-zinc-200 text-zinc-900 text-xs font-mono focus:outline-none focus:border-black"
+                      />
+                    </div>
 
-                  <div>
-                    <label className="block font-bold text-zinc-700 mb-1">Educational Qualification</label>
-                    <input
-                      type="text"
-                      placeholder="B.Tech / ITI / Diploma / Degree"
-                      value={candidateForm.qualification}
-                      onChange={(e) => setCandidateForm({ ...candidateForm, qualification: e.target.value })}
-                      className="w-full px-3 py-2 rounded-2xl bg-zinc-50 border border-zinc-200 text-zinc-900 text-xs focus:outline-none focus:border-black font-medium"
-                    />
-                  </div>
-
-                  <div className="sm:col-span-2">
-                    <label className="block font-bold text-zinc-700 mb-1">Target Trade / Specialization Role *</label>
-                    <input
-                      type="text"
-                      required
-                      placeholder="e.g. Full-Stack Developer Trainee / Operations Associate"
-                      value={candidateForm.tradeOrRole}
-                      onChange={(e) => setCandidateForm({ ...candidateForm, tradeOrRole: e.target.value })}
-                      className="w-full px-3 py-2 rounded-2xl bg-zinc-50 border border-zinc-200 text-zinc-900 text-xs focus:outline-none focus:border-black font-medium"
-                    />
-                  </div>
-
-                  <div>
-                    <label className="block font-bold text-zinc-700 mb-1">Monthly Stipend (₹) *</label>
-                    <input
-                      type="number"
-                      step={500}
-                      value={candidateForm.stipendAmount}
-                      onChange={(e) => setCandidateForm({ ...candidateForm, stipendAmount: Number(e.target.value) })}
-                      className="w-full px-3 py-2 rounded-2xl bg-zinc-50 border border-zinc-200 text-zinc-900 text-xs focus:outline-none focus:border-black font-bold"
-                    />
-                  </div>
-
-                  <div>
-                    <label className="block font-bold text-zinc-700 mb-1">Joining Date</label>
-                    <input
-                      type="date"
-                      value={candidateForm.joiningDate}
-                      onChange={(e) => setCandidateForm({ ...candidateForm, joiningDate: e.target.value })}
-                      className="w-full px-3 py-2 rounded-2xl bg-zinc-50 border border-zinc-200 text-zinc-900 text-xs focus:outline-none focus:border-black font-bold"
-                    />
-                  </div>
-
-                  <div>
-                    <label className="block font-bold text-zinc-700 mb-1">Bank Account (Aadhaar Seeded)</label>
-                    <input
-                      type="text"
-                      placeholder="987654321012"
-                      value={candidateForm.bankAccountNumber}
-                      onChange={(e) => setCandidateForm({ ...candidateForm, bankAccountNumber: e.target.value })}
-                      className="w-full px-3 py-2 rounded-2xl bg-zinc-50 border border-zinc-200 text-zinc-900 text-xs font-mono focus:outline-none focus:border-black"
-                    />
-                  </div>
-
-                  <div>
-                    <label className="block font-bold text-zinc-700 mb-1">Bank IFSC Code</label>
-                    <input
-                      type="text"
-                      placeholder="HDFC0001824"
-                      value={candidateForm.ifscCode}
-                      onChange={(e) => setCandidateForm({ ...candidateForm, ifscCode: e.target.value })}
-                      className="w-full px-3 py-2 rounded-2xl bg-zinc-50 border border-zinc-200 text-zinc-900 text-xs font-mono uppercase focus:outline-none focus:border-black"
-                    />
+                    <div className="sm:col-span-2">
+                      <label className="block font-bold text-zinc-700 mb-1">Target Role / Specialization *</label>
+                      <input
+                        type="text"
+                        required
+                        placeholder="e.g. Full-Stack Developer Trainee / Operations Associate"
+                        value={candidateForm.tradeOrRole}
+                        onChange={(e) => setCandidateForm({ ...candidateForm, tradeOrRole: e.target.value })}
+                        className="w-full px-3 py-2 rounded-2xl bg-zinc-50 border border-zinc-200 text-zinc-900 text-xs focus:outline-none focus:border-black font-medium"
+                      />
+                    </div>
                   </div>
                 </div>
 
-                <div className="pt-3 border-t border-zinc-100 flex items-center justify-end gap-2">
+                {/* 2. Candidate Compliance Documents (.docx, .pdf, .txt) */}
+                <div className="space-y-2 pt-2 border-t border-zinc-100">
+                  <span className="text-[11px] font-mono font-bold uppercase tracking-wider text-zinc-400 block">
+                    2. Upload Mandatory Candidate Documents (.docx, .pdf, .txt)
+                  </span>
+
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
+                    {/* Aadhaar Card */}
+                    <div className="p-3 rounded-2xl bg-zinc-50 border border-zinc-200 flex flex-col justify-between">
+                      <div className="flex items-center justify-between mb-1.5">
+                        <span className="font-bold text-zinc-800 text-xs">Aadhaar Card Document *</span>
+                        <span className="text-[9px] font-mono px-1.5 py-0.5 rounded-full bg-zinc-200 text-zinc-700">PDF / DOCX / TXT</span>
+                      </div>
+                      <label className="p-2 rounded-xl bg-white border border-zinc-200 hover:border-black flex items-center gap-2 cursor-pointer transition-colors text-[11px]">
+                        <UploadCloud className="w-3.5 h-3.5 text-zinc-400 shrink-0" />
+                        <span className="truncate font-mono text-zinc-700">
+                          {candidateDocs.aadhaarDoc?.name || 'Attach Aadhaar (.pdf/.docx/.txt)'}
+                        </span>
+                        <input
+                          type="file"
+                          accept=".pdf,.docx,.doc,.txt,.png,.jpg,.jpeg"
+                          className="hidden"
+                          onChange={(e) => handleDocFileSelect(e.target.files?.[0] || null, 'Aadhaar')}
+                        />
+                      </label>
+                    </div>
+
+                    {/* Educational Degree */}
+                    <div className="p-3 rounded-2xl bg-zinc-50 border border-zinc-200 flex flex-col justify-between">
+                      <div className="flex items-center justify-between mb-1.5">
+                        <span className="font-bold text-zinc-800 text-xs">Degree / Marksheet *</span>
+                        <span className="text-[9px] font-mono px-1.5 py-0.5 rounded-full bg-zinc-200 text-zinc-700">PDF / DOCX / TXT</span>
+                      </div>
+                      <label className="p-2 rounded-xl bg-white border border-zinc-200 hover:border-black flex items-center gap-2 cursor-pointer transition-colors text-[11px]">
+                        <UploadCloud className="w-3.5 h-3.5 text-zinc-400 shrink-0" />
+                        <span className="truncate font-mono text-zinc-700">
+                          {candidateDocs.educationDoc?.name || 'Attach Degree (.pdf/.docx/.txt)'}
+                        </span>
+                        <input
+                          type="file"
+                          accept=".pdf,.docx,.doc,.txt,.png,.jpg,.jpeg"
+                          className="hidden"
+                          onChange={(e) => handleDocFileSelect(e.target.files?.[0] || null, 'Education')}
+                        />
+                      </label>
+                    </div>
+
+                    {/* Bank Passbook / Cheque */}
+                    <div className="p-3 rounded-2xl bg-zinc-50 border border-zinc-200 flex flex-col justify-between">
+                      <div className="flex items-center justify-between mb-1.5">
+                        <span className="font-bold text-zinc-800 text-xs">Bank Passbook / Cheque</span>
+                        <span className="text-[9px] font-mono px-1.5 py-0.5 rounded-full bg-zinc-200 text-zinc-700">PDF / DOCX / TXT</span>
+                      </div>
+                      <label className="p-2 rounded-xl bg-white border border-zinc-200 hover:border-black flex items-center gap-2 cursor-pointer transition-colors text-[11px]">
+                        <UploadCloud className="w-3.5 h-3.5 text-zinc-400 shrink-0" />
+                        <span className="truncate font-mono text-zinc-700">
+                          {candidateDocs.bankProofDoc?.name || 'Attach Bank Proof'}
+                        </span>
+                        <input
+                          type="file"
+                          accept=".pdf,.docx,.doc,.txt,.png,.jpg,.jpeg"
+                          className="hidden"
+                          onChange={(e) => handleDocFileSelect(e.target.files?.[0] || null, 'Bank Proof')}
+                        />
+                      </label>
+                    </div>
+
+                    {/* Resume / CV */}
+                    <div className="p-3 rounded-2xl bg-zinc-50 border border-zinc-200 flex flex-col justify-between">
+                      <div className="flex items-center justify-between mb-1.5">
+                        <span className="font-bold text-zinc-800 text-xs">Candidate Resume / CV</span>
+                        <span className="text-[9px] font-mono px-1.5 py-0.5 rounded-full bg-zinc-200 text-zinc-700">DOCX / PDF / TXT</span>
+                      </div>
+                      <label className="p-2 rounded-xl bg-white border border-zinc-200 hover:border-black flex items-center gap-2 cursor-pointer transition-colors text-[11px]">
+                        <UploadCloud className="w-3.5 h-3.5 text-zinc-400 shrink-0" />
+                        <span className="truncate font-mono text-zinc-700">
+                          {candidateDocs.resumeDoc?.name || 'Attach Resume (.docx/.pdf/.txt)'}
+                        </span>
+                        <input
+                          type="file"
+                          accept=".pdf,.docx,.doc,.txt,.png,.jpg,.jpeg"
+                          className="hidden"
+                          onChange={(e) => handleDocFileSelect(e.target.files?.[0] || null, 'Resume')}
+                        />
+                      </label>
+                    </div>
+                  </div>
+                </div>
+
+                {/* 3. Automated SPOC Email Notification Setup */}
+                <div className="p-4 rounded-2xl bg-zinc-50 border border-zinc-200 space-y-2">
+                  <div className="flex items-center justify-between">
+                    <span className="font-bold text-zinc-900 text-xs flex items-center gap-1.5">
+                      <Mail className="w-3.5 h-3.5 text-zinc-600" />
+                      <span>SPOC Email ID (Auto-Notification Trigger) *</span>
+                    </span>
+                    <span className="text-[9px] font-mono px-1.5 py-0.5 rounded-full bg-emerald-100 text-emerald-800 font-bold">Auto-Trigger</span>
+                  </div>
+                  <p className="text-[11px] text-zinc-500">
+                    Once submitted, an official onboarding dossier with document links will be automatically dispatched to this SPOC email ID.
+                  </p>
+                  <input
+                    type="email"
+                    required
+                    placeholder="spoc@company.com"
+                    value={candidateForm.spocEmail}
+                    onChange={(e) => setCandidateForm({ ...candidateForm, spocEmail: e.target.value })}
+                    className="w-full px-3 py-2 rounded-xl bg-white border border-zinc-200 text-zinc-900 text-xs focus:outline-none focus:border-black font-medium"
+                  />
+                </div>
+
+                {/* Submit Actions */}
+                <div className="pt-2 border-t border-zinc-100 flex items-center justify-end gap-2">
                   <button
                     type="button"
                     onClick={() => setShowAddModal(false)}
@@ -1045,8 +1259,8 @@ export const ClientDashboard: React.FC = () => {
                     type="submit"
                     className="px-6 py-2 rounded-full bg-black hover:bg-zinc-800 text-white font-bold transition-all cursor-pointer shadow-sm flex items-center gap-1"
                   >
-                    <span>Onboard to Roster</span>
-                    <ArrowUpRight className="w-3.5 h-3.5" />
+                    <Send className="w-3.5 h-3.5" />
+                    <span>Onboard & Dispatch SPOC Alert ↗</span>
                   </button>
                 </div>
               </form>
@@ -1230,6 +1444,12 @@ export const ClientDashboard: React.FC = () => {
           </div>
         )}
       </AnimatePresence>
+
+      {/* MODAL 5: Universal Document Viewer & Downloader (.pdf, .docx, .txt) */}
+      <DocumentViewerModal
+        document={previewingDoc}
+        onClose={() => setPreviewingDoc(null)}
+      />
 
     </div>
   );
