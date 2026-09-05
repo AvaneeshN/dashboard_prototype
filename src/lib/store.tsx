@@ -308,6 +308,13 @@ export const StoreProvider: React.FC<{ children: React.ReactNode }> = ({ childre
                 if (matchedSub.dbt_claims) metrics.dbtClaimsHistory = matchedSub.dbt_claims;
                 if (matchedSub.spoc_logs) metrics.spocEmailLogs = matchedSub.spoc_logs;
                 if (matchedSub.assigned_company_spoc) metrics.assignedCompanySpoc = matchedSub.assigned_company_spoc;
+                if (matchedSub.naps_records) metrics.napsPortalRecords = matchedSub.naps_records;
+                if (matchedSub.invoices) metrics.invoices = matchedSub.invoices;
+                if (matchedSub.action_items) metrics.actionItems = matchedSub.action_items;
+                if (matchedSub.reporting_month) metrics.reportingMonth = matchedSub.reporting_month;
+                if (matchedSub.naps_portal_id) metrics.napsPortalId = matchedSub.naps_portal_id;
+                if (matchedSub.sanctioned_quota) metrics.sanctionedQuota = matchedSub.sanctioned_quota;
+                if (matchedSub.dbt_allocation_not_utilized !== undefined) metrics.dbtAllocationNotUtilized = matchedSub.dbt_allocation_not_utilized;
 
                 profile.apprenticeMetrics = metrics;
                 profile.company_name = matchedSub.company_name || profile.company_name;
