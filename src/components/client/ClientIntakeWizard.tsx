@@ -1083,7 +1083,8 @@ export const ClientIntakeWizard: React.FC = () => {
                               onChange={async (e) => {
                                 if (e.target.files?.[0]) {
                                   const file = e.target.files[0];
-                                  const doc = await processUploadedFile(file, docReq.category);
+                                  const clientId = user?.id || 'client';
+                                  const doc = await processUploadedFile(file, docReq.category, clientId);
                                   const currentCompanyDocs = formData.companyDocs || {};
                                   const currentDynamic = currentCompanyDocs.dynamicDocs || {};
 

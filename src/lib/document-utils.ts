@@ -53,7 +53,8 @@ export const uploadFileToSupabaseStorage = async (
  */
 export const processUploadedFile = async (
   file: File,
-  category: UploadedDocument['category']
+  category: UploadedDocument['category'],
+  clientId?: string
 ): Promise<UploadedDocument> => {
   const extension = file.name.split('.').pop()?.toLowerCase() || '';
   let docType: UploadedDocument['type'] = 'other';
@@ -95,9 +96,10 @@ export const processUploadedFile = async (
   let storageUrl: string | undefined;
   if (isSupabaseConfigured()) {
     try {
+      const sanitizedClient = (clientId || 'client_common').replace(/[^a-zA-Z0-9_-]/g, '_');
       const sanitizedCategory = (category || 'General').replace(/[^a-zA-Z0-9_-]/g, '_');
-      const sanitizedFileName = file.name.replace(/\s+/g, '_');
-      const storagePath = `${sanitizedCategory}/${docId}_${sanitizedFileName}`;
+      const sanitizedFileName = file.name.replace(/[^a-zA-Z0-9._-]/g, '_');
+      const storagePath = `${sanitizedClient}/${sanitizedCategory}/${docId}_${sanitizedFileName}`;
       const publicUrl = await uploadFileToSupabaseStorage(file, storagePath);
       if (publicUrl) {
         storageUrl = publicUrl;

@@ -249,22 +249,38 @@ export const ClientDashboard: React.FC = () => {
   };
 
   const metrics: ClientApprenticeMetrics = user?.apprenticeMetrics || defaultEmptyMetrics;
-  const clientDisplayName = activeSubmission?.company_name || metrics.companyName || user?.company_name || user?.full_name || metrics.clientName || 'Client Workspace';
+  const clientDisplayName = activeSubmission?.company_name || user?.company_name || user?.full_name || metrics.companyName || 'Client Workspace';
 
-  const candidateList = activeSubmission?.candidates || metrics.lastMonthOnboardedList || [];
-  const spocLogs = activeSubmission?.spoc_logs || metrics.spocEmailLogs || [];
+  // Strict tenant boundary: only display records belonging to THIS authenticated client
+  const candidateList = useMemo(() => {
+    if (activeSubmission) return activeSubmission.candidates || [];
+    if (user?.apprenticeMetrics?.lastMonthOnboardedList) return user.apprenticeMetrics.lastMonthOnboardedList;
+    return [];
+  }, [activeSubmission, user?.apprenticeMetrics?.lastMonthOnboardedList]);
+
+  const spocLogs = useMemo(() => {
+    if (activeSubmission) return activeSubmission.spoc_logs || [];
+    if (user?.apprenticeMetrics?.spocEmailLogs) return user.apprenticeMetrics.spocEmailLogs;
+    return [];
+  }, [activeSubmission, user?.apprenticeMetrics?.spocEmailLogs]);
 
   const effectiveNapsRecords: NAPSPortalRecord[] = useMemo(() => {
-    return activeSubmission?.naps_records || metrics.napsPortalRecords || [];
-  }, [activeSubmission?.naps_records, metrics.napsPortalRecords]);
+    if (activeSubmission) return activeSubmission.naps_records || [];
+    if (user?.apprenticeMetrics?.napsPortalRecords) return user.apprenticeMetrics.napsPortalRecords;
+    return [];
+  }, [activeSubmission, user?.apprenticeMetrics?.napsPortalRecords]);
 
   const effectiveInvoices: ComplianceInvoiceRecord[] = useMemo(() => {
-    return activeSubmission?.invoices || metrics.invoices || [];
-  }, [activeSubmission?.invoices, metrics.invoices]);
+    if (activeSubmission) return activeSubmission.invoices || [];
+    if (user?.apprenticeMetrics?.invoices) return user.apprenticeMetrics.invoices;
+    return [];
+  }, [activeSubmission, user?.apprenticeMetrics?.invoices]);
 
   const effectiveActionItems: ComplianceActionItem[] = useMemo(() => {
-    return activeSubmission?.action_items || metrics.actionItems || [];
-  }, [activeSubmission?.action_items, metrics.actionItems]);
+    if (activeSubmission) return activeSubmission.action_items || [];
+    if (user?.apprenticeMetrics?.actionItems) return user.apprenticeMetrics.actionItems;
+    return [];
+  }, [activeSubmission, user?.apprenticeMetrics?.actionItems]);
 
   const effectiveCandidatesList: ApprenticeRecord[] = useMemo(() => {
     return candidateList;
@@ -487,7 +503,8 @@ export const ClientDashboard: React.FC = () => {
     category: 'Aadhaar' | 'Education' | 'Bank Proof' | 'Resume' | 'Photo' | 'Signature'
   ) => {
     if (!file) return;
-    const doc = await processUploadedFile(file, category);
+    const clientId = user?.id || activeSubmission?.id || 'client';
+    const doc = await processUploadedFile(file, category, clientId);
     if (category === 'Aadhaar') setCandidateDocs(prev => ({ ...prev, aadhaarDoc: doc }));
     if (category === 'Education') setCandidateDocs(prev => ({ ...prev, educationDoc: doc }));
     if (category === 'Bank Proof') setCandidateDocs(prev => ({ ...prev, bankProofDoc: doc }));
