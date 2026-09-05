@@ -841,12 +841,12 @@ export const ClientDashboard: React.FC = () => {
                     <div className="bg-[#0a192f] text-white p-6 sm:p-7 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
                       <div className="flex items-center gap-4">
                         <div className="w-12 h-12 rounded-2xl bg-gradient-to-br from-amber-500 to-amber-700 flex items-center justify-center font-serif text-white font-extrabold text-xl shadow-md border border-amber-300/30 shrink-0">
-                          W
+                          C
                         </div>
                         <div>
                           <div className="flex items-center gap-2">
                             <span className="text-[11px] font-mono uppercase tracking-widest text-amber-400 font-bold">
-                              WorkForce2047 Compliance Ledger
+                              Apprenticeship Compliance Ledger
                             </span>
                             <span className="text-[10px] px-2 py-0.5 rounded-full bg-emerald-500/20 text-emerald-300 font-bold border border-emerald-500/30">
                               Active Compliance
@@ -1525,7 +1525,7 @@ export const ClientDashboard: React.FC = () => {
                           {filteredNapsRecords.length === 0 ? (
                             <tr>
                               <td colSpan={18} className="px-6 py-12 text-center text-zinc-500 font-sans">
-                                No NAPS government portal records filed yet. WorkForce2047 administrators update this ledger as monthly claims are processed.
+                                No NAPS government portal records filed yet. Operations administrators update this ledger as monthly claims are processed.
                               </td>
                             </tr>
                           ) : (

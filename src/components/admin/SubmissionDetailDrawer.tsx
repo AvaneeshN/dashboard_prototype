@@ -1156,7 +1156,7 @@ export const SubmissionDetailDrawer: React.FC<SubmissionDetailDrawerProps> = ({
               <div className="flex items-center justify-between border-b border-zinc-200 pb-3">
                 <div className="flex items-center gap-2">
                   <div className="w-8 h-8 rounded-lg bg-[#0a192f] text-amber-300 font-serif flex items-center justify-center font-bold text-xs">
-                    W
+                    C
                   </div>
                   <div>
                     <h3 className="text-sm font-extrabold text-zinc-900 uppercase font-mono">

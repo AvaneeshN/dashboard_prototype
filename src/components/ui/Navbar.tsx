@@ -23,11 +23,11 @@ export const Navbar: React.FC = () => {
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 h-16 flex items-center justify-between">
           <div className="flex items-center gap-2.5">
             <div className="w-8 h-8 rounded-lg bg-[#112240] border border-amber-400/40 flex items-center justify-center text-amber-300 font-serif font-bold text-xs shadow-xs tracking-tighter">
-              W
+              C
             </div>
             <div>
               <div className="font-extrabold text-sm tracking-tight text-white leading-none">
-                WorkForce2047
+                Console
               </div>
               <div className="text-[10px] font-mono text-slate-300 mt-0.5">
                 Compliance Management Portal
@@ -35,7 +35,7 @@ export const Navbar: React.FC = () => {
             </div>
           </div>
           <div className="text-[11px] font-mono text-slate-300 hidden sm:block">
-            Apprenticeship Act, 1961 Gateway
+            Apprenticeship Compliance Management Portal
           </div>
         </div>
       </header>
@@ -54,12 +54,12 @@ export const Navbar: React.FC = () => {
         {/* Logo */}
         <Link href={user.role === 'admin' ? '/admin' : '/client'} className="flex items-center gap-2.5 group">
           <div className="w-8 h-8 rounded-lg bg-[#112240] border border-amber-400/40 flex items-center justify-center text-amber-300 font-serif font-bold text-xs shadow-xs tracking-tighter transition-transform group-hover:scale-105">
-            W
+            C
           </div>
           <div>
             <div className="flex items-center gap-2">
               <span className="font-extrabold text-sm tracking-tight text-white">
-                WorkForce2047
+                Console
               </span>
               <span className="text-[10px] font-mono uppercase px-2 py-0.5 rounded-full bg-[#112240] text-amber-300 border border-amber-400/30">
                 {user.role === 'admin' ? 'Administration' : 'Client Portal'}
