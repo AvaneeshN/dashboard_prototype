@@ -60,269 +60,7 @@ import {
 } from 'recharts';
 import { motion, AnimatePresence } from 'framer-motion';
 
-type ClientViewTab = 'compliance_report' | 'naps_registry' | 'overview' | 'payroll_dbt' | 'compliance_contracts' | 'apprentices' | 'spoc_logs';
-
-const DEFAULT_NAPS_RECORDS: NAPSPortalRecord[] = [
-  {
-    id: 'naps-1',
-    establishmentCode: 'E12253600040',
-    ojtState: 'Telangana',
-    ojtDistrict: 'Hyderabad',
-    apprenticeCode: 'A012691340',
-    contractCode: 'CN072687468',
-    jurisdiction: 'central',
-    contractStartDate: '15/07/2026',
-    contractEndDate: '14/07/2027',
-    contractType: 'optional',
-    payoutMonth: 'AUG-2026',
-    beneficiaryStatus: 'created',
-    beneficiaryId: '*********7799',
-    dbtProcessedToPfmsDate: '04-08-2026',
-    candidateDbtConsent: 'Yes',
-    eKycStatus: 'Yes',
-    establishmentSharedStatus: 'paid',
-    amount: 1500.0,
-    paymentStatus: 'PAID',
-    paymentFailureReason: '-'
-  },
-  {
-    id: 'naps-2',
-    establishmentCode: 'E12253600040',
-    ojtState: 'Telangana',
-    ojtDistrict: 'Hyderabad',
-    apprenticeCode: 'A012691341',
-    contractCode: 'CN072687469',
-    jurisdiction: 'central',
-    contractStartDate: '15/07/2026',
-    contractEndDate: '14/07/2027',
-    contractType: 'optional',
-    payoutMonth: 'AUG-2026',
-    beneficiaryStatus: 'created',
-    beneficiaryId: '*********4512',
-    dbtProcessedToPfmsDate: '04-08-2026',
-    candidateDbtConsent: 'Yes',
-    eKycStatus: 'Yes',
-    establishmentSharedStatus: 'paid',
-    amount: 1500.0,
-    paymentStatus: 'PAID',
-    paymentFailureReason: '-'
-  },
-  {
-    id: 'naps-3',
-    establishmentCode: 'E12253600040',
-    ojtState: 'Telangana',
-    ojtDistrict: 'Hyderabad',
-    apprenticeCode: 'A012691342',
-    contractCode: 'CN072687470',
-    jurisdiction: 'central',
-    contractStartDate: '18/07/2026',
-    contractEndDate: '17/07/2027',
-    contractType: 'optional',
-    payoutMonth: 'AUG-2026',
-    beneficiaryStatus: 'created',
-    beneficiaryId: '*********8821',
-    dbtProcessedToPfmsDate: '05-08-2026',
-    candidateDbtConsent: 'Yes',
-    eKycStatus: 'Yes',
-    establishmentSharedStatus: 'paid',
-    amount: 1500.0,
-    paymentStatus: 'PAID',
-    paymentFailureReason: '-'
-  },
-  {
-    id: 'naps-4',
-    establishmentCode: 'E12253600040',
-    ojtState: 'Telangana',
-    ojtDistrict: 'Hyderabad',
-    apprenticeCode: 'A012691343',
-    contractCode: 'CN072687471',
-    jurisdiction: 'central',
-    contractStartDate: '22/07/2026',
-    contractEndDate: '21/07/2027',
-    contractType: 'optional',
-    payoutMonth: 'AUG-2026',
-    beneficiaryStatus: 'created',
-    beneficiaryId: '*********1139',
-    dbtProcessedToPfmsDate: '-',
-    candidateDbtConsent: 'Yes',
-    eKycStatus: 'Yes',
-    establishmentSharedStatus: 'pending',
-    amount: 1500.0,
-    paymentStatus: 'PENDING',
-    paymentFailureReason: '-'
-  },
-  {
-    id: 'naps-5',
-    establishmentCode: 'E12253600040',
-    ojtState: 'Telangana',
-    ojtDistrict: 'Hyderabad',
-    apprenticeCode: 'A012684210',
-    contractCode: 'CN062678120',
-    jurisdiction: 'central',
-    contractStartDate: '10/06/2026',
-    contractEndDate: '09/06/2027',
-    contractType: 'optional',
-    payoutMonth: 'JUL-2026',
-    beneficiaryStatus: 'created',
-    beneficiaryId: '*********3319',
-    dbtProcessedToPfmsDate: '08-07-2026',
-    candidateDbtConsent: 'Yes',
-    eKycStatus: 'Yes',
-    establishmentSharedStatus: 'paid',
-    amount: 1500.0,
-    paymentStatus: 'PAID',
-    paymentFailureReason: '-'
-  },
-  {
-    id: 'naps-6',
-    establishmentCode: 'E12253600040',
-    ojtState: 'Telangana',
-    ojtDistrict: 'Hyderabad',
-    apprenticeCode: 'A012684211',
-    contractCode: 'CN062678121',
-    jurisdiction: 'central',
-    contractStartDate: '10/06/2026',
-    contractEndDate: '09/06/2027',
-    contractType: 'optional',
-    payoutMonth: 'JUL-2026',
-    beneficiaryStatus: 'created',
-    beneficiaryId: '*********9042',
-    dbtProcessedToPfmsDate: '08-07-2026',
-    candidateDbtConsent: 'Yes',
-    eKycStatus: 'Yes',
-    establishmentSharedStatus: 'paid',
-    amount: 1500.0,
-    paymentStatus: 'PAID',
-    paymentFailureReason: '-'
-  },
-  {
-    id: 'naps-7',
-    establishmentCode: 'E12253600040',
-    ojtState: 'Telangana',
-    ojtDistrict: 'Hyderabad',
-    apprenticeCode: 'A012675901',
-    contractCode: 'CN052667101',
-    jurisdiction: 'central',
-    contractStartDate: '01/05/2026',
-    contractEndDate: '30/04/2027',
-    contractType: 'optional',
-    payoutMonth: 'JUN-2026',
-    beneficiaryStatus: 'created',
-    beneficiaryId: '*********6723',
-    dbtProcessedToPfmsDate: '12-06-2026',
-    candidateDbtConsent: 'Yes',
-    eKycStatus: 'Yes',
-    establishmentSharedStatus: 'paid',
-    amount: 1500.0,
-    paymentStatus: 'PAID',
-    paymentFailureReason: '-'
-  }
-];
-
-const DEFAULT_INVOICES: ComplianceInvoiceRecord[] = [
-  {
-    id: 'inv-1',
-    invoiceNo: 'WF-2026-INV-089',
-    invoiceDate: '01/08/2026',
-    amount: 18500,
-    status: 'SUBMITTED',
-    paymentDate: 'Pending',
-    remarks: 'Monthly facilitation fee for July 2026'
-  },
-  {
-    id: 'inv-2',
-    invoiceNo: 'WF-2026-INV-074',
-    invoiceDate: '01/07/2026',
-    amount: 18500,
-    status: 'PAID',
-    paymentDate: '10/07/2026',
-    remarks: 'Payment received via NEFT'
-  },
-  {
-    id: 'inv-3',
-    invoiceNo: 'WF-2026-INV-058',
-    invoiceDate: '01/06/2026',
-    amount: 18500,
-    status: 'PAID',
-    paymentDate: '09/06/2026',
-    remarks: 'Payment received via RTGS'
-  }
-];
-
-const DEFAULT_ACTION_ITEMS: ComplianceActionItem[] = [
-  {
-    id: 'act-1',
-    observation: '3 new apprentice contracts pending candidate eKYC consent on NAPS portal',
-    actionRequired: 'Follow up with candidates to complete Aadhaar OTP eKYC verification',
-    owner: 'Operations / SPOC',
-    targetDate: '10/08/2026',
-    status: 'IN PROGRESS'
-  },
-  {
-    id: 'act-2',
-    observation: 'DBT claim for July to be processed post employer stipend credit confirmation',
-    actionRequired: 'Upload bank payment scroll to portal for NAPS reimbursement release',
-    owner: 'WorkForce2047 TPA',
-    targetDate: '15/08/2026',
-    status: 'PLANNED'
-  },
-  {
-    id: 'act-3',
-    observation: 'Open quota of 20 apprentices remaining for current fiscal year',
-    actionRequired: 'Initiate campus drive batch for Q3 intake requirements',
-    owner: 'HR Lead / Client',
-    targetDate: '30/08/2026',
-    status: 'OPEN'
-  }
-];
-
-const DEFAULT_CANDIDATE_LIST: ApprenticeRecord[] = [
-  {
-    id: 'cand-1',
-    name: 'Arjun Sharma',
-    email: 'arjun.sharma@example.com',
-    phone: '+91 98765 43210',
-    tradeOrRole: 'Full-Stack Developer Trainee',
-    qualification: 'B.Tech / Information Technology',
-    contractCode: 'CN072687468',
-    onboardingDate: '15/07/2026',
-    stipendAmount: 18500,
-    dbtEligibleAmount: 1500,
-    contractStatus: 'Generated',
-    attendanceRate: '100%',
-    status: 'Active'
-  },
-  {
-    id: 'cand-2',
-    name: 'Priya Patel',
-    email: 'priya.patel@example.com',
-    phone: '+91 98765 43211',
-    tradeOrRole: 'Business Operations Associate',
-    qualification: 'B.Com / Management',
-    contractCode: 'CN072687469',
-    onboardingDate: '18/07/2026',
-    stipendAmount: 18500,
-    dbtEligibleAmount: 1500,
-    contractStatus: 'Generated',
-    attendanceRate: '100%',
-    status: 'Active'
-  },
-  {
-    id: 'cand-3',
-    name: 'Rahul Verma',
-    email: 'rahul.verma@example.com',
-    phone: '+91 98765 43212',
-    tradeOrRole: 'Cloud & DevOps Associate',
-    qualification: 'B.Sc / Computer Science',
-    contractCode: 'CN072687470',
-    onboardingDate: '22/07/2026',
-    stipendAmount: 18500,
-    dbtEligibleAmount: 1500,
-    contractStatus: 'Generated',
-    attendanceRate: '100%',
-    status: 'Active'
-  }
-];
+type ClientViewTab = 'compliance_report' | 'naps_registry' | 'compliance_contracts' | 'apprentices' | 'spoc_logs';
 
 export const ClientDashboard: React.FC = () => {
   const { 
@@ -431,42 +169,42 @@ export const ClientDashboard: React.FC = () => {
   const defaultEmptyMetrics: ClientApprenticeMetrics = {
     clientName: user?.full_name || 'Client Workspace',
     companyName: user?.company_name || '',
-    reportingMonth: 'JULY, 2026',
-    napsPortalId: 'E01232900003',
-    sanctionedQuota: 27,
-    totalApprenticesEligible: 27,
-    currentOnboardedApprentices: 7,
-    remainingNumbersLeft: 20,
-    onboardedThisMonth: 3,
-    utilizationPercentage: '25.9%',
-    dbtClaimedLastMonth: 10500,
-    dbtAllocationNotUtilized: 30000,
+    reportingMonth: new Date().toLocaleString('en-US', { month: 'long', year: 'numeric' }).toUpperCase(),
+    napsPortalId: 'Pending Allocation',
+    sanctionedQuota: 0,
+    totalApprenticesEligible: 0,
+    currentOnboardedApprentices: 0,
+    remainingNumbersLeft: 0,
+    onboardedThisMonth: 0,
+    utilizationPercentage: '0.0%',
+    dbtClaimedLastMonth: 0,
+    dbtAllocationNotUtilized: 0,
     pendingAmountClaimable: 0,
     governmentApproval: {
-      totalApproved: 7,
-      approvedThisMonth: 3,
+      totalApproved: 0,
+      approvedThisMonth: 0,
       pendingApproval: 0
     },
     lastMonthPayroll: {
-      totalDisbursed: 129500,
-      stipendProcessedCount: 7,
-      payoutDate: '05/07/2026',
-      status: 'Processed' as const,
+      totalDisbursed: 0,
+      stipendProcessedCount: 0,
+      payoutDate: 'Pending Cycle',
+      status: 'Pending Approval' as const,
       breakdown: {
-        baseStipend: 18500,
-        dbtGovtShare: 1500,
-        companyShare: 17000
+        baseStipend: 0,
+        dbtGovtShare: 0,
+        companyShare: 0
       }
     },
     contractLetters: {
-      totalGenerated: 7,
-      signedCount: 7,
+      totalGenerated: 0,
+      signedCount: 0,
       pendingSignature: 0,
-      lastGeneratedDate: '15/07/2026'
+      lastGeneratedDate: '-'
     },
     lastMonthCNRemarks: {
-      remarkCode: 'CN-ACTIVE',
-      summary: 'Compliance status healthy for July 2026.',
+      remarkCode: 'CN-INITIAL',
+      summary: 'Workspace registered. No compliance issues detected.',
       status: 'Clean / No Issues' as const,
       auditDate: new Date().toISOString().split('T')[0],
       details: 'All contracts and stipend disbursements are aligned with Apprenticeship Act guidelines.'
@@ -474,27 +212,106 @@ export const ClientDashboard: React.FC = () => {
     lastMonthOnboardedList: [] as ApprenticeRecord[],
     dbtClaimsHistory: [] as DBTClaimRecord[],
     spocEmailLogs: [] as SPOCEmailLog[],
-    napsPortalRecords: DEFAULT_NAPS_RECORDS,
-    invoices: DEFAULT_INVOICES,
-    actionItems: DEFAULT_ACTION_ITEMS
+    napsPortalRecords: [] as NAPSPortalRecord[],
+    invoices: [] as ComplianceInvoiceRecord[],
+    actionItems: [] as ComplianceActionItem[]
   };
 
   const metrics: ClientApprenticeMetrics = user?.apprenticeMetrics || defaultEmptyMetrics;
-  const clientDisplayName = metrics.companyName || user?.company_name || user?.full_name || metrics.clientName || 'Client Workspace';
+  const clientDisplayName = activeSubmission?.company_name || metrics.companyName || user?.company_name || user?.full_name || metrics.clientName || 'Client Workspace';
 
-  const quotaChartData = [
-    { name: 'Onboarded', value: metrics.currentOnboardedApprentices, color: '#18181b' },
-    { name: 'Remaining Quota', value: metrics.remainingNumbersLeft, color: '#e4e4e7' }
-  ];
+  const candidateList = activeSubmission?.candidates || metrics.lastMonthOnboardedList || [];
+  const spocLogs = activeSubmission?.spoc_logs || metrics.spocEmailLogs || [];
 
-  const financialChartData = [
-    { name: 'Company Share', amount: metrics.lastMonthPayroll.breakdown.companyShare, color: '#4a7c93' },
-    { name: 'DBT Govt Subsidy', amount: metrics.dbtClaimedLastMonth, color: '#10b981' },
-    { name: 'Pending Claim', amount: metrics.pendingAmountClaimable, color: '#f04e37' }
-  ];
+  const effectiveNapsRecords: NAPSPortalRecord[] = useMemo(() => {
+    return activeSubmission?.naps_records || metrics.napsPortalRecords || [];
+  }, [activeSubmission?.naps_records, metrics.napsPortalRecords]);
 
-  const candidateList = metrics.lastMonthOnboardedList || [];
-  const spocLogs = metrics.spocEmailLogs || [];
+  const effectiveInvoices: ComplianceInvoiceRecord[] = useMemo(() => {
+    return activeSubmission?.invoices || metrics.invoices || [];
+  }, [activeSubmission?.invoices, metrics.invoices]);
+
+  const effectiveActionItems: ComplianceActionItem[] = useMemo(() => {
+    return activeSubmission?.action_items || metrics.actionItems || [];
+  }, [activeSubmission?.action_items, metrics.actionItems]);
+
+  const effectiveCandidatesList: ApprenticeRecord[] = useMemo(() => {
+    return candidateList;
+  }, [candidateList]);
+
+  // Real quota calculation from actual intake submission
+  const sanctionedQuota = useMemo(() => {
+    if (activeSubmission?.responses?.requiredApprenticeCount) {
+      const parsed = Number(activeSubmission.responses.requiredApprenticeCount);
+      if (!isNaN(parsed) && parsed > 0) return parsed;
+    }
+    if (activeSubmission?.sanctioned_quota) return activeSubmission.sanctioned_quota;
+    if (metrics.sanctionedQuota && metrics.sanctionedQuota > 0) return metrics.sanctionedQuota;
+    return candidateList.length;
+  }, [activeSubmission?.responses?.requiredApprenticeCount, activeSubmission?.sanctioned_quota, metrics.sanctionedQuota, candidateList.length]);
+
+  const utilisedQuota = candidateList.length;
+  const openQuota = Math.max(0, sanctionedQuota - utilisedQuota);
+  const utilisationPercentage = sanctionedQuota > 0 ? ((utilisedQuota / sanctionedQuota) * 100).toFixed(1) + '%' : '0.0%';
+
+  const currentMonthPrefix = new Date().toISOString().slice(0, 7);
+  const onboardedThisMonth = useMemo(() => {
+    return candidateList.filter(c => {
+      if (!c.onboardingDate) return false;
+      return c.onboardingDate.includes(currentMonthPrefix) || c.status === 'Active';
+    }).length;
+  }, [candidateList, currentMonthPrefix]);
+
+  const dbtClaimedReal = useMemo(() => {
+    const paidSum = effectiveNapsRecords
+      .filter(r => r.paymentStatus === 'PAID')
+      .reduce((sum, r) => sum + (Number(r.amount) || 0), 0);
+    if (paidSum > 0) return paidSum;
+    return metrics.dbtClaimedLastMonth || 0;
+  }, [effectiveNapsRecords, metrics.dbtClaimedLastMonth]);
+
+  const dbtAllocationNotUtilized = useMemo(() => {
+    if (activeSubmission?.dbt_allocation_not_utilized !== undefined) {
+      return activeSubmission.dbt_allocation_not_utilized;
+    }
+    if (openQuota > 0) {
+      return openQuota * 1500;
+    }
+    return 0;
+  }, [activeSubmission?.dbt_allocation_not_utilized, openQuota]);
+
+  const totalApprovedGovt = candidateList.filter(c => c.contractStatus === 'Signed' || c.status === 'Active').length;
+  const approvedThisMonthGovt = onboardedThisMonth;
+  const pendingApprovalGovt = candidateList.filter(c => c.contractStatus === 'Pending Verification' || c.contractStatus === 'Generated').length;
+
+  const portalNapsId = activeSubmission?.naps_portal_id || metrics.napsPortalId || 'Pending Allocation';
+  const reportingMonthStr = activeSubmission?.reporting_month || metrics.reportingMonth || new Date().toLocaleString('en-US', { month: 'long', year: 'numeric' }).toUpperCase();
+
+  const monthlyNapsSummary = useMemo(() => {
+    const monthMap: Record<string, { count: number; dbtTotal: number; paidCount: number; latestPfmsDate: string }> = {};
+    effectiveNapsRecords.forEach(r => {
+      const m = r.payoutMonth || 'CURRENT';
+      if (!monthMap[m]) {
+        monthMap[m] = { count: 0, dbtTotal: 0, paidCount: 0, latestPfmsDate: '-' };
+      }
+      monthMap[m].count += 1;
+      monthMap[m].dbtTotal += Number(r.amount) || 0;
+      if (r.paymentStatus === 'PAID') monthMap[m].paidCount += 1;
+      if (r.dbtProcessedToPfmsDate && r.dbtProcessedToPfmsDate !== '-') {
+        monthMap[m].latestPfmsDate = r.dbtProcessedToPfmsDate;
+      }
+    });
+    return Object.entries(monthMap).map(([month, data]) => ({
+      month,
+      stipendPaid: data.count * (Number(activeSubmission?.responses?.stipendPerApprentice) || 18500),
+      dbtGovt: data.dbtTotal,
+      datePaid: '05/' + (month.includes('-') ? month.split('-')[0] : '07'),
+      dbtReleaseDate: data.latestPfmsDate,
+      remarks: data.paidCount > 0 
+        ? `DBT credited via PFMS to ${data.paidCount} of ${data.count} candidates`
+        : `DBT processing pending for ${data.count} candidate contracts`
+    }));
+  }, [effectiveNapsRecords, activeSubmission?.responses?.stipendPerApprentice]);
 
   const filteredApprentices = candidateList.filter(app => {
     const matchesSearch = 
@@ -504,34 +321,6 @@ export const ClientDashboard: React.FC = () => {
     const matchesStatus = statusFilter === 'all' || app.status.toLowerCase() === statusFilter.toLowerCase();
     return matchesSearch && matchesStatus;
   });
-
-  const effectiveNapsRecords: NAPSPortalRecord[] = useMemo(() => {
-    if (metrics.napsPortalRecords && metrics.napsPortalRecords.length > 0) {
-      return metrics.napsPortalRecords;
-    }
-    return DEFAULT_NAPS_RECORDS;
-  }, [metrics.napsPortalRecords]);
-
-  const effectiveInvoices: ComplianceInvoiceRecord[] = useMemo(() => {
-    if (metrics.invoices && metrics.invoices.length > 0) {
-      return metrics.invoices;
-    }
-    return DEFAULT_INVOICES;
-  }, [metrics.invoices]);
-
-  const effectiveActionItems: ComplianceActionItem[] = useMemo(() => {
-    if (metrics.actionItems && metrics.actionItems.length > 0) {
-      return metrics.actionItems;
-    }
-    return DEFAULT_ACTION_ITEMS;
-  }, [metrics.actionItems]);
-
-  const effectiveCandidatesList = useMemo(() => {
-    if (candidateList.length > 0) {
-      return candidateList;
-    }
-    return DEFAULT_CANDIDATE_LIST;
-  }, [candidateList]);
 
   const filteredNapsRecords = useMemo(() => {
     return effectiveNapsRecords.filter((rec) => {
@@ -766,9 +555,7 @@ export const ClientDashboard: React.FC = () => {
 
   const tabs = [
     { id: 'compliance_report', label: 'Compliance Report (Apprenticeship Act)', icon: <FileText className="w-3.5 h-3.5 text-amber-500" /> },
-    { id: 'naps_registry', label: `NAPS Government Portal (${filteredNapsRecords.length})`, icon: <Table className="w-3.5 h-3.5 text-sky-500" /> },
-    { id: 'overview', label: 'Overview & Quota', icon: <LayoutDashboard className="w-3.5 h-3.5" /> },
-    { id: 'payroll_dbt', label: 'Payroll & DBT Subsidy', icon: <DollarSign className="w-3.5 h-3.5" /> },
+    { id: 'naps_registry', label: `DBT Dashboard (${filteredNapsRecords.length})`, icon: <WalletCards className="w-3.5 h-3.5 text-sky-500" /> },
     { id: 'compliance_contracts', label: 'Contracts & CN Remarks', icon: <Shield className="w-3.5 h-3.5" /> },
     { id: 'apprentices', label: `Apprentice Roster (${filteredApprentices.length})`, icon: <Users className="w-3.5 h-3.5" /> },
     { id: 'spoc_logs', label: `SPOC Dispatches (${spocLogs.length})`, icon: <Mail className="w-3.5 h-3.5" /> }
@@ -860,6 +647,58 @@ export const ClientDashboard: React.FC = () => {
       ) : (
         <div className="space-y-6">
           
+          {/* Designated Notification SPOC Card */}
+          <div className="p-5 sm:p-6 rounded-3xl bg-white border border-zinc-200 shadow-sm flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+            <div className="flex items-start sm:items-center gap-3.5">
+              <div className="w-10 h-10 rounded-2xl bg-zinc-100 border border-zinc-200 flex items-center justify-center shrink-0">
+                <Mail className="w-5 h-5 text-zinc-700" />
+              </div>
+              <div>
+                <div className="flex items-center gap-2">
+                  <span className="font-mono text-[11px] font-bold uppercase tracking-wider text-zinc-400">
+                    Designated Notification SPOC
+                  </span>
+                  {currentSpoc?.email ? (
+                    <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-emerald-50 text-emerald-700 border border-emerald-200">
+                      Active Recipient
+                    </span>
+                  ) : (
+                    <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-amber-50 text-amber-700 border border-amber-200">
+                      Setup Required
+                    </span>
+                  )}
+                </div>
+                {currentSpoc?.email ? (
+                  <div className="mt-1">
+                    <span className="text-sm font-bold text-zinc-900">{currentSpoc.name}</span>
+                    <span className="text-xs text-zinc-500 font-mono ml-2">({currentSpoc.email})</span>
+                    {currentSpoc.phone && <span className="text-xs text-zinc-400 ml-2">· {currentSpoc.phone}</span>}
+                    <p className="text-xs text-zinc-500 mt-0.5">
+                      All candidate dossiers, verified documents, and onboarding notifications are automatically dispatched to this email.
+                    </p>
+                  </div>
+                ) : (
+                  <p className="text-xs text-zinc-600 mt-1">
+                    Please configure the primary SPOC name and email address. All candidate onboarding dossiers and documents will be sent to this recipient.
+                  </p>
+                )}
+              </div>
+            </div>
+
+            <button
+              type="button"
+              onClick={() => {
+                setSpocNameInput(currentSpoc?.name || '');
+                setSpocEmailInput(currentSpoc?.email || '');
+                setSpocPhoneInput(currentSpoc?.phone || '');
+                setShowSpocModal(true);
+              }}
+              className="px-4 py-2 rounded-full text-xs font-bold bg-black text-white hover:bg-zinc-800 transition-all cursor-pointer whitespace-nowrap self-start sm:self-center shrink-0 shadow-sm"
+            >
+              {currentSpoc?.email ? 'Edit SPOC' : 'Configure SPOC'}
+            </button>
+          </div>
+
           {/* Section Navigation Tabs */}
           <div className="flex items-center gap-1.5 p-1 rounded-full bg-zinc-200/80 border border-zinc-300 overflow-x-auto w-fit">
             {tabs.map((tab) => {
@@ -945,11 +784,11 @@ export const ClientDashboard: React.FC = () => {
                         </div>
                         <div>
                           <span className="text-zinc-400 text-[11px]">Reporting Month:</span>{' '}
-                          <strong className="text-amber-300 font-mono font-bold">{metrics.reportingMonth || 'JULY, 2026'}</strong>
+                          <strong className="text-amber-300 font-mono font-bold">{reportingMonthStr}</strong>
                         </div>
                         <div>
                           <span className="text-zinc-400 text-[11px]">Portal NAPS ID:</span>{' '}
-                          <strong className="text-white font-mono font-bold bg-white/10 px-2 py-0.5 rounded">{metrics.napsPortalId || 'E01232900003'}</strong>
+                          <strong className="text-white font-mono font-bold bg-white/10 px-2 py-0.5 rounded">{portalNapsId}</strong>
                         </div>
                       </div>
                       <div className="text-zinc-400 text-[11px] italic">
@@ -978,7 +817,7 @@ export const ClientDashboard: React.FC = () => {
                         </span>
                         <div className="mt-3">
                           <span className="text-2xl sm:text-3xl font-extrabold text-zinc-900 font-mono">
-                            {metrics.sanctionedQuota ?? 27}
+                            {sanctionedQuota}
                           </span>
                         </div>
                       </div>
@@ -990,7 +829,7 @@ export const ClientDashboard: React.FC = () => {
                         </span>
                         <div className="mt-3">
                           <span className="text-2xl sm:text-3xl font-extrabold text-zinc-900 font-mono">
-                            {metrics.currentOnboardedApprentices ?? 7}
+                            {utilisedQuota}
                           </span>
                         </div>
                       </div>
@@ -1002,7 +841,7 @@ export const ClientDashboard: React.FC = () => {
                         </span>
                         <div className="mt-3">
                           <span className="text-2xl sm:text-3xl font-extrabold text-zinc-900 font-mono">
-                            {metrics.remainingNumbersLeft ?? 20}
+                            {openQuota}
                           </span>
                         </div>
                       </div>
@@ -1014,7 +853,7 @@ export const ClientDashboard: React.FC = () => {
                         </span>
                         <div className="mt-3">
                           <span className="text-2xl sm:text-3xl font-extrabold text-emerald-700 font-mono">
-                            {metrics.utilizationPercentage || '25.9%'}
+                            {utilisationPercentage}
                           </span>
                         </div>
                       </div>
@@ -1026,7 +865,7 @@ export const ClientDashboard: React.FC = () => {
                         </span>
                         <div className="mt-3">
                           <span className="text-2xl sm:text-3xl font-extrabold text-zinc-900 font-mono">
-                            {metrics.onboardedThisMonth ?? 3}
+                            {onboardedThisMonth}
                           </span>
                         </div>
                       </div>
@@ -1034,11 +873,11 @@ export const ClientDashboard: React.FC = () => {
                       {/* DBT Claimed for Month - Warm Yellow */}
                       <div className="p-4 rounded-2xl bg-[#fef3c7] border border-amber-200 flex flex-col justify-between">
                         <span className="text-[11px] font-bold text-amber-900 uppercase tracking-tight leading-snug">
-                          DBT Claimed (JUNE - NAPS)
+                          DBT Claimed (NAPS)
                         </span>
                         <div className="mt-3">
                           <span className="text-xl sm:text-2xl font-extrabold text-amber-800 font-mono">
-                            ₹{(metrics.dbtClaimedLastMonth ?? 10500).toLocaleString('en-IN')}
+                            ₹{dbtClaimedReal.toLocaleString('en-IN')}
                           </span>
                         </div>
                       </div>
@@ -1050,7 +889,7 @@ export const ClientDashboard: React.FC = () => {
                         </span>
                         <div className="mt-3">
                           <span className="text-xl sm:text-2xl font-extrabold text-white font-mono">
-                            ₹{(metrics.dbtAllocationNotUtilized ?? 30000).toLocaleString('en-IN')}
+                            ₹{dbtAllocationNotUtilized.toLocaleString('en-IN')}
                           </span>
                         </div>
                       </div>
@@ -1075,7 +914,7 @@ export const ClientDashboard: React.FC = () => {
                           Total Approved (Till Date)
                         </span>
                         <div className="mt-2 text-2xl font-extrabold text-zinc-900 font-mono">
-                          {metrics.governmentApproval?.totalApproved ?? (metrics.currentOnboardedApprentices ?? 7)}
+                          {totalApprovedGovt}
                         </div>
                       </div>
 
@@ -1084,7 +923,7 @@ export const ClientDashboard: React.FC = () => {
                           Approved This Month
                         </span>
                         <div className="mt-2 text-2xl font-extrabold text-zinc-900 font-mono">
-                          {metrics.governmentApproval?.approvedThisMonth ?? (metrics.onboardedThisMonth ?? 3)}
+                          {approvedThisMonthGovt}
                         </div>
                       </div>
 
@@ -1093,7 +932,7 @@ export const ClientDashboard: React.FC = () => {
                           Pending Approval
                         </span>
                         <div className="mt-2 text-2xl font-extrabold text-zinc-900 font-mono">
-                          {metrics.governmentApproval?.pendingApproval ?? 0}
+                          {pendingApprovalGovt}
                         </div>
                       </div>
 
@@ -1102,7 +941,7 @@ export const ClientDashboard: React.FC = () => {
                           Portal Reference / NAPS ID
                         </span>
                         <div className="mt-2 text-base font-extrabold text-amber-900 font-mono tracking-wide">
-                          {metrics.napsPortalId || 'E01232900003'}
+                          {portalNapsId}
                         </div>
                       </div>
                     </div>
@@ -1140,33 +979,45 @@ export const ClientDashboard: React.FC = () => {
                           </tr>
                         </thead>
                         <tbody className="divide-y divide-zinc-200">
-                          {effectiveCandidatesList.map((app, idx) => (
-                            <tr key={app.id || idx} className="hover:bg-zinc-50/80 transition-colors">
-                              <td className="px-4 py-3 font-mono text-zinc-400 font-bold">{idx + 1}</td>
-                              <td className="px-4 py-3 font-bold text-zinc-900">{app.name}</td>
-                              <td className="px-4 py-3 font-mono font-semibold text-zinc-800">
-                                <span className="px-2 py-0.5 rounded bg-zinc-100 border border-zinc-200">
-                                  {app.contractCode || `CN07268746${idx + 8}`}
-                                </span>
-                              </td>
-                              <td className="px-4 py-3 text-zinc-600">{app.tradeOrRole}</td>
-                              <td className="px-4 py-3 font-mono text-zinc-500">{app.onboardingDate || '15/07/2026'}</td>
-                              <td className="px-4 py-3">
-                                <span className="inline-flex items-center gap-1.5 px-2 py-0.5 rounded-full text-[10px] font-bold bg-emerald-50 text-emerald-700 border border-emerald-200">
-                                  <CheckCircle2 className="w-3 h-3 text-emerald-600" />
-                                  Approved on NAPS Portal
-                                </span>
-                              </td>
-                              <td className="px-4 py-3 text-right">
-                                <button
-                                  onClick={() => setSelectedContractCandidate(app as ApprenticeRecord)}
-                                  className="text-xs font-bold text-sky-700 hover:text-sky-900 cursor-pointer"
-                                >
-                                  View Contract
-                                </button>
+                          {effectiveCandidatesList.length === 0 ? (
+                            <tr>
+                              <td colSpan={7} className="px-4 py-8 text-center text-zinc-400 font-medium">
+                                No candidates onboarded for this reporting period yet. Click &ldquo;+ Onboard Candidate&rdquo; to begin.
                               </td>
                             </tr>
-                          ))}
+                          ) : (
+                            effectiveCandidatesList.map((app, idx) => (
+                              <tr key={app.id || idx} className="hover:bg-zinc-50/80 transition-colors">
+                                <td className="px-4 py-3 font-mono text-zinc-400 font-bold">{idx + 1}</td>
+                                <td className="px-4 py-3 font-bold text-zinc-900">{app.name}</td>
+                                <td className="px-4 py-3 font-mono font-semibold text-zinc-800">
+                                  <span className="px-2 py-0.5 rounded bg-zinc-100 border border-zinc-200">
+                                    {app.contractCode || 'CN Pending'}
+                                  </span>
+                                </td>
+                                <td className="px-4 py-3 text-zinc-600">{app.tradeOrRole}</td>
+                                <td className="px-4 py-3 font-mono text-zinc-500">{app.onboardingDate || '-'}</td>
+                                <td className="px-4 py-3">
+                                  <span className={`inline-flex items-center gap-1.5 px-2 py-0.5 rounded-full text-[10px] font-bold ${
+                                    app.contractStatus === 'Signed' || app.status === 'Active'
+                                      ? 'bg-emerald-50 text-emerald-700 border border-emerald-200'
+                                      : 'bg-amber-50 text-amber-700 border border-amber-200'
+                                  }`}>
+                                    <CheckCircle2 className="w-3 h-3 text-emerald-600" />
+                                    {app.contractStatus === 'Signed' || app.status === 'Active' ? 'Approved on NAPS Portal' : (app.contractStatus || 'Pending Verification')}
+                                  </span>
+                                </td>
+                                <td className="px-4 py-3 text-right">
+                                  <button
+                                    onClick={() => setSelectedContractCandidate(app as ApprenticeRecord)}
+                                    className="text-xs font-bold text-sky-700 hover:text-sky-900 cursor-pointer"
+                                  >
+                                    View Contract
+                                  </button>
+                                </td>
+                              </tr>
+                            ))
+                          )}
                         </tbody>
                       </table>
                     </div>
@@ -1197,36 +1048,26 @@ export const ClientDashboard: React.FC = () => {
                           </tr>
                         </thead>
                         <tbody className="divide-y divide-zinc-200 font-mono">
-                          <tr className="hover:bg-zinc-50/80 transition-colors">
-                            <td className="px-4 py-3 font-bold text-zinc-900 font-sans">JUNE 2026</td>
-                            <td className="px-4 py-3 font-bold text-zinc-800">₹1,29,500</td>
-                            <td className="px-4 py-3 text-zinc-500">05/07/2026</td>
-                            <td className="px-4 py-3 font-bold text-emerald-700">₹10,500</td>
-                            <td className="px-4 py-3 text-zinc-500">20/07/2026</td>
-                            <td className="px-4 py-3 font-sans text-xs text-emerald-700">
-                              DBT credited via PFMS to 7 candidates
-                            </td>
-                          </tr>
-                          <tr className="hover:bg-zinc-50/80 transition-colors">
-                            <td className="px-4 py-3 font-bold text-zinc-900 font-sans">MAY 2026</td>
-                            <td className="px-4 py-3 font-bold text-zinc-800">₹74,000</td>
-                            <td className="px-4 py-3 text-zinc-500">05/06/2026</td>
-                            <td className="px-4 py-3 font-bold text-emerald-700">₹6,000</td>
-                            <td className="px-4 py-3 text-zinc-500">19/06/2026</td>
-                            <td className="px-4 py-3 font-sans text-xs text-zinc-600">
-                              Processed successfully via portal
-                            </td>
-                          </tr>
-                          <tr className="hover:bg-zinc-50/80 transition-colors">
-                            <td className="px-4 py-3 font-bold text-zinc-900 font-sans">APRIL 2026</td>
-                            <td className="px-4 py-3 font-bold text-zinc-800">₹74,000</td>
-                            <td className="px-4 py-3 text-zinc-500">05/05/2026</td>
-                            <td className="px-4 py-3 font-bold text-emerald-700">₹6,000</td>
-                            <td className="px-4 py-3 text-zinc-500">18/05/2026</td>
-                            <td className="px-4 py-3 font-sans text-xs text-zinc-600">
-                              Processed successfully via portal
-                            </td>
-                          </tr>
+                          {monthlyNapsSummary.length === 0 ? (
+                            <tr>
+                              <td colSpan={6} className="px-4 py-8 text-center text-zinc-400 font-sans font-medium">
+                                No monthly stipend and DBT disbursements recorded yet for this establishment.
+                              </td>
+                            </tr>
+                          ) : (
+                            monthlyNapsSummary.map((mRow, mIdx) => (
+                              <tr key={mIdx} className="hover:bg-zinc-50/80 transition-colors">
+                                <td className="px-4 py-3 font-bold text-zinc-900 font-sans">{mRow.month}</td>
+                                <td className="px-4 py-3 font-bold text-zinc-800">₹{mRow.stipendPaid.toLocaleString('en-IN')}</td>
+                                <td className="px-4 py-3 text-zinc-500">{mRow.datePaid}</td>
+                                <td className="px-4 py-3 font-bold text-emerald-700">₹{mRow.dbtGovt.toLocaleString('en-IN')}</td>
+                                <td className="px-4 py-3 text-zinc-500">{mRow.dbtReleaseDate}</td>
+                                <td className="px-4 py-3 font-sans text-xs text-zinc-600">
+                                  {mRow.remarks}
+                                </td>
+                              </tr>
+                            ))
+                          )}
                         </tbody>
                       </table>
                     </div>
@@ -1257,24 +1098,32 @@ export const ClientDashboard: React.FC = () => {
                           </tr>
                         </thead>
                         <tbody className="divide-y divide-zinc-200">
-                          {effectiveInvoices.map((inv) => (
-                            <tr key={inv.id} className="hover:bg-zinc-50/80 transition-colors">
-                              <td className="px-4 py-3 font-mono font-bold text-zinc-900">{inv.invoiceNo}</td>
-                              <td className="px-4 py-3 font-mono text-zinc-500">{inv.invoiceDate}</td>
-                              <td className="px-4 py-3 font-mono font-bold text-zinc-900">₹{inv.amount.toLocaleString('en-IN')}</td>
-                              <td className="px-4 py-3">
-                                <span className={`px-2 py-0.5 rounded-full text-[10px] font-bold ${
-                                  inv.status === 'PAID'
-                                    ? 'bg-emerald-50 text-emerald-700 border border-emerald-200'
-                                    : 'bg-amber-50 text-amber-700 border border-amber-200'
-                                }`}>
-                                  {inv.status}
-                                </span>
+                          {effectiveInvoices.length === 0 ? (
+                            <tr>
+                              <td colSpan={6} className="px-4 py-8 text-center text-zinc-400 font-medium">
+                                No facilitation invoices generated yet.
                               </td>
-                              <td className="px-4 py-3 font-mono text-zinc-500">{inv.paymentDate}</td>
-                              <td className="px-4 py-3 text-zinc-600">{inv.remarks || '-'}</td>
                             </tr>
-                          ))}
+                          ) : (
+                            effectiveInvoices.map((inv) => (
+                              <tr key={inv.id} className="hover:bg-zinc-50/80 transition-colors">
+                                <td className="px-4 py-3 font-mono font-bold text-zinc-900">{inv.invoiceNo}</td>
+                                <td className="px-4 py-3 font-mono text-zinc-500">{inv.invoiceDate}</td>
+                                <td className="px-4 py-3 font-mono font-bold text-zinc-900">₹{inv.amount.toLocaleString('en-IN')}</td>
+                                <td className="px-4 py-3">
+                                  <span className={`px-2 py-0.5 rounded-full text-[10px] font-bold ${
+                                    inv.status === 'PAID'
+                                      ? 'bg-emerald-50 text-emerald-700 border border-emerald-200'
+                                      : 'bg-amber-50 text-amber-700 border border-amber-200'
+                                  }`}>
+                                    {inv.status}
+                                  </span>
+                                </td>
+                                <td className="px-4 py-3 font-mono text-zinc-500">{inv.paymentDate}</td>
+                                <td className="px-4 py-3 text-zinc-600">{inv.remarks || '-'}</td>
+                              </tr>
+                            ))
+                          )}
                         </tbody>
                       </table>
                     </div>
@@ -1305,20 +1154,28 @@ export const ClientDashboard: React.FC = () => {
                           </tr>
                         </thead>
                         <tbody className="divide-y divide-zinc-200">
-                          {effectiveActionItems.map((act, idx) => (
-                            <tr key={act.id || idx} className="hover:bg-zinc-50/80 transition-colors">
-                              <td className="px-4 py-3 font-mono text-zinc-400 font-bold">{idx + 1}</td>
-                              <td className="px-4 py-3 font-medium text-zinc-900 max-w-xs">{act.observation}</td>
-                              <td className="px-4 py-3 text-zinc-700 max-w-xs">{act.actionRequired}</td>
-                              <td className="px-4 py-3 font-semibold text-zinc-800">{act.owner}</td>
-                              <td className="px-4 py-3 font-mono text-zinc-500">{act.targetDate}</td>
-                              <td className="px-4 py-3">
-                                <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-blue-50 text-blue-700 border border-blue-200">
-                                  {act.status || 'ACTIVE'}
-                                </span>
+                          {effectiveActionItems.length === 0 ? (
+                            <tr>
+                              <td colSpan={6} className="px-4 py-8 text-center text-zinc-400 font-medium">
+                                No active compliance action items or remarks recorded for this period.
                               </td>
                             </tr>
-                          ))}
+                          ) : (
+                            effectiveActionItems.map((act, idx) => (
+                              <tr key={act.id || idx} className="hover:bg-zinc-50/80 transition-colors">
+                                <td className="px-4 py-3 font-mono text-zinc-400 font-bold">{idx + 1}</td>
+                                <td className="px-4 py-3 font-medium text-zinc-900 max-w-xs">{act.observation}</td>
+                                <td className="px-4 py-3 text-zinc-700 max-w-xs">{act.actionRequired}</td>
+                                <td className="px-4 py-3 font-semibold text-zinc-800">{act.owner}</td>
+                                <td className="px-4 py-3 font-mono text-zinc-500">{act.targetDate}</td>
+                                <td className="px-4 py-3">
+                                  <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-blue-50 text-blue-700 border border-blue-200">
+                                    {act.status || 'ACTIVE'}
+                                  </span>
+                                </td>
+                              </tr>
+                            ))
+                          )}
                         </tbody>
                       </table>
                     </div>
@@ -1326,7 +1183,7 @@ export const ClientDashboard: React.FC = () => {
                 </motion.div>
               )}
 
-              {/* TAB: NAPS Government Portal Registry */}
+              {/* TAB: DBT Dashboard */}
               {activeTab === 'naps_registry' && (
                 <motion.div
                   key="naps_registry"
@@ -1347,7 +1204,7 @@ export const ClientDashboard: React.FC = () => {
                           <span className="text-xs text-zinc-400 font-mono">PFMS / DBT Sync</span>
                         </div>
                         <h2 className="text-xl sm:text-2xl font-bold tracking-tight text-zinc-900 mt-1">
-                          NAPS Government Portal Registry
+                          DBT Dashboard
                         </h2>
                         <p className="text-xs text-zinc-500 mt-1">
                           Official monthly establishment apprentice ledger, eKYC status, and direct benefit transfer records.
@@ -1455,7 +1312,7 @@ export const ClientDashboard: React.FC = () => {
                           {filteredNapsRecords.length === 0 ? (
                             <tr>
                               <td colSpan={18} className="px-6 py-12 text-center text-zinc-500 font-sans">
-                                No NAPS government portal records match your filter criteria.
+                                No NAPS government portal records filed yet. WorkForce2047 administrators update this ledger as monthly claims are processed.
                               </td>
                             </tr>
                           ) : (
@@ -1519,391 +1376,7 @@ export const ClientDashboard: React.FC = () => {
                 </motion.div>
               )}
 
-              {/* TAB 1: Overview & Quota */}
-              {activeTab === 'overview' && (
-                <motion.div
-                  key="overview"
-                  initial={{ opacity: 0, y: 8 }}
-                  animate={{ opacity: 1, y: 0 }}
-                  exit={{ opacity: 0, y: -8 }}
-                  transition={{ duration: 0.2 }}
-                  className="space-y-6"
-                >
-                  {/* Designated Notification SPOC Card */}
-                  <div className="p-5 sm:p-6 rounded-3xl bg-white border border-zinc-200 shadow-sm flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-                    <div className="flex items-start sm:items-center gap-3.5">
-                      <div className="w-10 h-10 rounded-2xl bg-zinc-100 border border-zinc-200 flex items-center justify-center shrink-0">
-                        <Mail className="w-5 h-5 text-zinc-700" />
-                      </div>
-                      <div>
-                        <div className="flex items-center gap-2">
-                          <span className="font-mono text-[11px] font-bold uppercase tracking-wider text-zinc-400">
-                            Designated Notification SPOC
-                          </span>
-                          {currentSpoc?.email ? (
-                            <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-emerald-50 text-emerald-700 border border-emerald-200">
-                              Active Recipient
-                            </span>
-                          ) : (
-                            <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-amber-50 text-amber-700 border border-amber-200">
-                              Setup Required
-                            </span>
-                          )}
-                        </div>
-                        {currentSpoc?.email ? (
-                          <div className="mt-1">
-                            <span className="text-sm font-bold text-zinc-900">{currentSpoc.name}</span>
-                            <span className="text-xs text-zinc-500 font-mono ml-2">({currentSpoc.email})</span>
-                            {currentSpoc.phone && <span className="text-xs text-zinc-400 ml-2">· {currentSpoc.phone}</span>}
-                            <p className="text-xs text-zinc-500 mt-0.5">
-                              All candidate dossiers, verified documents, and onboarding notifications are automatically dispatched to this email.
-                            </p>
-                          </div>
-                        ) : (
-                          <p className="text-xs text-zinc-600 mt-1">
-                            Please configure the primary SPOC name and email address. All candidate onboarding dossiers and documents will be sent to this recipient.
-                          </p>
-                        )}
-                      </div>
-                    </div>
-
-                    <button
-                      type="button"
-                      onClick={() => {
-                        setSpocNameInput(currentSpoc?.name || '');
-                        setSpocEmailInput(currentSpoc?.email || '');
-                        setSpocPhoneInput(currentSpoc?.phone || '');
-                        setShowSpocModal(true);
-                      }}
-                      className="px-4 py-2 rounded-full text-xs font-bold bg-black text-white hover:bg-zinc-800 transition-all cursor-pointer whitespace-nowrap self-start sm:self-center shrink-0 shadow-sm"
-                    >
-                      {currentSpoc?.email ? 'Edit SPOC' : 'Configure SPOC'}
-                    </button>
-                  </div>
-
-                  {/* Grid Stat Row */}
-                  <div className="grid grid-cols-1 sm:grid-cols-3 border border-zinc-200 rounded-3xl bg-white overflow-hidden shadow-sm divide-y sm:divide-y-0 sm:divide-x divide-zinc-200">
-                    
-                    <div className="p-6 sm:p-7">
-                      <span className="font-mono text-xs font-bold uppercase tracking-wider text-zinc-400 block mb-1">
-                        TOTAL CAPACITY
-                      </span>
-                      <div className="text-4xl sm:text-5xl font-extrabold text-zinc-900 tracking-tight">
-                        {metrics.totalApprenticesEligible}
-                      </div>
-                      <div className="text-xs text-zinc-500 font-medium mt-1">
-                        Eligible candidate quota
-                      </div>
-                    </div>
-
-                    <div className="p-6 sm:p-7">
-                      <span className="font-mono text-xs font-bold uppercase tracking-wider text-zinc-400 block mb-1">
-                        CURRENTLY ONBOARDED
-                      </span>
-                      <div className="text-4xl sm:text-5xl font-extrabold text-zinc-900 tracking-tight">
-                        {metrics.currentOnboardedApprentices}
-                      </div>
-                      <div className="text-xs text-zinc-500 font-medium mt-1">
-                        Active in national training
-                      </div>
-                    </div>
-
-                    <div className="p-6 sm:p-7 flex flex-col justify-between">
-                      <div>
-                        <span className="font-mono text-xs font-bold uppercase tracking-wider text-zinc-400 block mb-1">
-                          REMAINING SLOTS
-                        </span>
-                        <div className="text-4xl sm:text-5xl font-extrabold text-zinc-900 tracking-tight">
-                          {metrics.remainingNumbersLeft}
-                        </div>
-                      </div>
-                      <div className="mt-3 pt-2 border-t border-zinc-100 flex items-center justify-between text-xs">
-                        <span className="text-zinc-500">Available to fill</span>
-                        <button
-                          onClick={() => { setActiveTab('apprentices'); handleOpenAddModal(); }}
-                          className="font-bold text-black hover:underline cursor-pointer flex items-center gap-1"
-                        >
-                          <span>+ Add Candidate</span>
-                          <ArrowUpRight className="w-3.5 h-3.5" />
-                        </button>
-                      </div>
-                    </div>
-
-                  </div>
-
-                  {/* Quota Chart & Overview Summary */}
-                  <div className="grid grid-cols-1 lg:grid-cols-12 gap-5">
-                    <div className="lg:col-span-6">
-                      <GlassCard className="p-6 h-full flex flex-col justify-between">
-                        <div>
-                          <div className="flex items-center justify-between border-b border-zinc-100 pb-3 mb-4">
-                            <h3 className="text-xs font-extrabold uppercase tracking-wider text-zinc-800 flex items-center gap-2 font-mono">
-                              QUOTA UTILIZATION GAUGE
-                            </h3>
-                            <span className="text-xs font-bold px-2.5 py-0.5 rounded-full bg-zinc-100 border border-zinc-200">
-                              {metrics.totalApprenticesEligible > 0 ? Math.round((metrics.currentOnboardedApprentices / metrics.totalApprenticesEligible) * 100) : 0}% Filled
-                            </span>
-                          </div>
-
-                          <div className="h-48 w-full flex items-center justify-center">
-                            <ResponsiveContainer width="100%" height="100%">
-                              <PieChart>
-                                <Pie
-                                  data={quotaChartData}
-                                  cx="50%"
-                                  cy="50%"
-                                  innerRadius={55}
-                                  outerRadius={75}
-                                  paddingAngle={4}
-                                  dataKey="value"
-                                  stroke="#ffffff"
-                                  strokeWidth={3}
-                                >
-                                  {quotaChartData.map((entry, index) => (
-                                    <Cell key={`cell-${index}`} fill={entry.color} />
-                                  ))}
-                                </Pie>
-                                <Tooltip 
-                                  contentStyle={{ backgroundColor: '#ffffff', border: '1px solid #e4e4e7', borderRadius: '12px', color: '#09090b', fontSize: '12px', boxShadow: '0 4px 20px rgba(0,0,0,0.08)' }}
-                                />
-                              </PieChart>
-                            </ResponsiveContainer>
-                          </div>
-                        </div>
-
-                        <div className="grid grid-cols-2 gap-3 pt-3 border-t border-zinc-100 text-xs">
-                          <div className="flex items-center gap-2">
-                            <div className="w-2.5 h-2.5 rounded-full bg-black" />
-                            <span className="text-zinc-500">Onboarded: <strong className="text-zinc-900">{metrics.currentOnboardedApprentices}</strong></span>
-                          </div>
-                          <div className="flex items-center gap-2">
-                            <div className="w-2.5 h-2.5 rounded-full bg-zinc-300" />
-                            <span className="text-zinc-500">Remaining: <strong className="text-zinc-900">{metrics.remainingNumbersLeft}</strong></span>
-                          </div>
-                        </div>
-                      </GlassCard>
-                    </div>
-
-                    <div className="lg:col-span-6">
-                      <GlassCard className="p-6 h-full flex flex-col justify-between">
-                        <div>
-                          <h3 className="text-xs font-extrabold uppercase tracking-wider text-zinc-800 border-b border-zinc-100 pb-3 mb-4 font-mono">
-                            WORKSPACE STATUS & ACTIONS
-                          </h3>
-
-                          <div className="space-y-3 text-xs">
-                            <div className="p-4 rounded-2xl bg-zinc-50 border border-zinc-200 flex items-center justify-between">
-                              <div>
-                                <div className="font-bold text-zinc-900">Intake Form Submission</div>
-                                <div className="text-xs text-zinc-500">
-                                  {hasSubmittedIntake ? 'Completed & Logged in Registry' : 'Action Required — Complete candidate intake'}
-                                </div>
-                              </div>
-                              <span className={`px-3 py-1 rounded-full text-[10px] font-bold ${
-                                hasSubmittedIntake ? 'bg-zinc-900 text-white' : 'bg-rose-100 text-rose-800 border border-rose-200'
-                              }`}>
-                                {hasSubmittedIntake ? 'VERIFIED' : 'PENDING'}
-                              </span>
-                            </div>
-
-                            <div className="p-4 rounded-2xl bg-zinc-50 border border-zinc-200 flex items-center justify-between">
-                              <div>
-                                <div className="font-bold text-zinc-900">Active DBT Scheme</div>
-                                <div className="text-xs text-zinc-500">Government subsidy per apprentice</div>
-                              </div>
-                              <span className="px-3 py-1 rounded-full text-[10px] font-bold font-mono bg-zinc-200 text-zinc-800">
-                                ₹4,500/MO
-                              </span>
-                            </div>
-                          </div>
-                        </div>
-
-                        <div className="flex items-center gap-2 mt-5">
-                          <button
-                            onClick={() => { setActiveTab('apprentices'); handleOpenAddModal(); }}
-                            className="flex-1 py-3 rounded-full bg-black hover:bg-zinc-800 text-white text-xs font-bold flex items-center justify-center gap-1.5 transition-all cursor-pointer shadow-md"
-                          >
-                            <Plus className="w-3.5 h-3.5" />
-                            <span>ONBOARD APPRENTICE</span>
-                          </button>
-                          <button
-                            onClick={() => setActiveMainView('intake')}
-                            className="px-4 py-3 rounded-full bg-zinc-100 hover:bg-zinc-200 text-zinc-800 text-xs font-bold border border-zinc-200 cursor-pointer transition-all"
-                          >
-                            Edit Intake
-                          </button>
-                        </div>
-                      </GlassCard>
-                    </div>
-                  </div>
-                </motion.div>
-              )}
-
-              {/* TAB 2: Payroll & DBT Subsidies */}
-              {activeTab === 'payroll_dbt' && (
-                <motion.div
-                  key="payroll_dbt"
-                  initial={{ opacity: 0, y: 8 }}
-                  animate={{ opacity: 1, y: 0 }}
-                  exit={{ opacity: 0, y: -8 }}
-                  transition={{ duration: 0.2 }}
-                  className="space-y-6"
-                >
-                  <div className="grid grid-cols-1 sm:grid-cols-3 border border-zinc-200 rounded-3xl bg-white overflow-hidden shadow-sm divide-y sm:divide-y-0 sm:divide-x divide-zinc-200">
-                    
-                    <div className="p-6 sm:p-7">
-                      <span className="font-mono text-xs font-bold uppercase tracking-wider text-zinc-400 block mb-1">
-                        DBT CLAIMED (LAST MONTH)
-                      </span>
-                      <div className="text-3xl sm:text-4xl font-extrabold text-zinc-900 tracking-tight">
-                        ₹{metrics.dbtClaimedLastMonth.toLocaleString()}
-                      </div>
-                      <div className="text-xs text-zinc-500 font-medium mt-1">
-                        Govt subsidy direct transfer
-                      </div>
-                    </div>
-
-                    <div className="p-6 sm:p-7 flex flex-col justify-between">
-                      <div>
-                        <span className="font-mono text-xs font-bold uppercase tracking-wider text-zinc-400 block mb-1">
-                          PENDING CLAIMABLE AMOUNT
-                        </span>
-                        <div className="text-3xl sm:text-4xl font-extrabold text-zinc-900 tracking-tight">
-                          ₹{metrics.pendingAmountClaimable.toLocaleString()}
-                        </div>
-                      </div>
-                      {metrics.pendingAmountClaimable > 0 && (
-                        <div className="mt-3 pt-2 border-t border-zinc-100 flex justify-end">
-                          <button
-                            onClick={() => setShowDBTClaimModal(true)}
-                            className="px-4 py-1.5 rounded-full bg-black text-white text-xs font-bold hover:bg-zinc-800 transition-all cursor-pointer flex items-center gap-1"
-                          >
-                            <span>File DBT Claim</span>
-                            <ArrowUpRight className="w-3.5 h-3.5" />
-                          </button>
-                        </div>
-                      )}
-                    </div>
-
-                    <div className="p-6 sm:p-7 flex flex-col justify-between">
-                      <div>
-                        <span className="font-mono text-xs font-bold uppercase tracking-wider text-zinc-400 block mb-1">
-                          PAYROLL VOLUME DISBURSED
-                        </span>
-                        <div className="text-3xl sm:text-4xl font-extrabold text-zinc-900 tracking-tight">
-                          ₹{metrics.lastMonthPayroll.totalDisbursed.toLocaleString()}
-                        </div>
-                      </div>
-                      <div className="mt-3 pt-2 border-t border-zinc-100 flex items-center justify-between text-xs">
-                        <span className="text-zinc-500 font-medium">{metrics.lastMonthPayroll.stipendProcessedCount} stipends</span>
-                        <button
-                          onClick={() => setShowPayrollModal(true)}
-                          className="font-bold text-black hover:underline cursor-pointer flex items-center gap-1"
-                        >
-                          <span>Run Payroll</span>
-                          <ArrowUpRight className="w-3.5 h-3.5" />
-                        </button>
-                      </div>
-                    </div>
-
-                  </div>
-
-                  {/* Financial Bar Chart & DBT Claim History */}
-                  <div className="grid grid-cols-1 lg:grid-cols-12 gap-5">
-                    <div className="lg:col-span-7">
-                      <GlassCard className="p-6 h-full">
-                        <div className="flex items-center justify-between border-b border-zinc-100 pb-3 mb-4">
-                          <h3 className="text-xs font-extrabold uppercase tracking-wider text-zinc-800 font-mono">
-                            MONTHLY FINANCIALS & DBT SHARE COMPARISON
-                          </h3>
-                          <span className="text-xs font-mono text-zinc-400">Values in ₹ INR</span>
-                        </div>
-
-                        <div className="h-56 w-full">
-                          <ResponsiveContainer width="100%" height="100%">
-                            <BarChart data={financialChartData} margin={{ top: 10, right: 10, left: 0, bottom: 0 }}>
-                              <XAxis 
-                                dataKey="name" 
-                                stroke="#71717a" 
-                                fontSize={11} 
-                                tickLine={false} 
-                                axisLine={{ stroke: '#e4e4e7' }} 
-                              />
-                              <YAxis 
-                                stroke="#71717a" 
-                                fontSize={10} 
-                                tickLine={false} 
-                                axisLine={{ stroke: '#e4e4e7' }}
-                                tickFormatter={(val) => `₹${val / 1000}k`} 
-                              />
-                              <Tooltip 
-                                formatter={(value: any) => [`₹${Number(value).toLocaleString()}`, 'Amount']}
-                                contentStyle={{ backgroundColor: '#ffffff', border: '1px solid #e4e4e7', borderRadius: '12px', color: '#09090b', fontSize: '12px', boxShadow: '0 4px 20px rgba(0,0,0,0.08)' }}
-                              />
-                              <Bar dataKey="amount" radius={[6, 6, 0, 0]}>
-                                {financialChartData.map((entry, index) => (
-                                  <Cell key={`bar-cell-${index}`} fill={entry.color} />
-                                ))}
-                              </Bar>
-                            </BarChart>
-                          </ResponsiveContainer>
-                        </div>
-                      </GlassCard>
-                    </div>
-
-                    <div className="lg:col-span-5">
-                      <GlassCard className="p-6 h-full flex flex-col justify-between">
-                        <div>
-                          <div className="flex items-center justify-between border-b border-zinc-100 pb-3 mb-3">
-                            <h3 className="text-xs font-extrabold uppercase tracking-wider text-zinc-800 font-mono">
-                              DBT REIMBURSEMENT HISTORY
-                            </h3>
-                            <button
-                              onClick={() => setShowDBTClaimModal(true)}
-                              className="text-[11px] font-bold text-black hover:underline cursor-pointer"
-                            >
-                              + File Claim
-                            </button>
-                          </div>
-
-                          <div className="space-y-2.5 max-h-52 overflow-y-auto pr-1 text-xs">
-                            {(metrics.dbtClaimsHistory && metrics.dbtClaimsHistory.length > 0) ? (
-                              metrics.dbtClaimsHistory.map(claim => (
-                                <div key={claim.id} className="p-3 rounded-2xl bg-zinc-50 border border-zinc-200">
-                                  <div className="flex items-center justify-between mb-1">
-                                    <span className="font-bold text-zinc-900">{claim.monthYear}</span>
-                                    <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-emerald-100 text-emerald-800">
-                                      {claim.status}
-                                    </span>
-                                  </div>
-                                  <div className="flex justify-between text-zinc-500 text-[11px]">
-                                    <span>Claimed: <strong>₹{claim.amountClaimed.toLocaleString()}</strong></span>
-                                    <span className="font-mono text-zinc-400">{claim.utrReference}</span>
-                                  </div>
-                                </div>
-                              ))
-                            ) : (
-                              <div className="p-4 rounded-2xl bg-zinc-50 border border-zinc-200 text-center text-zinc-400">
-                                No claims filed yet. Run monthly payroll to generate claimable DBT subsidies.
-                              </div>
-                            )}
-                          </div>
-                        </div>
-
-                        <button
-                          onClick={() => setShowPayrollModal(true)}
-                          className="w-full mt-4 py-2.5 rounded-full bg-black text-white hover:bg-zinc-800 text-xs font-bold transition-all cursor-pointer flex items-center justify-center gap-1.5 shadow-sm"
-                        >
-                          <CreditCard className="w-3.5 h-3.5" />
-                          <span>RUN PAYROLL CYCLE</span>
-                        </button>
-                      </GlassCard>
-                    </div>
-                  </div>
-                </motion.div>
-              )}
-
-              {/* TAB 3: Compliance & Contracts */}
+              {/* TAB: Compliance & Contracts */}
               {activeTab === 'compliance_contracts' && (
                 <motion.div
                   key="compliance_contracts"
