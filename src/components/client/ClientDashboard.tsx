@@ -62,6 +62,31 @@ import { motion, AnimatePresence } from 'framer-motion';
 
 type ClientViewTab = 'compliance_report' | 'naps_registry' | 'compliance_contracts' | 'apprentices' | 'spoc_logs';
 
+export const ALL_REPORT_MONTHS = [
+  { value: 'all', label: 'All Months', full: 'ALL MONTHS', num: '' },
+  { value: 'JAN', label: 'January', full: 'JANUARY', num: '01' },
+  { value: 'FEB', label: 'February', full: 'FEBRUARY', num: '02' },
+  { value: 'MAR', label: 'March', full: 'MARCH', num: '03' },
+  { value: 'APR', label: 'April', full: 'APRIL', num: '04' },
+  { value: 'MAY', label: 'May', full: 'MAY', num: '05' },
+  { value: 'JUN', label: 'June', full: 'JUNE', num: '06' },
+  { value: 'JUL', label: 'July', full: 'JULY', num: '07' },
+  { value: 'AUG', label: 'August', full: 'AUGUST', num: '08' },
+  { value: 'SEP', label: 'September', full: 'SEPTEMBER', num: '09' },
+  { value: 'OCT', label: 'October', full: 'OCTOBER', num: '10' },
+  { value: 'NOV', label: 'November', full: 'NOVEMBER', num: '11' },
+  { value: 'DEC', label: 'December', full: 'DECEMBER', num: '12' },
+];
+
+export const ALL_REPORT_YEARS = [
+  { value: 'all', label: 'All Years' },
+  { value: '2024', label: '2024' },
+  { value: '2025', label: '2025' },
+  { value: '2026', label: '2026' },
+  { value: '2027', label: '2027' },
+  { value: '2028', label: '2028' },
+];
+
 export const ClientDashboard: React.FC = () => {
   const { 
     user, 
@@ -78,6 +103,12 @@ export const ClientDashboard: React.FC = () => {
   const [activeMainView, setActiveMainView] = useState<'intake' | 'dashboard'>('dashboard');
   const [searchQuery, setSearchQuery] = useState('');
   const [statusFilter, setStatusFilter] = useState<string>('all');
+  
+  // Interactive Month and Year Filters
+  const [selectedReportMonth, setSelectedReportMonth] = useState<string>('all');
+  const [selectedReportYear, setSelectedReportYear] = useState<string>('all');
+  const [filterCandidatesByMonth, setFilterCandidatesByMonth] = useState<boolean>(false);
+
   const [napsPayoutMonthFilter, setNapsPayoutMonthFilter] = useState<string>('all');
   const [napsClientSearch, setNapsClientSearch] = useState('');
   const [claimSuccessAlert, setClaimSuccessAlert] = useState<string | null>(null);
@@ -254,21 +285,48 @@ export const ClientDashboard: React.FC = () => {
   const openQuota = Math.max(0, sanctionedQuota - utilisedQuota);
   const utilisationPercentage = sanctionedQuota > 0 ? ((utilisedQuota / sanctionedQuota) * 100).toFixed(1) + '%' : '0.0%';
 
-  const currentMonthPrefix = new Date().toISOString().slice(0, 7);
+  const currentMonthObj = ALL_REPORT_MONTHS.find(m => m.value === selectedReportMonth);
+  const reportingMonthStr = useMemo(() => {
+    if (selectedReportMonth === 'all' && selectedReportYear === 'all') {
+      return activeSubmission?.reporting_month || metrics.reportingMonth || 'ALL REPORTING PERIODS';
+    }
+    if (selectedReportMonth === 'all') {
+      return `FULL YEAR ${selectedReportYear}`;
+    }
+    if (selectedReportYear === 'all') {
+      return `${currentMonthObj?.full || selectedReportMonth} (ALL YEARS)`;
+    }
+    return `${currentMonthObj?.full || selectedReportMonth}, ${selectedReportYear}`;
+  }, [selectedReportMonth, selectedReportYear, currentMonthObj, activeSubmission?.reporting_month, metrics.reportingMonth]);
+
   const onboardedThisMonth = useMemo(() => {
     return candidateList.filter(c => {
       if (!c.onboardingDate) return false;
-      return c.onboardingDate.includes(currentMonthPrefix) || c.status === 'Active';
+      if (selectedReportYear !== 'all' && !c.onboardingDate.includes(selectedReportYear)) {
+        return false;
+      }
+      if (selectedReportMonth !== 'all') {
+        const mNum = currentMonthObj?.num;
+        if (mNum && !c.onboardingDate.includes(`-${mNum}-`) && !c.onboardingDate.includes(`/${mNum}/`)) {
+          return false;
+        }
+      }
+      return true;
     }).length;
-  }, [candidateList, currentMonthPrefix]);
+  }, [candidateList, selectedReportMonth, selectedReportYear, currentMonthObj]);
 
   const dbtClaimedReal = useMemo(() => {
     const paidSum = effectiveNapsRecords
-      .filter(r => r.paymentStatus === 'PAID')
+      .filter(r => {
+        if (r.paymentStatus !== 'PAID') return false;
+        const pUpper = (r.payoutMonth || '').toUpperCase();
+        if (selectedReportMonth !== 'all' && !pUpper.includes(selectedReportMonth)) return false;
+        if (selectedReportYear !== 'all' && !pUpper.includes(selectedReportYear)) return false;
+        return true;
+      })
       .reduce((sum, r) => sum + (Number(r.amount) || 0), 0);
-    if (paidSum > 0) return paidSum;
-    return metrics.dbtClaimedLastMonth || 0;
-  }, [effectiveNapsRecords, metrics.dbtClaimedLastMonth]);
+    return paidSum;
+  }, [effectiveNapsRecords, selectedReportMonth, selectedReportYear]);
 
   const dbtAllocationNotUtilized = useMemo(() => {
     if (activeSubmission?.dbt_allocation_not_utilized !== undefined) {
@@ -285,12 +343,15 @@ export const ClientDashboard: React.FC = () => {
   const pendingApprovalGovt = candidateList.filter(c => c.contractStatus === 'Pending Verification' || c.contractStatus === 'Generated').length;
 
   const portalNapsId = activeSubmission?.naps_portal_id || metrics.napsPortalId || 'Pending Allocation';
-  const reportingMonthStr = activeSubmission?.reporting_month || metrics.reportingMonth || new Date().toLocaleString('en-US', { month: 'long', year: 'numeric' }).toUpperCase();
 
   const monthlyNapsSummary = useMemo(() => {
     const monthMap: Record<string, { count: number; dbtTotal: number; paidCount: number; latestPfmsDate: string }> = {};
     effectiveNapsRecords.forEach(r => {
       const m = r.payoutMonth || 'CURRENT';
+      const mUpper = m.toUpperCase();
+      if (selectedReportMonth !== 'all' && !mUpper.includes(selectedReportMonth)) return;
+      if (selectedReportYear !== 'all' && !mUpper.includes(selectedReportYear)) return;
+
       if (!monthMap[m]) {
         monthMap[m] = { count: 0, dbtTotal: 0, paidCount: 0, latestPfmsDate: '-' };
       }
@@ -311,7 +372,22 @@ export const ClientDashboard: React.FC = () => {
         ? `DBT credited via PFMS to ${data.paidCount} of ${data.count} candidates`
         : `DBT processing pending for ${data.count} candidate contracts`
     }));
-  }, [effectiveNapsRecords, activeSubmission?.responses?.stipendPerApprentice]);
+  }, [effectiveNapsRecords, selectedReportMonth, selectedReportYear, activeSubmission?.responses?.stipendPerApprentice]);
+
+  const displayedCandidatesList = useMemo(() => {
+    if (!filterCandidatesByMonth || (selectedReportMonth === 'all' && selectedReportYear === 'all')) {
+      return effectiveCandidatesList;
+    }
+    return effectiveCandidatesList.filter(c => {
+      if (!c.onboardingDate) return false;
+      if (selectedReportYear !== 'all' && !c.onboardingDate.includes(selectedReportYear)) return false;
+      if (selectedReportMonth !== 'all') {
+        const mNum = currentMonthObj?.num;
+        if (mNum && !c.onboardingDate.includes(`-${mNum}-`) && !c.onboardingDate.includes(`/${mNum}/`)) return false;
+      }
+      return true;
+    });
+  }, [effectiveCandidatesList, filterCandidatesByMonth, selectedReportMonth, selectedReportYear, currentMonthObj]);
 
   const filteredApprentices = candidateList.filter(app => {
     const matchesSearch = 
@@ -324,16 +400,18 @@ export const ClientDashboard: React.FC = () => {
 
   const filteredNapsRecords = useMemo(() => {
     return effectiveNapsRecords.filter((rec) => {
-      const matchesMonth = napsPayoutMonthFilter === 'all' || rec.payoutMonth === napsPayoutMonthFilter;
+      const recMonthUpper = (rec.payoutMonth || '').toUpperCase();
+      const matchesMonth = selectedReportMonth === 'all' || recMonthUpper.includes(selectedReportMonth);
+      const matchesYear = selectedReportYear === 'all' || recMonthUpper.includes(selectedReportYear);
       const matchesSearch = !napsClientSearch.trim() ||
         rec.apprenticeCode.toLowerCase().includes(napsClientSearch.toLowerCase()) ||
         rec.contractCode.toLowerCase().includes(napsClientSearch.toLowerCase()) ||
         rec.establishmentCode.toLowerCase().includes(napsClientSearch.toLowerCase()) ||
         rec.beneficiaryId.toLowerCase().includes(napsClientSearch.toLowerCase()) ||
         rec.ojtDistrict.toLowerCase().includes(napsClientSearch.toLowerCase());
-      return matchesMonth && matchesSearch;
+      return matchesMonth && matchesYear && matchesSearch;
     });
-  }, [effectiveNapsRecords, napsPayoutMonthFilter, napsClientSearch]);
+  }, [effectiveNapsRecords, selectedReportMonth, selectedReportYear, napsClientSearch]);
 
   const napsMonthOptions = useMemo(() => {
     const months = Array.from(new Set(effectiveNapsRecords.map(r => r.payoutMonth).filter(Boolean)));
@@ -397,7 +475,7 @@ export const ClientDashboard: React.FC = () => {
     const url = URL.createObjectURL(blob);
     const link = document.createElement('a');
     link.setAttribute('href', url);
-    link.setAttribute('download', `NAPS_Portal_Registry_${metrics.reportingMonth?.replace(/[^a-zA-Z0-9]/g, '_') || 'Report'}.csv`);
+    link.setAttribute('download', `NAPS_Portal_Registry_${reportingMonthStr.replace(/[^a-zA-Z0-9]/g, '_') || 'Report'}.csv`);
     document.body.appendChild(link);
     link.click();
     document.body.removeChild(link);
@@ -775,24 +853,69 @@ export const ClientDashboard: React.FC = () => {
                       </div>
                     </div>
 
-                    {/* Sub-bar with Metadata */}
-                    <div className="bg-[#102a4c] text-zinc-300 px-6 py-3 border-t border-white/10 flex flex-wrap items-center justify-between gap-4 text-xs">
-                      <div className="flex items-center gap-6">
+                    {/* Sub-bar with Metadata & Month/Year Selector */}
+                    <div className="bg-[#102a4c] text-zinc-300 px-6 py-3.5 border-t border-white/10 flex flex-wrap items-center justify-between gap-4 text-xs">
+                      <div className="flex flex-wrap items-center gap-6">
                         <div>
                           <span className="text-zinc-400 text-[11px]">Client / Establishment:</span>{' '}
                           <strong className="text-white font-semibold">{clientDisplayName}</strong>
                         </div>
                         <div>
-                          <span className="text-zinc-400 text-[11px]">Reporting Month:</span>{' '}
-                          <strong className="text-amber-300 font-mono font-bold">{reportingMonthStr}</strong>
-                        </div>
-                        <div>
                           <span className="text-zinc-400 text-[11px]">Portal NAPS ID:</span>{' '}
                           <strong className="text-white font-mono font-bold bg-white/10 px-2 py-0.5 rounded">{portalNapsId}</strong>
                         </div>
+                        <div>
+                          <span className="text-zinc-400 text-[11px]">Active Period:</span>{' '}
+                          <strong className="text-amber-300 font-mono font-bold bg-amber-400/15 px-2.5 py-0.5 rounded border border-amber-300/30">
+                            {reportingMonthStr}
+                          </strong>
+                        </div>
                       </div>
-                      <div className="text-zinc-400 text-[11px] italic">
-                        Prepared for: <span className="text-white font-semibold">Team WorkForce2047 Partners LLP</span>
+
+                      {/* Interactive Month and Year Filter Selector */}
+                      <div className="flex items-center gap-2 bg-white/10 p-1.5 rounded-2xl border border-white/15">
+                        <Calendar className="w-3.5 h-3.5 text-amber-300 ml-1.5" />
+                        <span className="text-[11px] font-bold text-zinc-300 font-mono">Filter Cycle:</span>
+                        
+                        {/* Month Selector */}
+                        <select
+                          value={selectedReportMonth}
+                          onChange={(e) => setSelectedReportMonth(e.target.value)}
+                          className="px-2.5 py-1 rounded-xl bg-zinc-900/90 text-white font-bold text-xs border border-white/20 focus:outline-none focus:border-amber-400 cursor-pointer"
+                        >
+                          {ALL_REPORT_MONTHS.map(m => (
+                            <option key={m.value} value={m.value} className="bg-zinc-900 text-white">
+                              {m.label}
+                            </option>
+                          ))}
+                        </select>
+
+                        {/* Year Selector */}
+                        <select
+                          value={selectedReportYear}
+                          onChange={(e) => setSelectedReportYear(e.target.value)}
+                          className="px-2.5 py-1 rounded-xl bg-zinc-900/90 text-white font-bold text-xs border border-white/20 focus:outline-none focus:border-amber-400 cursor-pointer font-mono"
+                        >
+                          {ALL_REPORT_YEARS.map(y => (
+                            <option key={y.value} value={y.value} className="bg-zinc-900 text-white">
+                              {y.label}
+                            </option>
+                          ))}
+                        </select>
+
+                        {(selectedReportMonth !== 'all' || selectedReportYear !== 'all') && (
+                          <button
+                            type="button"
+                            onClick={() => {
+                              setSelectedReportMonth('all');
+                              setSelectedReportYear('all');
+                            }}
+                            className="px-2 py-1 rounded-xl bg-white/15 hover:bg-white/25 text-zinc-200 text-[10px] font-bold cursor-pointer transition-all"
+                            title="Reset to All Cycles"
+                          >
+                            Reset
+                          </button>
+                        )}
                       </div>
                     </div>
                   </div>
@@ -955,14 +1078,31 @@ export const ClientDashboard: React.FC = () => {
                         <h3 className="text-sm font-extrabold uppercase tracking-wider text-zinc-900">
                           3. Contract Numbers (CN) – Candidates Onboarded on Month
                         </h3>
+                        <span className="text-[11px] font-mono text-zinc-400">({displayedCandidatesList.length} shown)</span>
                       </div>
-                      <button
-                        onClick={handleOpenAddModal}
-                        className="px-3.5 py-1.5 rounded-full bg-[#0a192f] text-white text-xs font-bold flex items-center gap-1.5 hover:bg-zinc-800 transition-colors cursor-pointer self-start sm:self-auto"
-                      >
-                        <Plus className="w-3.5 h-3.5" />
-                        <span>+ Onboard Candidate</span>
-                      </button>
+
+                      <div className="flex items-center gap-2 self-start sm:self-auto">
+                        {(selectedReportMonth !== 'all' || selectedReportYear !== 'all') && (
+                          <button
+                            type="button"
+                            onClick={() => setFilterCandidatesByMonth(!filterCandidatesByMonth)}
+                            className={`px-3 py-1 rounded-full text-xs font-bold border transition-all cursor-pointer ${
+                              filterCandidatesByMonth
+                                ? 'bg-amber-100 text-amber-900 border-amber-300'
+                                : 'bg-zinc-100 text-zinc-700 border-zinc-300 hover:bg-zinc-200'
+                            }`}
+                          >
+                            {filterCandidatesByMonth ? `Filtered: ${reportingMonthStr}` : 'Filter by Active Period'}
+                          </button>
+                        )}
+                        <button
+                          onClick={handleOpenAddModal}
+                          className="px-3.5 py-1.5 rounded-full bg-[#0a192f] text-white text-xs font-bold flex items-center gap-1.5 hover:bg-zinc-800 transition-colors cursor-pointer"
+                        >
+                          <Plus className="w-3.5 h-3.5" />
+                          <span>+ Onboard Candidate</span>
+                        </button>
+                      </div>
                     </div>
 
                     <div className="overflow-x-auto rounded-2xl border border-zinc-200">
@@ -979,14 +1119,14 @@ export const ClientDashboard: React.FC = () => {
                           </tr>
                         </thead>
                         <tbody className="divide-y divide-zinc-200">
-                          {effectiveCandidatesList.length === 0 ? (
+                          {displayedCandidatesList.length === 0 ? (
                             <tr>
                               <td colSpan={7} className="px-4 py-8 text-center text-zinc-400 font-medium">
-                                No candidates onboarded for this reporting period yet. Click &ldquo;+ Onboard Candidate&rdquo; to begin.
+                                No candidates onboarded for this reporting period ({reportingMonthStr}) yet. Click &ldquo;+ Onboard Candidate&rdquo; to begin.
                               </td>
                             </tr>
                           ) : (
-                            effectiveCandidatesList.map((app, idx) => (
+                            displayedCandidatesList.map((app, idx) => (
                               <tr key={app.id || idx} className="hover:bg-zinc-50/80 transition-colors">
                                 <td className="px-4 py-3 font-mono text-zinc-400 font-bold">{idx + 1}</td>
                                 <td className="px-4 py-3 font-bold text-zinc-900">{app.name}</td>
@@ -1226,20 +1366,46 @@ export const ClientDashboard: React.FC = () => {
 
                     {/* Filter & Search Bar */}
                     <div className="pt-3 border-t border-zinc-200 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
-                      <div className="flex items-center gap-2">
+                      <div className="flex flex-wrap items-center gap-2">
                         <Filter className="w-4 h-4 text-zinc-400" />
-                        <span className="text-xs font-bold text-zinc-600">Payout Month:</span>
+                        <span className="text-xs font-bold text-zinc-600">Month:</span>
                         <select
-                          value={napsPayoutMonthFilter}
-                          onChange={(e) => setNapsPayoutMonthFilter(e.target.value)}
+                          value={selectedReportMonth}
+                          onChange={(e) => setSelectedReportMonth(e.target.value)}
                           className="px-3 py-1.5 rounded-full bg-zinc-100 border border-zinc-300 text-xs font-bold text-zinc-800 focus:outline-none focus:border-black cursor-pointer font-mono"
                         >
-                          {napsMonthOptions.map((m) => (
-                            <option key={m} value={m}>
-                              {m === 'all' ? 'All Months' : m}
+                          {ALL_REPORT_MONTHS.map((m) => (
+                            <option key={m.value} value={m.value}>
+                              {m.label}
                             </option>
                           ))}
                         </select>
+
+                        <span className="text-xs font-bold text-zinc-600 ml-1">Year:</span>
+                        <select
+                          value={selectedReportYear}
+                          onChange={(e) => setSelectedReportYear(e.target.value)}
+                          className="px-3 py-1.5 rounded-full bg-zinc-100 border border-zinc-300 text-xs font-bold text-zinc-800 focus:outline-none focus:border-black cursor-pointer font-mono"
+                        >
+                          {ALL_REPORT_YEARS.map((y) => (
+                            <option key={y.value} value={y.value}>
+                              {y.label}
+                            </option>
+                          ))}
+                        </select>
+
+                        {(selectedReportMonth !== 'all' || selectedReportYear !== 'all') && (
+                          <button
+                            type="button"
+                            onClick={() => {
+                              setSelectedReportMonth('all');
+                              setSelectedReportYear('all');
+                            }}
+                            className="px-2.5 py-1 rounded-full bg-zinc-200 hover:bg-zinc-300 text-zinc-700 text-xs font-bold cursor-pointer transition-all"
+                          >
+                            Show All
+                          </button>
+                        )}
                       </div>
 
                       {/* Search Input */}

@@ -218,13 +218,21 @@ export const SubmissionDetailDrawer: React.FC<SubmissionDetailDrawerProps> = ({
   };
 
   const handleDuplicateNapsToNextMonth = async (rec: NAPSPortalRecord) => {
-    const nextMonthMap: Record<string, string> = {
-      'JUN-2026': 'JUL-2026',
-      'JUL-2026': 'AUG-2026',
-      'AUG-2026': 'SEP-2026',
-      'SEP-2026': 'OCT-2026'
-    };
-    const nextMonth = nextMonthMap[rec.payoutMonth] || 'AUG-2026';
+    const months = ['JAN', 'FEB', 'MAR', 'APR', 'MAY', 'JUN', 'JUL', 'AUG', 'SEP', 'OCT', 'NOV', 'DEC'];
+    let nextMonth = 'SEP-2026';
+    const parts = (rec.payoutMonth || '').split('-');
+    if (parts.length === 2) {
+      const curM = parts[0].toUpperCase();
+      const curY = parseInt(parts[1], 10);
+      const mIdx = months.indexOf(curM);
+      if (mIdx !== -1 && !isNaN(curY)) {
+        if (mIdx === 11) {
+          nextMonth = `JAN-${curY + 1}`;
+        } else {
+          nextMonth = `${months[mIdx + 1]}-${curY}`;
+        }
+      }
+    }
     const duplicated: Omit<NAPSPortalRecord, 'id'> = {
       ...rec,
       payoutMonth: nextMonth,
@@ -1196,15 +1204,33 @@ export const SubmissionDetailDrawer: React.FC<SubmissionDetailDrawerProps> = ({
 
                 <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
                   <div>
-                    <label className="block text-[11px] font-bold text-zinc-700 mb-1">Payout Month *</label>
-                    <input
-                      type="text"
-                      required
-                      value={napsForm.payoutMonth}
-                      onChange={(e) => setNapsForm({ ...napsForm, payoutMonth: e.target.value.toUpperCase() })}
-                      placeholder="AUG-2026"
-                      className="w-full px-3 py-2 rounded-xl bg-zinc-50 border border-zinc-200 text-zinc-900 font-mono font-bold text-xs focus:outline-none focus:border-black uppercase"
-                    />
+                    <label className="block text-[11px] font-bold text-zinc-700 mb-1">Payout Month & Year *</label>
+                    <div className="grid grid-cols-2 gap-1.5">
+                      <select
+                        value={(napsForm.payoutMonth || 'AUG-2026').split('-')[0] || 'AUG'}
+                        onChange={(e) => {
+                          const yr = (napsForm.payoutMonth || 'AUG-2026').split('-')[1] || '2026';
+                          setNapsForm({ ...napsForm, payoutMonth: `${e.target.value}-${yr}` });
+                        }}
+                        className="px-2 py-2 rounded-xl bg-zinc-50 border border-zinc-200 text-zinc-900 font-mono font-bold text-xs focus:outline-none focus:border-black cursor-pointer"
+                      >
+                        {['JAN', 'FEB', 'MAR', 'APR', 'MAY', 'JUN', 'JUL', 'AUG', 'SEP', 'OCT', 'NOV', 'DEC'].map(m => (
+                          <option key={m} value={m}>{m}</option>
+                        ))}
+                      </select>
+                      <select
+                        value={(napsForm.payoutMonth || 'AUG-2026').split('-')[1] || '2026'}
+                        onChange={(e) => {
+                          const mo = (napsForm.payoutMonth || 'AUG-2026').split('-')[0] || 'AUG';
+                          setNapsForm({ ...napsForm, payoutMonth: `${mo}-${e.target.value}` });
+                        }}
+                        className="px-2 py-2 rounded-xl bg-zinc-50 border border-zinc-200 text-zinc-900 font-mono font-bold text-xs focus:outline-none focus:border-black cursor-pointer"
+                      >
+                        {['2024', '2025', '2026', '2027', '2028', '2029', '2030'].map(y => (
+                          <option key={y} value={y}>{y}</option>
+                        ))}
+                      </select>
+                    </div>
                   </div>
 
                   <div>
