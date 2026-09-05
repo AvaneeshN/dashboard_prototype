@@ -2,11 +2,12 @@
 
 import React, { useState, useEffect, useMemo } from 'react';
 import { useStore } from '@/lib/store';
-import { ApprenticeRecord, UploadedDocument, SPOCEmailLog } from '@/types';
+import { ApprenticeRecord, UploadedDocument, SPOCEmailLog, NAPSPortalRecord, ComplianceInvoiceRecord, ComplianceActionItem, ClientApprenticeMetrics, DBTClaimRecord } from '@/types';
 import { GlassCard } from '@/components/ui/GlassCard';
 import { ClientIntakeWizard } from './ClientIntakeWizard';
 import { DocumentViewerModal } from '@/components/ui/DocumentViewerModal';
 import { processUploadedFile, downloadDocumentFile } from '@/lib/document-utils';
+import { NavyWaveBackground } from '@/components/ui/NavyWaveBackground';
 import { 
   Users, 
   UserCheck, 
@@ -42,7 +43,9 @@ import {
   Send,
   Eye,
   FileCheck2,
-  Paperclip
+  Paperclip,
+  Table,
+  Filter
 } from 'lucide-react';
 import { 
   ResponsiveContainer, 
@@ -57,7 +60,269 @@ import {
 } from 'recharts';
 import { motion, AnimatePresence } from 'framer-motion';
 
-type ClientViewTab = 'overview' | 'payroll_dbt' | 'compliance_contracts' | 'apprentices' | 'spoc_logs';
+type ClientViewTab = 'compliance_report' | 'naps_registry' | 'overview' | 'payroll_dbt' | 'compliance_contracts' | 'apprentices' | 'spoc_logs';
+
+const DEFAULT_NAPS_RECORDS: NAPSPortalRecord[] = [
+  {
+    id: 'naps-1',
+    establishmentCode: 'E12253600040',
+    ojtState: 'Telangana',
+    ojtDistrict: 'Hyderabad',
+    apprenticeCode: 'A012691340',
+    contractCode: 'CN072687468',
+    jurisdiction: 'central',
+    contractStartDate: '15/07/2026',
+    contractEndDate: '14/07/2027',
+    contractType: 'optional',
+    payoutMonth: 'AUG-2026',
+    beneficiaryStatus: 'created',
+    beneficiaryId: '*********7799',
+    dbtProcessedToPfmsDate: '04-08-2026',
+    candidateDbtConsent: 'Yes',
+    eKycStatus: 'Yes',
+    establishmentSharedStatus: 'paid',
+    amount: 1500.0,
+    paymentStatus: 'PAID',
+    paymentFailureReason: '-'
+  },
+  {
+    id: 'naps-2',
+    establishmentCode: 'E12253600040',
+    ojtState: 'Telangana',
+    ojtDistrict: 'Hyderabad',
+    apprenticeCode: 'A012691341',
+    contractCode: 'CN072687469',
+    jurisdiction: 'central',
+    contractStartDate: '15/07/2026',
+    contractEndDate: '14/07/2027',
+    contractType: 'optional',
+    payoutMonth: 'AUG-2026',
+    beneficiaryStatus: 'created',
+    beneficiaryId: '*********4512',
+    dbtProcessedToPfmsDate: '04-08-2026',
+    candidateDbtConsent: 'Yes',
+    eKycStatus: 'Yes',
+    establishmentSharedStatus: 'paid',
+    amount: 1500.0,
+    paymentStatus: 'PAID',
+    paymentFailureReason: '-'
+  },
+  {
+    id: 'naps-3',
+    establishmentCode: 'E12253600040',
+    ojtState: 'Telangana',
+    ojtDistrict: 'Hyderabad',
+    apprenticeCode: 'A012691342',
+    contractCode: 'CN072687470',
+    jurisdiction: 'central',
+    contractStartDate: '18/07/2026',
+    contractEndDate: '17/07/2027',
+    contractType: 'optional',
+    payoutMonth: 'AUG-2026',
+    beneficiaryStatus: 'created',
+    beneficiaryId: '*********8821',
+    dbtProcessedToPfmsDate: '05-08-2026',
+    candidateDbtConsent: 'Yes',
+    eKycStatus: 'Yes',
+    establishmentSharedStatus: 'paid',
+    amount: 1500.0,
+    paymentStatus: 'PAID',
+    paymentFailureReason: '-'
+  },
+  {
+    id: 'naps-4',
+    establishmentCode: 'E12253600040',
+    ojtState: 'Telangana',
+    ojtDistrict: 'Hyderabad',
+    apprenticeCode: 'A012691343',
+    contractCode: 'CN072687471',
+    jurisdiction: 'central',
+    contractStartDate: '22/07/2026',
+    contractEndDate: '21/07/2027',
+    contractType: 'optional',
+    payoutMonth: 'AUG-2026',
+    beneficiaryStatus: 'created',
+    beneficiaryId: '*********1139',
+    dbtProcessedToPfmsDate: '-',
+    candidateDbtConsent: 'Yes',
+    eKycStatus: 'Yes',
+    establishmentSharedStatus: 'pending',
+    amount: 1500.0,
+    paymentStatus: 'PENDING',
+    paymentFailureReason: '-'
+  },
+  {
+    id: 'naps-5',
+    establishmentCode: 'E12253600040',
+    ojtState: 'Telangana',
+    ojtDistrict: 'Hyderabad',
+    apprenticeCode: 'A012684210',
+    contractCode: 'CN062678120',
+    jurisdiction: 'central',
+    contractStartDate: '10/06/2026',
+    contractEndDate: '09/06/2027',
+    contractType: 'optional',
+    payoutMonth: 'JUL-2026',
+    beneficiaryStatus: 'created',
+    beneficiaryId: '*********3319',
+    dbtProcessedToPfmsDate: '08-07-2026',
+    candidateDbtConsent: 'Yes',
+    eKycStatus: 'Yes',
+    establishmentSharedStatus: 'paid',
+    amount: 1500.0,
+    paymentStatus: 'PAID',
+    paymentFailureReason: '-'
+  },
+  {
+    id: 'naps-6',
+    establishmentCode: 'E12253600040',
+    ojtState: 'Telangana',
+    ojtDistrict: 'Hyderabad',
+    apprenticeCode: 'A012684211',
+    contractCode: 'CN062678121',
+    jurisdiction: 'central',
+    contractStartDate: '10/06/2026',
+    contractEndDate: '09/06/2027',
+    contractType: 'optional',
+    payoutMonth: 'JUL-2026',
+    beneficiaryStatus: 'created',
+    beneficiaryId: '*********9042',
+    dbtProcessedToPfmsDate: '08-07-2026',
+    candidateDbtConsent: 'Yes',
+    eKycStatus: 'Yes',
+    establishmentSharedStatus: 'paid',
+    amount: 1500.0,
+    paymentStatus: 'PAID',
+    paymentFailureReason: '-'
+  },
+  {
+    id: 'naps-7',
+    establishmentCode: 'E12253600040',
+    ojtState: 'Telangana',
+    ojtDistrict: 'Hyderabad',
+    apprenticeCode: 'A012675901',
+    contractCode: 'CN052667101',
+    jurisdiction: 'central',
+    contractStartDate: '01/05/2026',
+    contractEndDate: '30/04/2027',
+    contractType: 'optional',
+    payoutMonth: 'JUN-2026',
+    beneficiaryStatus: 'created',
+    beneficiaryId: '*********6723',
+    dbtProcessedToPfmsDate: '12-06-2026',
+    candidateDbtConsent: 'Yes',
+    eKycStatus: 'Yes',
+    establishmentSharedStatus: 'paid',
+    amount: 1500.0,
+    paymentStatus: 'PAID',
+    paymentFailureReason: '-'
+  }
+];
+
+const DEFAULT_INVOICES: ComplianceInvoiceRecord[] = [
+  {
+    id: 'inv-1',
+    invoiceNo: 'WF-2026-INV-089',
+    invoiceDate: '01/08/2026',
+    amount: 18500,
+    status: 'SUBMITTED',
+    paymentDate: 'Pending',
+    remarks: 'Monthly facilitation fee for July 2026'
+  },
+  {
+    id: 'inv-2',
+    invoiceNo: 'WF-2026-INV-074',
+    invoiceDate: '01/07/2026',
+    amount: 18500,
+    status: 'PAID',
+    paymentDate: '10/07/2026',
+    remarks: 'Payment received via NEFT'
+  },
+  {
+    id: 'inv-3',
+    invoiceNo: 'WF-2026-INV-058',
+    invoiceDate: '01/06/2026',
+    amount: 18500,
+    status: 'PAID',
+    paymentDate: '09/06/2026',
+    remarks: 'Payment received via RTGS'
+  }
+];
+
+const DEFAULT_ACTION_ITEMS: ComplianceActionItem[] = [
+  {
+    id: 'act-1',
+    observation: '3 new apprentice contracts pending candidate eKYC consent on NAPS portal',
+    actionRequired: 'Follow up with candidates to complete Aadhaar OTP eKYC verification',
+    owner: 'Operations / SPOC',
+    targetDate: '10/08/2026',
+    status: 'IN PROGRESS'
+  },
+  {
+    id: 'act-2',
+    observation: 'DBT claim for July to be processed post employer stipend credit confirmation',
+    actionRequired: 'Upload bank payment scroll to portal for NAPS reimbursement release',
+    owner: 'WorkForce2047 TPA',
+    targetDate: '15/08/2026',
+    status: 'PLANNED'
+  },
+  {
+    id: 'act-3',
+    observation: 'Open quota of 20 apprentices remaining for current fiscal year',
+    actionRequired: 'Initiate campus drive batch for Q3 intake requirements',
+    owner: 'HR Lead / Client',
+    targetDate: '30/08/2026',
+    status: 'OPEN'
+  }
+];
+
+const DEFAULT_CANDIDATE_LIST: ApprenticeRecord[] = [
+  {
+    id: 'cand-1',
+    name: 'Arjun Sharma',
+    email: 'arjun.sharma@example.com',
+    phone: '+91 98765 43210',
+    tradeOrRole: 'Full-Stack Developer Trainee',
+    qualification: 'B.Tech / Information Technology',
+    contractCode: 'CN072687468',
+    onboardingDate: '15/07/2026',
+    stipendAmount: 18500,
+    dbtEligibleAmount: 1500,
+    contractStatus: 'Generated',
+    attendanceRate: '100%',
+    status: 'Active'
+  },
+  {
+    id: 'cand-2',
+    name: 'Priya Patel',
+    email: 'priya.patel@example.com',
+    phone: '+91 98765 43211',
+    tradeOrRole: 'Business Operations Associate',
+    qualification: 'B.Com / Management',
+    contractCode: 'CN072687469',
+    onboardingDate: '18/07/2026',
+    stipendAmount: 18500,
+    dbtEligibleAmount: 1500,
+    contractStatus: 'Generated',
+    attendanceRate: '100%',
+    status: 'Active'
+  },
+  {
+    id: 'cand-3',
+    name: 'Rahul Verma',
+    email: 'rahul.verma@example.com',
+    phone: '+91 98765 43212',
+    tradeOrRole: 'Cloud & DevOps Associate',
+    qualification: 'B.Sc / Computer Science',
+    contractCode: 'CN072687470',
+    onboardingDate: '22/07/2026',
+    stipendAmount: 18500,
+    dbtEligibleAmount: 1500,
+    contractStatus: 'Generated',
+    attendanceRate: '100%',
+    status: 'Active'
+  }
+];
 
 export const ClientDashboard: React.FC = () => {
   const { 
@@ -71,10 +336,12 @@ export const ClientDashboard: React.FC = () => {
     assignCompanySpoc
   } = useStore();
 
-  const [activeTab, setActiveTab] = useState<ClientViewTab>('overview');
+  const [activeTab, setActiveTab] = useState<ClientViewTab>('compliance_report');
   const [activeMainView, setActiveMainView] = useState<'intake' | 'dashboard'>('dashboard');
   const [searchQuery, setSearchQuery] = useState('');
   const [statusFilter, setStatusFilter] = useState<string>('all');
+  const [napsPayoutMonthFilter, setNapsPayoutMonthFilter] = useState<string>('all');
+  const [napsClientSearch, setNapsClientSearch] = useState('');
   const [claimSuccessAlert, setClaimSuccessAlert] = useState<string | null>(null);
 
   // Modal States
@@ -161,44 +428,58 @@ export const ClientDashboard: React.FC = () => {
     }
   }, [currentSpoc?.email, currentSpoc?.name, activeSubmission?.assigned_company_spoc?.email, user?.apprenticeMetrics?.assignedCompanySpoc?.email, activeSubmission?.responses?.complianceOfficerEmail, user?.email]);
 
-  const defaultEmptyMetrics = {
+  const defaultEmptyMetrics: ClientApprenticeMetrics = {
     clientName: user?.full_name || 'Client Workspace',
     companyName: user?.company_name || '',
-    totalApprenticesEligible: 0,
-    currentOnboardedApprentices: 0,
-    remainingNumbersLeft: 0,
-    dbtClaimedLastMonth: 0,
+    reportingMonth: 'JULY, 2026',
+    napsPortalId: 'E01232900003',
+    sanctionedQuota: 27,
+    totalApprenticesEligible: 27,
+    currentOnboardedApprentices: 7,
+    remainingNumbersLeft: 20,
+    onboardedThisMonth: 3,
+    utilizationPercentage: '25.9%',
+    dbtClaimedLastMonth: 10500,
+    dbtAllocationNotUtilized: 30000,
     pendingAmountClaimable: 0,
+    governmentApproval: {
+      totalApproved: 7,
+      approvedThisMonth: 3,
+      pendingApproval: 0
+    },
     lastMonthPayroll: {
-      totalDisbursed: 0,
-      stipendProcessedCount: 0,
-      payoutDate: 'Pending Intake',
-      status: 'Pending Approval' as const,
+      totalDisbursed: 129500,
+      stipendProcessedCount: 7,
+      payoutDate: '05/07/2026',
+      status: 'Processed' as const,
       breakdown: {
-        baseStipend: 0,
-        dbtGovtShare: 0,
-        companyShare: 0
+        baseStipend: 18500,
+        dbtGovtShare: 1500,
+        companyShare: 17000
       }
     },
     contractLetters: {
-      totalGenerated: 0,
-      signedCount: 0,
+      totalGenerated: 7,
+      signedCount: 7,
       pendingSignature: 0,
-      lastGeneratedDate: '-'
+      lastGeneratedDate: '15/07/2026'
     },
     lastMonthCNRemarks: {
-      remarkCode: 'CN-INITIAL',
-      summary: 'New workspace registered. Complete the intake form to initialize compliance tracking.',
-      status: 'Action Required' as const,
+      remarkCode: 'CN-ACTIVE',
+      summary: 'Compliance status healthy for July 2026.',
+      status: 'Clean / No Issues' as const,
       auditDate: new Date().toISOString().split('T')[0],
-      details: 'Fill out the 4-section apprentice intake form to allocate quota and enable DBT subsidies.'
+      details: 'All contracts and stipend disbursements are aligned with Apprenticeship Act guidelines.'
     },
-    lastMonthOnboardedList: [],
-    dbtClaimsHistory: [],
-    spocEmailLogs: []
+    lastMonthOnboardedList: [] as ApprenticeRecord[],
+    dbtClaimsHistory: [] as DBTClaimRecord[],
+    spocEmailLogs: [] as SPOCEmailLog[],
+    napsPortalRecords: DEFAULT_NAPS_RECORDS,
+    invoices: DEFAULT_INVOICES,
+    actionItems: DEFAULT_ACTION_ITEMS
   };
 
-  const metrics = user?.apprenticeMetrics || defaultEmptyMetrics;
+  const metrics: ClientApprenticeMetrics = user?.apprenticeMetrics || defaultEmptyMetrics;
   const clientDisplayName = metrics.companyName || user?.company_name || user?.full_name || metrics.clientName || 'Client Workspace';
 
   const quotaChartData = [
@@ -223,6 +504,115 @@ export const ClientDashboard: React.FC = () => {
     const matchesStatus = statusFilter === 'all' || app.status.toLowerCase() === statusFilter.toLowerCase();
     return matchesSearch && matchesStatus;
   });
+
+  const effectiveNapsRecords: NAPSPortalRecord[] = useMemo(() => {
+    if (metrics.napsPortalRecords && metrics.napsPortalRecords.length > 0) {
+      return metrics.napsPortalRecords;
+    }
+    return DEFAULT_NAPS_RECORDS;
+  }, [metrics.napsPortalRecords]);
+
+  const effectiveInvoices: ComplianceInvoiceRecord[] = useMemo(() => {
+    if (metrics.invoices && metrics.invoices.length > 0) {
+      return metrics.invoices;
+    }
+    return DEFAULT_INVOICES;
+  }, [metrics.invoices]);
+
+  const effectiveActionItems: ComplianceActionItem[] = useMemo(() => {
+    if (metrics.actionItems && metrics.actionItems.length > 0) {
+      return metrics.actionItems;
+    }
+    return DEFAULT_ACTION_ITEMS;
+  }, [metrics.actionItems]);
+
+  const effectiveCandidatesList = useMemo(() => {
+    if (candidateList.length > 0) {
+      return candidateList;
+    }
+    return DEFAULT_CANDIDATE_LIST;
+  }, [candidateList]);
+
+  const filteredNapsRecords = useMemo(() => {
+    return effectiveNapsRecords.filter((rec) => {
+      const matchesMonth = napsPayoutMonthFilter === 'all' || rec.payoutMonth === napsPayoutMonthFilter;
+      const matchesSearch = !napsClientSearch.trim() ||
+        rec.apprenticeCode.toLowerCase().includes(napsClientSearch.toLowerCase()) ||
+        rec.contractCode.toLowerCase().includes(napsClientSearch.toLowerCase()) ||
+        rec.establishmentCode.toLowerCase().includes(napsClientSearch.toLowerCase()) ||
+        rec.beneficiaryId.toLowerCase().includes(napsClientSearch.toLowerCase()) ||
+        rec.ojtDistrict.toLowerCase().includes(napsClientSearch.toLowerCase());
+      return matchesMonth && matchesSearch;
+    });
+  }, [effectiveNapsRecords, napsPayoutMonthFilter, napsClientSearch]);
+
+  const napsMonthOptions = useMemo(() => {
+    const months = Array.from(new Set(effectiveNapsRecords.map(r => r.payoutMonth).filter(Boolean)));
+    return ['all', ...months];
+  }, [effectiveNapsRecords]);
+
+  const exportNapsRecordsToCsv = () => {
+    const list = filteredNapsRecords.length > 0 ? filteredNapsRecords : effectiveNapsRecords;
+    if (!list.length) return;
+
+    const headers = [
+      'Establishment Code',
+      'OJT State',
+      'OJT District',
+      'Apprentice Code',
+      'Contract Code',
+      'Jurisdiction',
+      'Contract Start Date',
+      'Contract End Date',
+      'Contract Type',
+      'Payout Month',
+      'Beneficiary Status',
+      'Beneficiary ID',
+      'DBT Processed to PFMS Date',
+      'Candidate DBT Consent',
+      'eKYC Status',
+      'Establishment Shared Status',
+      'Amount (INR)',
+      'Payment Status',
+      'Payment Failure Reason'
+    ];
+
+    const rows = list.map(r => [
+      r.establishmentCode,
+      r.ojtState,
+      r.ojtDistrict,
+      r.apprenticeCode,
+      r.contractCode,
+      r.jurisdiction,
+      r.contractStartDate,
+      r.contractEndDate,
+      r.contractType,
+      r.payoutMonth,
+      r.beneficiaryStatus,
+      r.beneficiaryId,
+      r.dbtProcessedToPfmsDate || '-',
+      r.candidateDbtConsent,
+      r.eKycStatus,
+      r.establishmentSharedStatus,
+      r.amount,
+      r.paymentStatus,
+      r.paymentFailureReason || '-'
+    ]);
+
+    const csvContent = [
+      headers.join(','),
+      ...rows.map(row => row.map(val => `"${String(val).replace(/"/g, '""')}"`).join(','))
+    ].join('\n');
+
+    const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    link.setAttribute('href', url);
+    link.setAttribute('download', `NAPS_Portal_Registry_${metrics.reportingMonth?.replace(/[^a-zA-Z0-9]/g, '_') || 'Report'}.csv`);
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+  };
 
   // Handle Document File Change
   const handleDocFileSelect = async (
@@ -375,6 +765,8 @@ export const ClientDashboard: React.FC = () => {
   };
 
   const tabs = [
+    { id: 'compliance_report', label: 'Compliance Report (Apprenticeship Act)', icon: <FileText className="w-3.5 h-3.5 text-amber-500" /> },
+    { id: 'naps_registry', label: `NAPS Government Portal (${filteredNapsRecords.length})`, icon: <Table className="w-3.5 h-3.5 text-sky-500" /> },
     { id: 'overview', label: 'Overview & Quota', icon: <LayoutDashboard className="w-3.5 h-3.5" /> },
     { id: 'payroll_dbt', label: 'Payroll & DBT Subsidy', icon: <DollarSign className="w-3.5 h-3.5" /> },
     { id: 'compliance_contracts', label: 'Contracts & CN Remarks', icon: <Shield className="w-3.5 h-3.5" /> },
@@ -383,7 +775,9 @@ export const ClientDashboard: React.FC = () => {
   ];
 
   return (
-    <div className="max-w-7xl mx-auto py-8 px-4 sm:px-6 lg:px-8 space-y-7 font-sans text-zinc-900">
+    <div className="relative min-h-screen">
+      <NavyWaveBackground intensity="subtle" className="fixed inset-0 pointer-events-none -z-10" />
+      <div className="max-w-7xl mx-auto py-8 px-4 sm:px-6 lg:px-8 space-y-7 font-sans text-zinc-900">
       
       {/* 1. Header Bar */}
       <div className="flex flex-col md:flex-row md:items-end justify-between gap-4 border-b border-zinc-200 pb-6">
@@ -497,6 +891,634 @@ export const ClientDashboard: React.FC = () => {
           <div className="min-h-[420px]">
             <AnimatePresence mode="wait">
               
+              {/* TAB: Compliance Management Report (Apprenticeship Act, 1961) */}
+              {activeTab === 'compliance_report' && (
+                <motion.div
+                  key="compliance_report"
+                  initial={{ opacity: 0, y: 8 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  exit={{ opacity: 0, y: -8 }}
+                  transition={{ duration: 0.2 }}
+                  className="space-y-6"
+                >
+                  {/* Executive Report Header Card */}
+                  <div className="rounded-3xl overflow-hidden shadow-sm border border-zinc-200">
+                    {/* Top Banner with Navy Background */}
+                    <div className="bg-[#0a192f] text-white p-6 sm:p-7 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+                      <div className="flex items-center gap-4">
+                        <div className="w-12 h-12 rounded-2xl bg-gradient-to-br from-amber-500 to-amber-700 flex items-center justify-center font-serif text-white font-extrabold text-xl shadow-md border border-amber-300/30 shrink-0">
+                          W
+                        </div>
+                        <div>
+                          <div className="flex items-center gap-2">
+                            <span className="text-[11px] font-mono uppercase tracking-widest text-amber-400 font-bold">
+                              WorkForce2047 Compliance Ledger
+                            </span>
+                            <span className="text-[10px] px-2 py-0.5 rounded-full bg-emerald-500/20 text-emerald-300 font-bold border border-emerald-500/30">
+                              Active Compliance
+                            </span>
+                          </div>
+                          <h2 className="text-xl sm:text-2xl font-bold tracking-tight text-white mt-1">
+                            Monthly Apprenticeship Act, 1961 (India) – Compliance Management Report
+                          </h2>
+                        </div>
+                      </div>
+
+                      <div className="flex items-center gap-2 self-start sm:self-auto">
+                        <button
+                          type="button"
+                          onClick={() => window.print()}
+                          className="px-3.5 py-2 rounded-xl bg-white/10 hover:bg-white/20 text-white text-xs font-bold flex items-center gap-1.5 transition-colors cursor-pointer border border-white/15"
+                        >
+                          <Printer className="w-3.5 h-3.5" />
+                          <span>Print Report</span>
+                        </button>
+                      </div>
+                    </div>
+
+                    {/* Sub-bar with Metadata */}
+                    <div className="bg-[#102a4c] text-zinc-300 px-6 py-3 border-t border-white/10 flex flex-wrap items-center justify-between gap-4 text-xs">
+                      <div className="flex items-center gap-6">
+                        <div>
+                          <span className="text-zinc-400 text-[11px]">Client / Establishment:</span>{' '}
+                          <strong className="text-white font-semibold">{clientDisplayName}</strong>
+                        </div>
+                        <div>
+                          <span className="text-zinc-400 text-[11px]">Reporting Month:</span>{' '}
+                          <strong className="text-amber-300 font-mono font-bold">{metrics.reportingMonth || 'JULY, 2026'}</strong>
+                        </div>
+                        <div>
+                          <span className="text-zinc-400 text-[11px]">Portal NAPS ID:</span>{' '}
+                          <strong className="text-white font-mono font-bold bg-white/10 px-2 py-0.5 rounded">{metrics.napsPortalId || 'E01232900003'}</strong>
+                        </div>
+                      </div>
+                      <div className="text-zinc-400 text-[11px] italic">
+                        Prepared for: <span className="text-white font-semibold">Team WorkForce2047 Partners LLP</span>
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Section 1: Quota & Onboarding Overview */}
+                  <div className="rounded-3xl bg-white border border-zinc-200 p-6 sm:p-7 shadow-sm space-y-4">
+                    <div className="flex items-center justify-between border-b border-zinc-200 pb-3">
+                      <div className="flex items-center gap-2">
+                        <div className="w-2.5 h-2.5 rounded-full bg-[#0a192f]"></div>
+                        <h3 className="text-sm font-extrabold uppercase tracking-wider text-zinc-900">
+                          1. Quota & Onboarding Overview
+                        </h3>
+                      </div>
+                      <span className="text-xs text-zinc-500 font-mono">Statutory Quota: 2.5% – 15%</span>
+                    </div>
+
+                    <div className="grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-7 gap-3">
+                      {/* Sanctioned Quota */}
+                      <div className="p-4 rounded-2xl bg-zinc-50 border border-zinc-200 flex flex-col justify-between">
+                        <span className="text-[11px] font-bold text-zinc-500 uppercase tracking-tight leading-snug">
+                          Sanctioned Quota
+                        </span>
+                        <div className="mt-3">
+                          <span className="text-2xl sm:text-3xl font-extrabold text-zinc-900 font-mono">
+                            {metrics.sanctionedQuota ?? 27}
+                          </span>
+                        </div>
+                      </div>
+
+                      {/* Utilised Till Date */}
+                      <div className="p-4 rounded-2xl bg-zinc-50 border border-zinc-200 flex flex-col justify-between">
+                        <span className="text-[11px] font-bold text-zinc-500 uppercase tracking-tight leading-snug">
+                          Utilised Till Date
+                        </span>
+                        <div className="mt-3">
+                          <span className="text-2xl sm:text-3xl font-extrabold text-zinc-900 font-mono">
+                            {metrics.currentOnboardedApprentices ?? 7}
+                          </span>
+                        </div>
+                      </div>
+
+                      {/* Remaining Open Quota */}
+                      <div className="p-4 rounded-2xl bg-zinc-50 border border-zinc-200 flex flex-col justify-between">
+                        <span className="text-[11px] font-bold text-zinc-500 uppercase tracking-tight leading-snug">
+                          Remaining Open Quota
+                        </span>
+                        <div className="mt-3">
+                          <span className="text-2xl sm:text-3xl font-extrabold text-zinc-900 font-mono">
+                            {metrics.remainingNumbersLeft ?? 20}
+                          </span>
+                        </div>
+                      </div>
+
+                      {/* Utilisation % - Light green */}
+                      <div className="p-4 rounded-2xl bg-[#dcfce7] border border-emerald-200 flex flex-col justify-between">
+                        <span className="text-[11px] font-bold text-emerald-800 uppercase tracking-tight leading-snug">
+                          Utilisation %
+                        </span>
+                        <div className="mt-3">
+                          <span className="text-2xl sm:text-3xl font-extrabold text-emerald-700 font-mono">
+                            {metrics.utilizationPercentage || '25.9%'}
+                          </span>
+                        </div>
+                      </div>
+
+                      {/* Onboarded This Month */}
+                      <div className="p-4 rounded-2xl bg-zinc-50 border border-zinc-200 flex flex-col justify-between">
+                        <span className="text-[11px] font-bold text-zinc-500 uppercase tracking-tight leading-snug">
+                          Onboarded This Month
+                        </span>
+                        <div className="mt-3">
+                          <span className="text-2xl sm:text-3xl font-extrabold text-zinc-900 font-mono">
+                            {metrics.onboardedThisMonth ?? 3}
+                          </span>
+                        </div>
+                      </div>
+
+                      {/* DBT Claimed for Month - Warm Yellow */}
+                      <div className="p-4 rounded-2xl bg-[#fef3c7] border border-amber-200 flex flex-col justify-between">
+                        <span className="text-[11px] font-bold text-amber-900 uppercase tracking-tight leading-snug">
+                          DBT Claimed (JUNE - NAPS)
+                        </span>
+                        <div className="mt-3">
+                          <span className="text-xl sm:text-2xl font-extrabold text-amber-800 font-mono">
+                            ₹{(metrics.dbtClaimedLastMonth ?? 10500).toLocaleString('en-IN')}
+                          </span>
+                        </div>
+                      </div>
+
+                      {/* DBT Allocation Not Fully Utilized - Burgundy Dark Red with White Text */}
+                      <div className="p-4 rounded-2xl bg-[#8b1e1e] border border-red-900 text-white flex flex-col justify-between shadow-sm">
+                        <span className="text-[11px] font-bold text-red-100 uppercase tracking-tight leading-snug">
+                          DBT Allocation Not Utilized
+                        </span>
+                        <div className="mt-3">
+                          <span className="text-xl sm:text-2xl font-extrabold text-white font-mono">
+                            ₹{(metrics.dbtAllocationNotUtilized ?? 30000).toLocaleString('en-IN')}
+                          </span>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Section 2: Government Approval Status */}
+                  <div className="rounded-3xl bg-white border border-zinc-200 p-6 sm:p-7 shadow-sm space-y-4">
+                    <div className="flex items-center justify-between border-b border-zinc-200 pb-3">
+                      <div className="flex items-center gap-2">
+                        <div className="w-2.5 h-2.5 rounded-full bg-[#0a192f]"></div>
+                        <h3 className="text-sm font-extrabold uppercase tracking-wider text-zinc-900">
+                          2. Government Approval Status
+                        </h3>
+                      </div>
+                      <span className="text-xs text-zinc-500 font-mono">Ministry of Skill Development & Entrepreneurship (MSDE)</span>
+                    </div>
+
+                    <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+                      <div className="p-4 rounded-2xl bg-zinc-50 border border-zinc-200">
+                        <span className="text-[11px] font-bold text-zinc-500 uppercase tracking-tight">
+                          Total Approved (Till Date)
+                        </span>
+                        <div className="mt-2 text-2xl font-extrabold text-zinc-900 font-mono">
+                          {metrics.governmentApproval?.totalApproved ?? (metrics.currentOnboardedApprentices ?? 7)}
+                        </div>
+                      </div>
+
+                      <div className="p-4 rounded-2xl bg-zinc-50 border border-zinc-200">
+                        <span className="text-[11px] font-bold text-zinc-500 uppercase tracking-tight">
+                          Approved This Month
+                        </span>
+                        <div className="mt-2 text-2xl font-extrabold text-zinc-900 font-mono">
+                          {metrics.governmentApproval?.approvedThisMonth ?? (metrics.onboardedThisMonth ?? 3)}
+                        </div>
+                      </div>
+
+                      <div className="p-4 rounded-2xl bg-zinc-50 border border-zinc-200">
+                        <span className="text-[11px] font-bold text-zinc-500 uppercase tracking-tight">
+                          Pending Approval
+                        </span>
+                        <div className="mt-2 text-2xl font-extrabold text-zinc-900 font-mono">
+                          {metrics.governmentApproval?.pendingApproval ?? 0}
+                        </div>
+                      </div>
+
+                      <div className="p-4 rounded-2xl bg-amber-50/80 border border-amber-200">
+                        <span className="text-[11px] font-bold text-amber-900 uppercase tracking-tight">
+                          Portal Reference / NAPS ID
+                        </span>
+                        <div className="mt-2 text-base font-extrabold text-amber-900 font-mono tracking-wide">
+                          {metrics.napsPortalId || 'E01232900003'}
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Section 3: Contract Numbers (CN) – Candidates Onboarded on Month */}
+                  <div className="rounded-3xl bg-white border border-zinc-200 p-6 sm:p-7 shadow-sm space-y-4">
+                    <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-zinc-200 pb-3">
+                      <div className="flex items-center gap-2">
+                        <div className="w-2.5 h-2.5 rounded-full bg-[#0a192f]"></div>
+                        <h3 className="text-sm font-extrabold uppercase tracking-wider text-zinc-900">
+                          3. Contract Numbers (CN) – Candidates Onboarded on Month
+                        </h3>
+                      </div>
+                      <button
+                        onClick={handleOpenAddModal}
+                        className="px-3.5 py-1.5 rounded-full bg-[#0a192f] text-white text-xs font-bold flex items-center gap-1.5 hover:bg-zinc-800 transition-colors cursor-pointer self-start sm:self-auto"
+                      >
+                        <Plus className="w-3.5 h-3.5" />
+                        <span>+ Onboard Candidate</span>
+                      </button>
+                    </div>
+
+                    <div className="overflow-x-auto rounded-2xl border border-zinc-200">
+                      <table className="w-full text-left text-xs text-zinc-700">
+                        <thead className="bg-zinc-50 border-b border-zinc-200 font-bold text-[11px] uppercase tracking-wider text-zinc-500">
+                          <tr>
+                            <th className="px-4 py-3">S.No</th>
+                            <th className="px-4 py-3">Candidate Name</th>
+                            <th className="px-4 py-3">CN Number</th>
+                            <th className="px-4 py-3">Trade / Role</th>
+                            <th className="px-4 py-3">Onboarding Date</th>
+                            <th className="px-4 py-3">Govt Status / Remarks</th>
+                            <th className="px-4 py-3 text-right">Actions</th>
+                          </tr>
+                        </thead>
+                        <tbody className="divide-y divide-zinc-200">
+                          {effectiveCandidatesList.map((app, idx) => (
+                            <tr key={app.id || idx} className="hover:bg-zinc-50/80 transition-colors">
+                              <td className="px-4 py-3 font-mono text-zinc-400 font-bold">{idx + 1}</td>
+                              <td className="px-4 py-3 font-bold text-zinc-900">{app.name}</td>
+                              <td className="px-4 py-3 font-mono font-semibold text-zinc-800">
+                                <span className="px-2 py-0.5 rounded bg-zinc-100 border border-zinc-200">
+                                  {app.contractCode || `CN07268746${idx + 8}`}
+                                </span>
+                              </td>
+                              <td className="px-4 py-3 text-zinc-600">{app.tradeOrRole}</td>
+                              <td className="px-4 py-3 font-mono text-zinc-500">{app.onboardingDate || '15/07/2026'}</td>
+                              <td className="px-4 py-3">
+                                <span className="inline-flex items-center gap-1.5 px-2 py-0.5 rounded-full text-[10px] font-bold bg-emerald-50 text-emerald-700 border border-emerald-200">
+                                  <CheckCircle2 className="w-3 h-3 text-emerald-600" />
+                                  Approved on NAPS Portal
+                                </span>
+                              </td>
+                              <td className="px-4 py-3 text-right">
+                                <button
+                                  onClick={() => setSelectedContractCandidate(app as ApprenticeRecord)}
+                                  className="text-xs font-bold text-sky-700 hover:text-sky-900 cursor-pointer"
+                                >
+                                  View Contract
+                                </button>
+                              </td>
+                            </tr>
+                          ))}
+                        </tbody>
+                      </table>
+                    </div>
+                  </div>
+
+                  {/* Section 4: Stipend Payment & DBT Status */}
+                  <div className="rounded-3xl bg-white border border-zinc-200 p-6 sm:p-7 shadow-sm space-y-4">
+                    <div className="flex items-center justify-between border-b border-zinc-200 pb-3">
+                      <div className="flex items-center gap-2">
+                        <div className="w-2.5 h-2.5 rounded-full bg-[#0a192f]"></div>
+                        <h3 className="text-sm font-extrabold uppercase tracking-wider text-zinc-900">
+                          4. Stipend Payment & DBT Status
+                        </h3>
+                      </div>
+                      <span className="text-xs text-zinc-500 font-mono">DBT Subsidy ₹1,500 / candidate / month</span>
+                    </div>
+
+                    <div className="overflow-x-auto rounded-2xl border border-zinc-200">
+                      <table className="w-full text-left text-xs text-zinc-700">
+                        <thead className="bg-zinc-50 border-b border-zinc-200 font-bold text-[11px] uppercase tracking-wider text-zinc-500">
+                          <tr>
+                            <th className="px-4 py-3">Month</th>
+                            <th className="px-4 py-3">Stipend Paid by Employer</th>
+                            <th className="px-4 py-3">Date Paid</th>
+                            <th className="px-4 py-3">DBT by Govt.</th>
+                            <th className="px-4 py-3">DBT Release Date</th>
+                            <th className="px-4 py-3">Remarks / PFMS Status</th>
+                          </tr>
+                        </thead>
+                        <tbody className="divide-y divide-zinc-200 font-mono">
+                          <tr className="hover:bg-zinc-50/80 transition-colors">
+                            <td className="px-4 py-3 font-bold text-zinc-900 font-sans">JUNE 2026</td>
+                            <td className="px-4 py-3 font-bold text-zinc-800">₹1,29,500</td>
+                            <td className="px-4 py-3 text-zinc-500">05/07/2026</td>
+                            <td className="px-4 py-3 font-bold text-emerald-700">₹10,500</td>
+                            <td className="px-4 py-3 text-zinc-500">20/07/2026</td>
+                            <td className="px-4 py-3 font-sans text-xs text-emerald-700">
+                              DBT credited via PFMS to 7 candidates
+                            </td>
+                          </tr>
+                          <tr className="hover:bg-zinc-50/80 transition-colors">
+                            <td className="px-4 py-3 font-bold text-zinc-900 font-sans">MAY 2026</td>
+                            <td className="px-4 py-3 font-bold text-zinc-800">₹74,000</td>
+                            <td className="px-4 py-3 text-zinc-500">05/06/2026</td>
+                            <td className="px-4 py-3 font-bold text-emerald-700">₹6,000</td>
+                            <td className="px-4 py-3 text-zinc-500">19/06/2026</td>
+                            <td className="px-4 py-3 font-sans text-xs text-zinc-600">
+                              Processed successfully via portal
+                            </td>
+                          </tr>
+                          <tr className="hover:bg-zinc-50/80 transition-colors">
+                            <td className="px-4 py-3 font-bold text-zinc-900 font-sans">APRIL 2026</td>
+                            <td className="px-4 py-3 font-bold text-zinc-800">₹74,000</td>
+                            <td className="px-4 py-3 text-zinc-500">05/05/2026</td>
+                            <td className="px-4 py-3 font-bold text-emerald-700">₹6,000</td>
+                            <td className="px-4 py-3 text-zinc-500">18/05/2026</td>
+                            <td className="px-4 py-3 font-sans text-xs text-zinc-600">
+                              Processed successfully via portal
+                            </td>
+                          </tr>
+                        </tbody>
+                      </table>
+                    </div>
+                  </div>
+
+                  {/* Section 5: Invoice Status */}
+                  <div className="rounded-3xl bg-white border border-zinc-200 p-6 sm:p-7 shadow-sm space-y-4">
+                    <div className="flex items-center justify-between border-b border-zinc-200 pb-3">
+                      <div className="flex items-center gap-2">
+                        <div className="w-2.5 h-2.5 rounded-full bg-[#0a192f]"></div>
+                        <h3 className="text-sm font-extrabold uppercase tracking-wider text-zinc-900">
+                          5. Invoice Status
+                        </h3>
+                      </div>
+                      <span className="text-xs text-zinc-500 font-mono">TPA Facilitation & Management</span>
+                    </div>
+
+                    <div className="overflow-x-auto rounded-2xl border border-zinc-200">
+                      <table className="w-full text-left text-xs text-zinc-700">
+                        <thead className="bg-zinc-50 border-b border-zinc-200 font-bold text-[11px] uppercase tracking-wider text-zinc-500">
+                          <tr>
+                            <th className="px-4 py-3">Invoice No.</th>
+                            <th className="px-4 py-3">Invoice Date</th>
+                            <th className="px-4 py-3">Amount (₹)</th>
+                            <th className="px-4 py-3">Status</th>
+                            <th className="px-4 py-3">Payment Date</th>
+                            <th className="px-4 py-3">Remarks</th>
+                          </tr>
+                        </thead>
+                        <tbody className="divide-y divide-zinc-200">
+                          {effectiveInvoices.map((inv) => (
+                            <tr key={inv.id} className="hover:bg-zinc-50/80 transition-colors">
+                              <td className="px-4 py-3 font-mono font-bold text-zinc-900">{inv.invoiceNo}</td>
+                              <td className="px-4 py-3 font-mono text-zinc-500">{inv.invoiceDate}</td>
+                              <td className="px-4 py-3 font-mono font-bold text-zinc-900">₹{inv.amount.toLocaleString('en-IN')}</td>
+                              <td className="px-4 py-3">
+                                <span className={`px-2 py-0.5 rounded-full text-[10px] font-bold ${
+                                  inv.status === 'PAID'
+                                    ? 'bg-emerald-50 text-emerald-700 border border-emerald-200'
+                                    : 'bg-amber-50 text-amber-700 border border-amber-200'
+                                }`}>
+                                  {inv.status}
+                                </span>
+                              </td>
+                              <td className="px-4 py-3 font-mono text-zinc-500">{inv.paymentDate}</td>
+                              <td className="px-4 py-3 text-zinc-600">{inv.remarks || '-'}</td>
+                            </tr>
+                          ))}
+                        </tbody>
+                      </table>
+                    </div>
+                  </div>
+
+                  {/* Section 6: Remarks / Action Items */}
+                  <div className="rounded-3xl bg-white border border-zinc-200 p-6 sm:p-7 shadow-sm space-y-4">
+                    <div className="flex items-center justify-between border-b border-zinc-200 pb-3">
+                      <div className="flex items-center gap-2">
+                        <div className="w-2.5 h-2.5 rounded-full bg-[#0a192f]"></div>
+                        <h3 className="text-sm font-extrabold uppercase tracking-wider text-zinc-900">
+                          6. Remarks / Action Items
+                        </h3>
+                      </div>
+                      <span className="text-xs text-zinc-500 font-mono">Governance & Timeline</span>
+                    </div>
+
+                    <div className="overflow-x-auto rounded-2xl border border-zinc-200">
+                      <table className="w-full text-left text-xs text-zinc-700">
+                        <thead className="bg-zinc-50 border-b border-zinc-200 font-bold text-[11px] uppercase tracking-wider text-zinc-500">
+                          <tr>
+                            <th className="px-4 py-3">S.No</th>
+                            <th className="px-4 py-3">Observation / Remark</th>
+                            <th className="px-4 py-3">Action Required</th>
+                            <th className="px-4 py-3">Owner</th>
+                            <th className="px-4 py-3">Target Date</th>
+                            <th className="px-4 py-3">Status</th>
+                          </tr>
+                        </thead>
+                        <tbody className="divide-y divide-zinc-200">
+                          {effectiveActionItems.map((act, idx) => (
+                            <tr key={act.id || idx} className="hover:bg-zinc-50/80 transition-colors">
+                              <td className="px-4 py-3 font-mono text-zinc-400 font-bold">{idx + 1}</td>
+                              <td className="px-4 py-3 font-medium text-zinc-900 max-w-xs">{act.observation}</td>
+                              <td className="px-4 py-3 text-zinc-700 max-w-xs">{act.actionRequired}</td>
+                              <td className="px-4 py-3 font-semibold text-zinc-800">{act.owner}</td>
+                              <td className="px-4 py-3 font-mono text-zinc-500">{act.targetDate}</td>
+                              <td className="px-4 py-3">
+                                <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-blue-50 text-blue-700 border border-blue-200">
+                                  {act.status || 'ACTIVE'}
+                                </span>
+                              </td>
+                            </tr>
+                          ))}
+                        </tbody>
+                      </table>
+                    </div>
+                  </div>
+                </motion.div>
+              )}
+
+              {/* TAB: NAPS Government Portal Registry */}
+              {activeTab === 'naps_registry' && (
+                <motion.div
+                  key="naps_registry"
+                  initial={{ opacity: 0, y: 8 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  exit={{ opacity: 0, y: -8 }}
+                  transition={{ duration: 0.2 }}
+                  className="space-y-6"
+                >
+                  {/* Registry Header Card */}
+                  <div className="p-6 rounded-3xl bg-white border border-zinc-200 shadow-sm space-y-4">
+                    <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
+                      <div>
+                        <div className="flex items-center gap-2">
+                          <span className="px-2.5 py-0.5 rounded-full text-[10px] font-bold bg-sky-100 text-sky-800 border border-sky-200 font-mono">
+                            National Apprenticeship Promotion Scheme
+                          </span>
+                          <span className="text-xs text-zinc-400 font-mono">PFMS / DBT Sync</span>
+                        </div>
+                        <h2 className="text-xl sm:text-2xl font-bold tracking-tight text-zinc-900 mt-1">
+                          NAPS Government Portal Registry
+                        </h2>
+                        <p className="text-xs text-zinc-500 mt-1">
+                          Official monthly establishment apprentice ledger, eKYC status, and direct benefit transfer records.
+                        </p>
+                      </div>
+
+                      {/* Action Controls */}
+                      <div className="flex items-center gap-2 self-start md:self-auto">
+                        <button
+                          type="button"
+                          onClick={exportNapsRecordsToCsv}
+                          className="px-4 py-2 rounded-full bg-zinc-900 text-white hover:bg-zinc-800 text-xs font-bold flex items-center gap-1.5 transition-colors cursor-pointer shadow-sm"
+                        >
+                          <Download className="w-3.5 h-3.5" />
+                          <span>Export CSV</span>
+                        </button>
+                      </div>
+                    </div>
+
+                    {/* Filter & Search Bar */}
+                    <div className="pt-3 border-t border-zinc-200 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+                      <div className="flex items-center gap-2">
+                        <Filter className="w-4 h-4 text-zinc-400" />
+                        <span className="text-xs font-bold text-zinc-600">Payout Month:</span>
+                        <select
+                          value={napsPayoutMonthFilter}
+                          onChange={(e) => setNapsPayoutMonthFilter(e.target.value)}
+                          className="px-3 py-1.5 rounded-full bg-zinc-100 border border-zinc-300 text-xs font-bold text-zinc-800 focus:outline-none focus:border-black cursor-pointer font-mono"
+                        >
+                          {napsMonthOptions.map((m) => (
+                            <option key={m} value={m}>
+                              {m === 'all' ? 'All Months' : m}
+                            </option>
+                          ))}
+                        </select>
+                      </div>
+
+                      {/* Search Input */}
+                      <div className="relative w-full sm:w-72">
+                        <Search className="w-4 h-4 text-zinc-400 absolute left-3 top-2.5" />
+                        <input
+                          type="text"
+                          placeholder="Search Apprentice / Contract..."
+                          value={napsClientSearch}
+                          onChange={(e) => setNapsClientSearch(e.target.value)}
+                          className="w-full pl-9 pr-3 py-1.5 rounded-full bg-zinc-100 border border-zinc-200 text-xs text-zinc-800 focus:outline-none focus:border-black"
+                        />
+                      </div>
+                    </div>
+
+                    {/* Quick Summary Pill Bar */}
+                    <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 pt-2">
+                      <div className="p-3 rounded-2xl bg-zinc-50 border border-zinc-200">
+                        <span className="text-[10px] font-bold uppercase tracking-tight text-zinc-500">Total Entries</span>
+                        <div className="text-lg font-bold font-mono text-zinc-900 mt-0.5">{filteredNapsRecords.length}</div>
+                      </div>
+                      <div className="p-3 rounded-2xl bg-zinc-50 border border-zinc-200">
+                        <span className="text-[10px] font-bold uppercase tracking-tight text-zinc-500">Total DBT Amount</span>
+                        <div className="text-lg font-bold font-mono text-emerald-700 mt-0.5">
+                          ₹{filteredNapsRecords.reduce((acc, r) => acc + (r.amount || 0), 0).toLocaleString('en-IN')}
+                        </div>
+                      </div>
+                      <div className="p-3 rounded-2xl bg-emerald-50 border border-emerald-200">
+                        <span className="text-[10px] font-bold uppercase tracking-tight text-emerald-800">Paid Status</span>
+                        <div className="text-lg font-bold font-mono text-emerald-700 mt-0.5">
+                          {filteredNapsRecords.filter(r => r.paymentStatus === 'PAID').length}
+                        </div>
+                      </div>
+                      <div className="p-3 rounded-2xl bg-amber-50 border border-amber-200">
+                        <span className="text-[10px] font-bold uppercase tracking-tight text-amber-800">Pending</span>
+                        <div className="text-lg font-bold font-mono text-amber-700 mt-0.5">
+                          {filteredNapsRecords.filter(r => r.paymentStatus !== 'PAID').length}
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Full Multi-Column NAPS Government Portal Table (TPA Columns Omitted) */}
+                  <div className="rounded-3xl bg-white border border-zinc-200 overflow-hidden shadow-sm">
+                    <div className="overflow-x-auto max-h-[600px]">
+                      <table className="w-full text-left text-xs text-zinc-700 whitespace-nowrap">
+                        <thead className="bg-[#0a192f] text-white font-bold text-[11px] uppercase tracking-wider sticky top-0 z-10">
+                          <tr>
+                            <th className="px-3.5 py-3">Establishment Code</th>
+                            <th className="px-3.5 py-3">OJT State</th>
+                            <th className="px-3.5 py-3">OJT District</th>
+                            <th className="px-3.5 py-3">Apprentice Code</th>
+                            <th className="px-3.5 py-3">Contract Code</th>
+                            <th className="px-3.5 py-3">Jurisdiction</th>
+                            <th className="px-3.5 py-3">Contract Dates</th>
+                            <th className="px-3.5 py-3">Contract Type</th>
+                            <th className="px-3.5 py-3">Payout Month</th>
+                            <th className="px-3.5 py-3">Beneficiary Status</th>
+                            <th className="px-3.5 py-3">Beneficiary ID</th>
+                            <th className="px-3.5 py-3">DBT to PFMS Date</th>
+                            <th className="px-3.5 py-3">Candidate DBT Consent</th>
+                            <th className="px-3.5 py-3">eKYC Status</th>
+                            <th className="px-3.5 py-3">Establishment Shared</th>
+                            <th className="px-3.5 py-3">Amount (₹)</th>
+                            <th className="px-3.5 py-3">Payment Status</th>
+                            <th className="px-3.5 py-3">Payment Failure Reason</th>
+                          </tr>
+                        </thead>
+                        <tbody className="divide-y divide-zinc-200 font-mono text-[11px]">
+                          {filteredNapsRecords.length === 0 ? (
+                            <tr>
+                              <td colSpan={18} className="px-6 py-12 text-center text-zinc-500 font-sans">
+                                No NAPS government portal records match your filter criteria.
+                              </td>
+                            </tr>
+                          ) : (
+                            filteredNapsRecords.map((r) => (
+                              <tr key={r.id} className="hover:bg-zinc-50/90 transition-colors">
+                                <td className="px-3.5 py-3 font-bold text-zinc-900">{r.establishmentCode}</td>
+                                <td className="px-3.5 py-3 font-sans text-zinc-600">{r.ojtState}</td>
+                                <td className="px-3.5 py-3 font-sans text-zinc-600">{r.ojtDistrict}</td>
+                                <td className="px-3.5 py-3 font-bold text-sky-700">{r.apprenticeCode}</td>
+                                <td className="px-3.5 py-3 text-zinc-800">{r.contractCode}</td>
+                                <td className="px-3.5 py-3 font-sans capitalize text-zinc-600">{r.jurisdiction}</td>
+                                <td className="px-3.5 py-3 text-zinc-500">
+                                  {r.contractStartDate} → {r.contractEndDate}
+                                </td>
+                                <td className="px-3.5 py-3 font-sans capitalize text-zinc-600">{r.contractType}</td>
+                                <td className="px-3.5 py-3 font-bold text-zinc-900">{r.payoutMonth}</td>
+                                <td className="px-3.5 py-3 font-sans capitalize text-zinc-600">{r.beneficiaryStatus}</td>
+                                <td className="px-3.5 py-3 text-zinc-500">{r.beneficiaryId}</td>
+                                <td className="px-3.5 py-3 text-zinc-500">{r.dbtProcessedToPfmsDate || '-'}</td>
+                                <td className="px-3.5 py-3 font-sans">
+                                  <span className={`px-2 py-0.5 rounded-full text-[10px] font-bold ${
+                                    r.candidateDbtConsent === 'Yes'
+                                      ? 'bg-emerald-50 text-emerald-700 border border-emerald-200'
+                                      : 'bg-zinc-100 text-zinc-600'
+                                  }`}>
+                                    {r.candidateDbtConsent}
+                                  </span>
+                                </td>
+                                <td className="px-3.5 py-3 font-sans">
+                                  <span className={`px-2 py-0.5 rounded-full text-[10px] font-bold ${
+                                    r.eKycStatus === 'Yes'
+                                      ? 'bg-emerald-50 text-emerald-700 border border-emerald-200'
+                                      : 'bg-amber-50 text-amber-700 border border-amber-200'
+                                  }`}>
+                                    {r.eKycStatus}
+                                  </span>
+                                </td>
+                                <td className="px-3.5 py-3 font-sans capitalize text-zinc-600">{r.establishmentSharedStatus}</td>
+                                <td className="px-3.5 py-3 font-bold text-zinc-900">
+                                  ₹{r.amount.toFixed(1)}
+                                </td>
+                                <td className="px-3.5 py-3 font-sans">
+                                  <span className={`px-2 py-0.5 rounded-full text-[10px] font-bold ${
+                                    r.paymentStatus === 'PAID'
+                                      ? 'bg-emerald-100 text-emerald-800 border border-emerald-300'
+                                      : r.paymentStatus === 'PENDING'
+                                      ? 'bg-amber-100 text-amber-800 border border-amber-300'
+                                      : 'bg-red-100 text-red-800 border border-red-300'
+                                  }`}>
+                                    {r.paymentStatus}
+                                  </span>
+                                </td>
+                                <td className="px-3.5 py-3 text-zinc-400">{r.paymentFailureReason || '-'}</td>
+                              </tr>
+                            ))
+                          )}
+                        </tbody>
+                      </table>
+                    </div>
+                  </div>
+                </motion.div>
+              )}
+
               {/* TAB 1: Overview & Quota */}
               {activeTab === 'overview' && (
                 <motion.div
@@ -1896,6 +2918,7 @@ export const ClientDashboard: React.FC = () => {
         )}
       </AnimatePresence>
 
+    </div>
     </div>
   );
 };

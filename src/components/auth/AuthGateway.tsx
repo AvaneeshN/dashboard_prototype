@@ -22,6 +22,8 @@ import {
 import { useRouter } from 'next/navigation';
 import { motion, AnimatePresence } from 'framer-motion';
 
+import { NavyWaveBackground } from '@/components/ui/NavyWaveBackground';
+
 export const AuthGateway: React.FC = () => {
   const { login, register, submissions } = useStore();
   const router = useRouter();
@@ -178,7 +180,8 @@ export const AuthGateway: React.FC = () => {
   };
 
   return (
-    <div className="relative min-h-[calc(100vh-4rem)] flex flex-col items-center justify-center p-4 sm:p-6 overflow-hidden bg-[#fafafa] font-sans">
+    <div className="relative min-h-[calc(100vh-4rem)] flex flex-col items-center justify-center p-4 sm:p-6 overflow-hidden bg-gradient-to-b from-[#f8fafc] via-[#f1f5f9] to-[#0a192f]/10 font-sans">
+      <NavyWaveBackground intensity="standard" />
       <ParticleField />
 
       <div className="relative z-10 w-full max-w-[440px] flex flex-col items-center">

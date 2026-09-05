@@ -21,14 +21,21 @@ export const Navbar: React.FC = () => {
     return (
       <header className="sticky top-0 z-50 w-full border-b border-zinc-200 bg-white/90 backdrop-blur-md font-sans">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 h-16 flex items-center justify-between">
-          <div className="flex items-center gap-2">
-            <span className="text-base leading-none">✦</span>
-            <span className="font-extrabold text-base tracking-tight text-black">
-              Console
-            </span>
+          <div className="flex items-center gap-2.5">
+            <div className="w-8 h-8 rounded-lg bg-[#0a192f] border border-[#1e3a5f] flex items-center justify-center text-amber-300 font-serif font-bold text-xs shadow-xs tracking-tighter">
+              W
+            </div>
+            <div>
+              <div className="font-extrabold text-sm tracking-tight text-[#0a192f] leading-none">
+                WorkForce2047
+              </div>
+              <div className="text-[10px] font-mono text-zinc-400">
+                Compliance Management Portal
+              </div>
+            </div>
           </div>
-          <div className="text-[11px] font-mono text-zinc-400">
-            Secure Authentication Gateway
+          <div className="text-[11px] font-mono text-zinc-400 hidden sm:block">
+            Apprenticeship Act, 1961 Gateway
           </div>
         </div>
       </header>
@@ -45,14 +52,20 @@ export const Navbar: React.FC = () => {
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 h-16 flex items-center justify-between">
         
         {/* Logo */}
-        <Link href={user.role === 'admin' ? '/admin' : '/client'} className="flex items-center gap-2 group">
-          <span className="text-base leading-none">✦</span>
-          <span className="font-extrabold text-base tracking-tight text-black">
-            Console
-          </span>
-          <span className="text-[10px] font-mono uppercase px-2 py-0.5 rounded-full bg-zinc-100 text-zinc-600 border border-zinc-200 ml-1">
-            {user.role === 'admin' ? 'Administration' : 'Client Portal'}
-          </span>
+        <Link href={user.role === 'admin' ? '/admin' : '/client'} className="flex items-center gap-2.5 group">
+          <div className="w-8 h-8 rounded-lg bg-[#0a192f] border border-[#1e3a5f] flex items-center justify-center text-amber-300 font-serif font-bold text-xs shadow-xs tracking-tighter transition-transform group-hover:scale-105">
+            W
+          </div>
+          <div>
+            <div className="flex items-center gap-1.5">
+              <span className="font-extrabold text-sm tracking-tight text-[#0a192f]">
+                WorkForce2047
+              </span>
+              <span className="text-[10px] font-mono uppercase px-2 py-0.5 rounded-full bg-zinc-100 text-zinc-600 border border-zinc-200">
+                {user.role === 'admin' ? 'Administration' : 'Client Portal'}
+              </span>
+            </div>
+          </div>
         </Link>
 
         {/* Right Navigation Controls */}

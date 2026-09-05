@@ -2,7 +2,14 @@
 
 import React, { useEffect, useState } from 'react';
 import { useStore } from '@/lib/store';
-import { FormSubmission, SubmissionStatus, UploadedDocument } from '@/types';
+import { 
+  FormSubmission, 
+  SubmissionStatus, 
+  UploadedDocument,
+  NAPSPortalRecord,
+  ComplianceInvoiceRecord,
+  ComplianceActionItem
+} from '@/types';
 import { DocumentViewerModal } from '@/components/ui/DocumentViewerModal';
 import { downloadDocumentFile } from '@/lib/document-utils';
 import { 
@@ -27,7 +34,12 @@ import {
   ExternalLink,
   Eye,
   Send,
-  Paperclip
+  Paperclip,
+  Table,
+  Plus,
+  Trash2,
+  Edit2,
+  Copy
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 
@@ -42,9 +54,43 @@ export const SubmissionDetailDrawer: React.FC<SubmissionDetailDrawerProps> = ({
   onClose,
   onStatusChange
 }) => {
-  const { assignCompanySpoc, adminSpoc } = useStore();
-  const [activeTab, setActiveTab] = useState<'application' | 'documents' | 'candidates' | 'dbt_claims' | 'spoc_logs'>('application');
+  const { 
+    assignCompanySpoc, 
+    adminSpoc,
+    addNAPSRecord,
+    updateNAPSRecord,
+    deleteNAPSRecord,
+    updateClientComplianceReport
+  } = useStore();
+  const [activeTab, setActiveTab] = useState<'application' | 'documents' | 'candidates' | 'dbt_claims' | 'spoc_logs' | 'naps_portal'>('application');
   const [previewingDoc, setPreviewingDoc] = useState<any>(null);
+
+  // NAPS Record Modal States
+  const [showNapsModal, setShowNapsModal] = useState(false);
+  const [editingNapsRecord, setEditingNapsRecord] = useState<NAPSPortalRecord | null>(null);
+  const [napsFormMonthFilter, setNapsFormMonthFilter] = useState<string>('all');
+  const [napsSearchQuery, setNapsSearchQuery] = useState('');
+  const [napsForm, setNapsForm] = useState<Omit<NAPSPortalRecord, 'id'>>({
+    establishmentCode: 'E12253600040',
+    ojtState: 'Telangana',
+    ojtDistrict: 'Hyderabad',
+    apprenticeCode: '',
+    contractCode: '',
+    jurisdiction: 'central',
+    contractStartDate: '2026-07-15',
+    contractEndDate: '2027-07-14',
+    contractType: 'optional',
+    payoutMonth: 'AUG-2026',
+    beneficiaryStatus: 'created',
+    beneficiaryId: '*********7799',
+    dbtProcessedToPfmsDate: '',
+    candidateDbtConsent: 'Yes',
+    eKycStatus: 'Yes',
+    establishmentSharedStatus: 'paid',
+    amount: 1500.0,
+    paymentStatus: 'PAID',
+    paymentFailureReason: ''
+  });
 
   // Company SPOC Assignment Form State
   const [isEditingSpoc, setIsEditingSpoc] = useState(false);
@@ -84,6 +130,7 @@ export const SubmissionDetailDrawer: React.FC<SubmissionDetailDrawerProps> = ({
   const candidateList = submission.candidates || [];
   const dbtClaims = submission.dbt_claims || [];
   const spocLogs = submission.spoc_logs || [];
+  const napsRecords = submission.naps_records || [];
 
   const handleSaveCompanySpoc = () => {
     if (!companySpocState.name || !companySpocState.email) return;
@@ -91,6 +138,99 @@ export const SubmissionDetailDrawer: React.FC<SubmissionDetailDrawerProps> = ({
     setIsEditingSpoc(false);
     setSpocSaveSuccess(true);
     setTimeout(() => setSpocSaveSuccess(false), 4000);
+  };
+
+  const filteredNapsRecords = napsRecords.filter(r => {
+    const matchesMonth = napsFormMonthFilter === 'all' || r.payoutMonth.toLowerCase() === napsFormMonthFilter.toLowerCase();
+    const matchesQuery = 
+      r.apprenticeCode.toLowerCase().includes(napsSearchQuery.toLowerCase()) ||
+      r.contractCode.toLowerCase().includes(napsSearchQuery.toLowerCase()) ||
+      r.beneficiaryId.toLowerCase().includes(napsSearchQuery.toLowerCase()) ||
+      r.establishmentCode.toLowerCase().includes(napsSearchQuery.toLowerCase());
+    return matchesMonth && matchesQuery;
+  });
+
+  const availableNapsMonths = Array.from(new Set(napsRecords.map(r => r.payoutMonth))).filter(Boolean);
+
+  const handleOpenAddNaps = () => {
+    setEditingNapsRecord(null);
+    setNapsForm({
+      establishmentCode: napsRecords[0]?.establishmentCode || 'E12253600040',
+      ojtState: napsRecords[0]?.ojtState || 'Telangana',
+      ojtDistrict: napsRecords[0]?.ojtDistrict || 'Hyderabad',
+      apprenticeCode: '',
+      contractCode: '',
+      jurisdiction: 'central',
+      contractStartDate: '2026-07-15',
+      contractEndDate: '2027-07-14',
+      contractType: 'optional',
+      payoutMonth: 'AUG-2026',
+      beneficiaryStatus: 'created',
+      beneficiaryId: '*********7799',
+      dbtProcessedToPfmsDate: '',
+      candidateDbtConsent: 'Yes',
+      eKycStatus: 'Yes',
+      establishmentSharedStatus: 'paid',
+      amount: 1500.0,
+      paymentStatus: 'PAID',
+      paymentFailureReason: ''
+    });
+    setShowNapsModal(true);
+  };
+
+  const handleOpenEditNaps = (rec: NAPSPortalRecord) => {
+    setEditingNapsRecord(rec);
+    setNapsForm({
+      establishmentCode: rec.establishmentCode,
+      ojtState: rec.ojtState,
+      ojtDistrict: rec.ojtDistrict,
+      apprenticeCode: rec.apprenticeCode,
+      contractCode: rec.contractCode,
+      jurisdiction: rec.jurisdiction,
+      contractStartDate: rec.contractStartDate,
+      contractEndDate: rec.contractEndDate,
+      contractType: rec.contractType,
+      payoutMonth: rec.payoutMonth,
+      beneficiaryStatus: rec.beneficiaryStatus,
+      beneficiaryId: rec.beneficiaryId,
+      dbtProcessedToPfmsDate: rec.dbtProcessedToPfmsDate || '',
+      candidateDbtConsent: rec.candidateDbtConsent,
+      eKycStatus: rec.eKycStatus,
+      establishmentSharedStatus: rec.establishmentSharedStatus,
+      amount: rec.amount,
+      paymentStatus: rec.paymentStatus,
+      paymentFailureReason: rec.paymentFailureReason || ''
+    });
+    setShowNapsModal(true);
+  };
+
+  const handleSaveNapsForm = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!napsForm.apprenticeCode || !napsForm.contractCode) return;
+
+    if (editingNapsRecord) {
+      await updateNAPSRecord(submission.id, editingNapsRecord.id, napsForm);
+    } else {
+      await addNAPSRecord(submission.id, napsForm);
+    }
+    setShowNapsModal(false);
+    setEditingNapsRecord(null);
+  };
+
+  const handleDuplicateNapsToNextMonth = async (rec: NAPSPortalRecord) => {
+    const nextMonthMap: Record<string, string> = {
+      'JUN-2026': 'JUL-2026',
+      'JUL-2026': 'AUG-2026',
+      'AUG-2026': 'SEP-2026',
+      'SEP-2026': 'OCT-2026'
+    };
+    const nextMonth = nextMonthMap[rec.payoutMonth] || 'AUG-2026';
+    const duplicated: Omit<NAPSPortalRecord, 'id'> = {
+      ...rec,
+      payoutMonth: nextMonth,
+      dbtProcessedToPfmsDate: ''
+    };
+    await addNAPSRecord(submission.id, duplicated);
   };
 
   const getStatusBadge = (status: SubmissionStatus) => {
@@ -123,13 +263,13 @@ export const SubmissionDetailDrawer: React.FC<SubmissionDetailDrawerProps> = ({
             animate={{ opacity: 1, x: 0 }}
             exit={{ opacity: 0, x: 100 }}
             transition={{ duration: 0.22, ease: [0.16, 1, 0.3, 1] }}
-            className="w-full max-w-2xl h-full bg-white border-l border-zinc-200 shadow-2xl flex flex-col text-zinc-900"
+            className="w-full max-w-4xl h-full bg-white border-l border-zinc-200 shadow-2xl flex flex-col text-zinc-900"
           >
             {/* Sticky Header with Always-Visible Close Button */}
             <div className="sticky top-0 z-30 bg-white/95 backdrop-blur-md px-6 py-4 border-b border-zinc-200 flex items-center justify-between">
               <div className="flex items-center gap-3">
-                <div className="w-10 h-10 rounded-full bg-black text-white flex items-center justify-center font-bold text-xs shrink-0">
-                  {submission.company_name?.charAt(0) || submission.client_name?.charAt(0) || 'C'}
+                <div className="w-10 h-10 rounded-full bg-[#0a192f] text-amber-300 font-serif flex items-center justify-center font-bold text-xs shrink-0">
+                  {submission.company_name?.charAt(0) || submission.client_name?.charAt(0) || 'W'}
                 </div>
                 <div>
                   <h3 className="text-sm font-extrabold text-zinc-900 leading-tight">
@@ -155,6 +295,7 @@ export const SubmissionDetailDrawer: React.FC<SubmissionDetailDrawerProps> = ({
             <div className="px-6 py-2.5 bg-zinc-50 border-b border-zinc-200 flex items-center gap-1.5 overflow-x-auto">
               {[
                 { id: 'application', label: 'Intake Application' },
+                { id: 'naps_portal', label: `NAPS Government Portal (${napsRecords.length})` },
                 { id: 'documents', label: 'Company Documents' },
                 { id: 'candidates', label: `Apprentices (${candidateList.length})` },
                 { id: 'dbt_claims', label: `DBT Claims (${dbtClaims.length})` },
@@ -392,6 +533,150 @@ export const SubmissionDetailDrawer: React.FC<SubmissionDetailDrawerProps> = ({
                         </div>
                       )}
                     </div>
+                  </div>
+                </div>
+              )}
+
+              {/* TAB: NAPS Government Portal (Government DBT) */}
+              {activeTab === 'naps_portal' && (
+                <div className="space-y-4">
+                  {/* Top Bar: Controls & Add Record */}
+                  <div className="p-4 rounded-2xl bg-[#0a192f] text-white flex flex-col sm:flex-row sm:items-center justify-between gap-3 shadow-md">
+                    <div>
+                      <div className="flex items-center gap-2">
+                        <Table className="w-4 h-4 text-amber-300" />
+                        <h4 className="text-xs font-bold uppercase tracking-wider font-mono">
+                          NAPS Portal Apprenticeship & DBT Registry
+                        </h4>
+                      </div>
+                      <p className="text-[11px] text-zinc-300 mt-0.5">
+                        Client-specific records verified against NAPS / PFMS portal. Records update the client's live view.
+                      </p>
+                    </div>
+
+                    <div className="flex items-center gap-2 self-start sm:self-auto">
+                      <button
+                        type="button"
+                        onClick={handleOpenAddNaps}
+                        className="px-3 py-1.5 rounded-full bg-amber-400 hover:bg-amber-300 text-zinc-950 font-bold text-xs flex items-center gap-1.5 cursor-pointer shadow-sm transition-all"
+                      >
+                        <Plus className="w-3.5 h-3.5" />
+                        <span>+ Add Monthly Record</span>
+                      </button>
+                    </div>
+                  </div>
+
+                  {/* Filter & Search Bar */}
+                  <div className="flex flex-wrap items-center justify-between gap-2 text-xs">
+                    <div className="flex items-center gap-2">
+                      <span className="font-mono text-zinc-500 text-[11px] font-bold">Month:</span>
+                      <select
+                        value={napsFormMonthFilter}
+                        onChange={(e) => setNapsFormMonthFilter(e.target.value)}
+                        className="px-2.5 py-1 rounded-full bg-zinc-100 border border-zinc-300 text-zinc-900 font-bold text-xs cursor-pointer focus:outline-none"
+                      >
+                        <option value="all">All Months ({napsRecords.length})</option>
+                        {availableNapsMonths.map(m => (
+                          <option key={m} value={m}>{m}</option>
+                        ))}
+                      </select>
+                    </div>
+
+                    <input
+                      type="text"
+                      placeholder="Search apprentice, contract or ID..."
+                      value={napsSearchQuery}
+                      onChange={(e) => setNapsSearchQuery(e.target.value)}
+                      className="px-3 py-1 rounded-full bg-zinc-50 border border-zinc-300 text-xs text-zinc-800 placeholder:text-zinc-400 focus:outline-none focus:border-black w-60"
+                    />
+                  </div>
+
+                  {/* NAPS Portal Table (TPA Omitted) */}
+                  <div className="overflow-x-auto rounded-2xl border border-zinc-200 bg-white shadow-xs">
+                    <table className="w-full text-left text-[11px]">
+                      <thead className="bg-[#112240] text-white uppercase tracking-wider text-[9px] font-mono whitespace-nowrap">
+                        <tr>
+                          <th className="py-2.5 px-3">Establishment</th>
+                          <th className="py-2.5 px-3">OJT State / Dist</th>
+                          <th className="py-2.5 px-3">Apprentice Code</th>
+                          <th className="py-2.5 px-3">Contract Code</th>
+                          <th className="py-2.5 px-3">Jurisdiction</th>
+                          <th className="py-2.5 px-3">Contract Period</th>
+                          <th className="py-2.5 px-3">Month</th>
+                          <th className="py-2.5 px-3">Beneficiary ID</th>
+                          <th className="py-2.5 px-3">PFMS Date</th>
+                          <th className="py-2.5 px-3">eKYC / Consent</th>
+                          <th className="py-2.5 px-3">Est. Share</th>
+                          <th className="py-2.5 px-3">DBT (₹)</th>
+                          <th className="py-2.5 px-3">Status</th>
+                          <th className="py-2.5 px-3 text-right">Actions</th>
+                        </tr>
+                      </thead>
+                      <tbody className="divide-y divide-zinc-100 font-medium whitespace-nowrap">
+                        {filteredNapsRecords.length > 0 ? (
+                          filteredNapsRecords.map((rec) => (
+                            <tr key={rec.id} className="hover:bg-zinc-50/80 transition-colors">
+                              <td className="py-2 px-3 font-mono font-bold text-zinc-800">{rec.establishmentCode}</td>
+                              <td className="py-2 px-3 text-zinc-600">{rec.ojtState}, {rec.ojtDistrict}</td>
+                              <td className="py-2 px-3 font-mono text-zinc-900 font-bold">{rec.apprenticeCode}</td>
+                              <td className="py-2 px-3 font-mono text-zinc-700">{rec.contractCode}</td>
+                              <td className="py-2 px-3 uppercase text-[10px] text-zinc-500">{rec.jurisdiction}</td>
+                              <td className="py-2 px-3 text-zinc-600 font-mono text-[10px]">{rec.contractStartDate} → {rec.contractEndDate}</td>
+                              <td className="py-2 px-3 font-bold font-mono text-[#0a192f] bg-zinc-50">{rec.payoutMonth}</td>
+                              <td className="py-2 px-3 font-mono text-zinc-500">{rec.beneficiaryId}</td>
+                              <td className="py-2 px-3 font-mono text-zinc-600">{rec.dbtProcessedToPfmsDate || '-'}</td>
+                              <td className="py-2 px-3 text-[10px]">
+                                <span className="text-emerald-700 font-bold">eKYC: {rec.eKycStatus}</span>
+                                <span className="text-zinc-400 ml-1">· DBT: {rec.candidateDbtConsent}</span>
+                              </td>
+                              <td className="py-2 px-3 capitalize text-zinc-600">{rec.establishmentSharedStatus}</td>
+                              <td className="py-2 px-3 font-bold text-zinc-900">₹{rec.amount}</td>
+                              <td className="py-2 px-3">
+                                <span className={`px-2 py-0.5 rounded-full text-[9px] font-bold ${
+                                  rec.paymentStatus === 'PAID' ? 'bg-emerald-100 text-emerald-800' : 'bg-amber-100 text-amber-800'
+                                }`}>
+                                  {rec.paymentStatus}
+                                </span>
+                              </td>
+                              <td className="py-2 px-3 text-right">
+                                <div className="flex items-center justify-end gap-1">
+                                  <button
+                                    type="button"
+                                    onClick={() => handleDuplicateNapsToNextMonth(rec)}
+                                    title="Replicate to next month"
+                                    className="p-1 text-zinc-500 hover:text-black rounded hover:bg-zinc-100 cursor-pointer"
+                                  >
+                                    <Copy className="w-3.5 h-3.5" />
+                                  </button>
+                                  <button
+                                    type="button"
+                                    onClick={() => handleOpenEditNaps(rec)}
+                                    title="Edit record"
+                                    className="p-1 text-zinc-500 hover:text-black rounded hover:bg-zinc-100 cursor-pointer"
+                                  >
+                                    <Edit2 className="w-3.5 h-3.5" />
+                                  </button>
+                                  <button
+                                    type="button"
+                                    onClick={() => deleteNAPSRecord(submission.id, rec.id)}
+                                    title="Delete record"
+                                    className="p-1 text-rose-500 hover:text-rose-700 rounded hover:bg-rose-50 cursor-pointer"
+                                  >
+                                    <Trash2 className="w-3.5 h-3.5" />
+                                  </button>
+                                </div>
+                              </td>
+                            </tr>
+                          ))
+                        ) : (
+                          <tr>
+                            <td colSpan={14} className="py-8 text-center text-zinc-400">
+                              No NAPS portal records logged for this client yet. Click "+ Add Monthly Record" to enter government registry rows.
+                            </td>
+                          </tr>
+                        )}
+                      </tbody>
+                    </table>
                   </div>
                 </div>
               )}
@@ -775,6 +1060,260 @@ export const SubmissionDetailDrawer: React.FC<SubmissionDetailDrawerProps> = ({
 
           </motion.div>
         </div>
+      </AnimatePresence>
+
+      {/* NAPS Record Add/Edit Modal */}
+      <AnimatePresence>
+        {showNapsModal && (
+          <div className="fixed inset-0 z-[120] flex items-center justify-center p-4 bg-black/50 backdrop-blur-xs font-sans">
+            <motion.div
+              initial={{ opacity: 0, scale: 0.96 }}
+              animate={{ opacity: 1, scale: 1 }}
+              exit={{ opacity: 0, scale: 0.96 }}
+              className="w-full max-w-2xl bg-white rounded-3xl p-6 border border-zinc-200 shadow-2xl space-y-4 max-h-[90vh] overflow-y-auto"
+            >
+              <div className="flex items-center justify-between border-b border-zinc-200 pb-3">
+                <div className="flex items-center gap-2">
+                  <div className="w-8 h-8 rounded-lg bg-[#0a192f] text-amber-300 font-serif flex items-center justify-center font-bold text-xs">
+                    W
+                  </div>
+                  <div>
+                    <h3 className="text-sm font-extrabold text-zinc-900 uppercase font-mono">
+                      {editingNapsRecord ? 'Edit NAPS Portal Record' : 'Add NAPS Government Portal Record'}
+                    </h3>
+                    <p className="text-[10px] text-zinc-500 font-mono">Client: {submission.company_name || submission.client_name}</p>
+                  </div>
+                </div>
+                <button 
+                  type="button" 
+                  onClick={() => setShowNapsModal(false)}
+                  className="p-1 rounded-full text-zinc-400 hover:text-black cursor-pointer"
+                >
+                  <X className="w-4 h-4" />
+                </button>
+              </div>
+
+              <form onSubmit={handleSaveNapsForm} className="space-y-3.5 text-xs">
+                <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                  <div>
+                    <label className="block text-[11px] font-bold text-zinc-700 mb-1">Establishment Code *</label>
+                    <input
+                      type="text"
+                      required
+                      value={napsForm.establishmentCode}
+                      onChange={(e) => setNapsForm({ ...napsForm, establishmentCode: e.target.value })}
+                      placeholder="E12253600040"
+                      className="w-full px-3 py-2 rounded-xl bg-zinc-50 border border-zinc-200 text-zinc-900 font-mono text-xs focus:outline-none focus:border-black font-semibold"
+                    />
+                  </div>
+
+                  <div>
+                    <label className="block text-[11px] font-bold text-zinc-700 mb-1">OJT State *</label>
+                    <input
+                      type="text"
+                      required
+                      value={napsForm.ojtState}
+                      onChange={(e) => setNapsForm({ ...napsForm, ojtState: e.target.value })}
+                      placeholder="Telangana"
+                      className="w-full px-3 py-2 rounded-xl bg-zinc-50 border border-zinc-200 text-zinc-900 text-xs focus:outline-none focus:border-black"
+                    />
+                  </div>
+
+                  <div>
+                    <label className="block text-[11px] font-bold text-zinc-700 mb-1">OJT District *</label>
+                    <input
+                      type="text"
+                      required
+                      value={napsForm.ojtDistrict}
+                      onChange={(e) => setNapsForm({ ...napsForm, ojtDistrict: e.target.value })}
+                      placeholder="Hyderabad"
+                      className="w-full px-3 py-2 rounded-xl bg-zinc-50 border border-zinc-200 text-zinc-900 text-xs focus:outline-none focus:border-black"
+                    />
+                  </div>
+                </div>
+
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                  <div>
+                    <label className="block text-[11px] font-bold text-zinc-700 mb-1">Apprentice Code *</label>
+                    <input
+                      type="text"
+                      required
+                      value={napsForm.apprenticeCode}
+                      onChange={(e) => setNapsForm({ ...napsForm, apprenticeCode: e.target.value })}
+                      placeholder="A012691340"
+                      className="w-full px-3 py-2 rounded-xl bg-zinc-50 border border-zinc-200 text-zinc-900 font-mono text-xs focus:outline-none focus:border-black font-bold"
+                    />
+                  </div>
+
+                  <div>
+                    <label className="block text-[11px] font-bold text-zinc-700 mb-1">Contract Code *</label>
+                    <input
+                      type="text"
+                      required
+                      value={napsForm.contractCode}
+                      onChange={(e) => setNapsForm({ ...napsForm, contractCode: e.target.value })}
+                      placeholder="CN072687468"
+                      className="w-full px-3 py-2 rounded-xl bg-zinc-50 border border-zinc-200 text-zinc-900 font-mono text-xs focus:outline-none focus:border-black font-semibold"
+                    />
+                  </div>
+                </div>
+
+                <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                  <div>
+                    <label className="block text-[11px] font-bold text-zinc-700 mb-1">Jurisdiction</label>
+                    <select
+                      value={napsForm.jurisdiction}
+                      onChange={(e) => setNapsForm({ ...napsForm, jurisdiction: e.target.value })}
+                      className="w-full px-3 py-2 rounded-xl bg-zinc-50 border border-zinc-200 text-zinc-900 text-xs focus:outline-none focus:border-black cursor-pointer font-medium"
+                    >
+                      <option value="central">central</option>
+                      <option value="state">state</option>
+                    </select>
+                  </div>
+
+                  <div>
+                    <label className="block text-[11px] font-bold text-zinc-700 mb-1">Contract Start Date</label>
+                    <input
+                      type="text"
+                      value={napsForm.contractStartDate}
+                      onChange={(e) => setNapsForm({ ...napsForm, contractStartDate: e.target.value })}
+                      placeholder="15/07/2026"
+                      className="w-full px-3 py-2 rounded-xl bg-zinc-50 border border-zinc-200 text-zinc-900 font-mono text-xs focus:outline-none focus:border-black"
+                    />
+                  </div>
+
+                  <div>
+                    <label className="block text-[11px] font-bold text-zinc-700 mb-1">Contract End Date</label>
+                    <input
+                      type="text"
+                      value={napsForm.contractEndDate}
+                      onChange={(e) => setNapsForm({ ...napsForm, contractEndDate: e.target.value })}
+                      placeholder="14/07/2027"
+                      className="w-full px-3 py-2 rounded-xl bg-zinc-50 border border-zinc-200 text-zinc-900 font-mono text-xs focus:outline-none focus:border-black"
+                    />
+                  </div>
+                </div>
+
+                <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                  <div>
+                    <label className="block text-[11px] font-bold text-zinc-700 mb-1">Payout Month *</label>
+                    <input
+                      type="text"
+                      required
+                      value={napsForm.payoutMonth}
+                      onChange={(e) => setNapsForm({ ...napsForm, payoutMonth: e.target.value.toUpperCase() })}
+                      placeholder="AUG-2026"
+                      className="w-full px-3 py-2 rounded-xl bg-zinc-50 border border-zinc-200 text-zinc-900 font-mono font-bold text-xs focus:outline-none focus:border-black uppercase"
+                    />
+                  </div>
+
+                  <div>
+                    <label className="block text-[11px] font-bold text-zinc-700 mb-1">Beneficiary ID (Masked)</label>
+                    <input
+                      type="text"
+                      value={napsForm.beneficiaryId}
+                      onChange={(e) => setNapsForm({ ...napsForm, beneficiaryId: e.target.value })}
+                      placeholder="*********7799"
+                      className="w-full px-3 py-2 rounded-xl bg-zinc-50 border border-zinc-200 text-zinc-900 font-mono text-xs focus:outline-none focus:border-black"
+                    />
+                  </div>
+
+                  <div>
+                    <label className="block text-[11px] font-bold text-zinc-700 mb-1">DBT Processed PFMS Date</label>
+                    <input
+                      type="text"
+                      value={napsForm.dbtProcessedToPfmsDate || ''}
+                      onChange={(e) => setNapsForm({ ...napsForm, dbtProcessedToPfmsDate: e.target.value })}
+                      placeholder="04-08-2026 or leave empty"
+                      className="w-full px-3 py-2 rounded-xl bg-zinc-50 border border-zinc-200 text-zinc-900 font-mono text-xs focus:outline-none focus:border-black"
+                    />
+                  </div>
+                </div>
+
+                <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                  <div>
+                    <label className="block text-[11px] font-bold text-zinc-700 mb-1">Candidate DBT Consent</label>
+                    <select
+                      value={napsForm.candidateDbtConsent}
+                      onChange={(e) => setNapsForm({ ...napsForm, candidateDbtConsent: e.target.value as any })}
+                      className="w-full px-3 py-2 rounded-xl bg-zinc-50 border border-zinc-200 text-zinc-900 text-xs focus:outline-none focus:border-black cursor-pointer"
+                    >
+                      <option value="Yes">Yes</option>
+                      <option value="No">No</option>
+                    </select>
+                  </div>
+
+                  <div>
+                    <label className="block text-[11px] font-bold text-zinc-700 mb-1">eKYC Status</label>
+                    <select
+                      value={napsForm.eKycStatus}
+                      onChange={(e) => setNapsForm({ ...napsForm, eKycStatus: e.target.value as any })}
+                      className="w-full px-3 py-2 rounded-xl bg-zinc-50 border border-zinc-200 text-zinc-900 text-xs focus:outline-none focus:border-black cursor-pointer"
+                    >
+                      <option value="Yes">Yes</option>
+                      <option value="No">No</option>
+                    </select>
+                  </div>
+
+                  <div>
+                    <label className="block text-[11px] font-bold text-zinc-700 mb-1">Establishment Shared</label>
+                    <select
+                      value={napsForm.establishmentSharedStatus}
+                      onChange={(e) => setNapsForm({ ...napsForm, establishmentSharedStatus: e.target.value })}
+                      className="w-full px-3 py-2 rounded-xl bg-zinc-50 border border-zinc-200 text-zinc-900 text-xs focus:outline-none focus:border-black cursor-pointer"
+                    >
+                      <option value="paid">paid</option>
+                      <option value="pending">pending</option>
+                    </select>
+                  </div>
+                </div>
+
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                  <div>
+                    <label className="block text-[11px] font-bold text-zinc-700 mb-1">DBT Amount (₹) *</label>
+                    <input
+                      type="number"
+                      required
+                      step={100}
+                      value={napsForm.amount}
+                      onChange={(e) => setNapsForm({ ...napsForm, amount: Number(e.target.value) || 0 })}
+                      className="w-full px-3 py-2 rounded-xl bg-zinc-50 border border-zinc-200 text-zinc-900 font-bold text-xs focus:outline-none focus:border-black"
+                    />
+                  </div>
+
+                  <div>
+                    <label className="block text-[11px] font-bold text-zinc-700 mb-1">Payment Status *</label>
+                    <select
+                      value={napsForm.paymentStatus}
+                      onChange={(e) => setNapsForm({ ...napsForm, paymentStatus: e.target.value })}
+                      className="w-full px-3 py-2 rounded-xl bg-zinc-50 border border-zinc-200 text-zinc-900 font-bold text-xs focus:outline-none focus:border-black cursor-pointer"
+                    >
+                      <option value="PAID">PAID</option>
+                      <option value="PENDING">PENDING</option>
+                      <option value="FAILED">FAILED</option>
+                    </select>
+                  </div>
+                </div>
+
+                <div className="pt-3 border-t border-zinc-200 flex items-center justify-end gap-2">
+                  <button
+                    type="button"
+                    onClick={() => setShowNapsModal(false)}
+                    className="px-4 py-2 rounded-full text-xs font-bold text-zinc-600 hover:text-black cursor-pointer"
+                  >
+                    Cancel
+                  </button>
+                  <button
+                    type="submit"
+                    className="px-5 py-2 rounded-full bg-[#0a192f] text-white hover:bg-zinc-800 text-xs font-bold cursor-pointer transition-all shadow-sm"
+                  >
+                    {editingNapsRecord ? 'Save Record Changes' : 'Add to Client NAPS Registry'}
+                  </button>
+                </div>
+              </form>
+            </motion.div>
+          </div>
+        )}
       </AnimatePresence>
 
       {/* Universal Document Viewer Modal */}

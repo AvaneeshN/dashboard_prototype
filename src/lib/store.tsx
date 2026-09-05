@@ -13,7 +13,10 @@ import {
   ClientApprenticeMetrics,
   SPOCEmailLog,
   CompanyOperationsSPOC,
-  RequiredDocumentConfig
+  RequiredDocumentConfig,
+  NAPSPortalRecord,
+  ComplianceInvoiceRecord,
+  ComplianceActionItem
 } from '@/types';
 import { INITIAL_PROFILES, INITIAL_SUBMISSIONS, INITIAL_LOGIN_LOGS } from './mock-data';
 import { createClient, isSupabaseConfigured } from '@/lib/supabase/client';
@@ -84,6 +87,12 @@ interface AuthState {
   requiredDocuments: RequiredDocumentConfig[];
   updateRequiredDocuments: (docs: RequiredDocumentConfig[]) => Promise<void>;
   resetRequiredDocuments: () => Promise<void>;
+
+  // NAPS Portal & Compliance Report Management (Client-wise manual admin operations)
+  addNAPSRecord: (submissionId: string, record: Omit<NAPSPortalRecord, 'id'>) => Promise<NAPSPortalRecord>;
+  updateNAPSRecord: (submissionId: string, recordId: string, updates: Partial<NAPSPortalRecord>) => Promise<void>;
+  deleteNAPSRecord: (submissionId: string, recordId: string) => Promise<void>;
+  updateClientComplianceReport: (submissionId: string, updates: Partial<FormSubmission>) => Promise<void>;
 }
 
 const StoreContext = createContext<AuthState | null>(null);
@@ -481,6 +490,13 @@ export const StoreProvider: React.FC<{ children: React.ReactNode }> = ({ childre
       if (matchedSub.dbt_claims) metrics.dbtClaimsHistory = matchedSub.dbt_claims;
       if (matchedSub.spoc_logs) metrics.spocEmailLogs = matchedSub.spoc_logs;
       if (matchedSub.assigned_company_spoc) metrics.assignedCompanySpoc = matchedSub.assigned_company_spoc;
+      if (matchedSub.naps_records) metrics.napsPortalRecords = matchedSub.naps_records;
+      if (matchedSub.invoices) metrics.invoices = matchedSub.invoices;
+      if (matchedSub.action_items) metrics.actionItems = matchedSub.action_items;
+      if (matchedSub.reporting_month) metrics.reportingMonth = matchedSub.reporting_month;
+      if (matchedSub.naps_portal_id) metrics.napsPortalId = matchedSub.naps_portal_id;
+      if (matchedSub.sanctioned_quota) metrics.sanctionedQuota = matchedSub.sanctioned_quota;
+      if (matchedSub.dbt_allocation_not_utilized !== undefined) metrics.dbtAllocationNotUtilized = matchedSub.dbt_allocation_not_utilized;
 
       authenticatedUser.apprenticeMetrics = metrics;
       authenticatedUser.company_name = matchedSub.company_name || authenticatedUser.company_name;
@@ -1154,6 +1170,138 @@ export const StoreProvider: React.FC<{ children: React.ReactNode }> = ({ childre
     }
   };
 
+  // NAPS Portal Records Management (Client-by-client manual entry from Admin)
+  const addNAPSRecord = async (
+    submissionId: string, 
+    recordData: Omit<NAPSPortalRecord, 'id'>
+  ): Promise<NAPSPortalRecord> => {
+    const targetSub = submissions.find(s => s.id === submissionId);
+    if (!targetSub) throw new Error('Client submission record not found.');
+
+    const newRecord: NAPSPortalRecord = {
+      ...recordData,
+      id: 'naps-' + Date.now() + '-' + Math.random().toString(36).substring(2, 6),
+      createdAt: new Date().toISOString()
+    };
+
+    const existingRecords = targetSub.naps_records || [];
+    const updatedRecords = [newRecord, ...existingRecords];
+
+    const updatedSub: FormSubmission = {
+      ...targetSub,
+      naps_records: updatedRecords,
+      last_active_at: new Date().toISOString()
+    };
+
+    const updatedSubmissions = submissions.map(s => s.id === submissionId ? updatedSub : s);
+    setSubmissions(updatedSubmissions);
+
+    // If current logged in client is the owner, update their active user metrics
+    if (user && (user.id === targetSub.client_id || user.email.toLowerCase() === targetSub.client_email.toLowerCase())) {
+      const updatedMetrics: ClientApprenticeMetrics = {
+        ...(user.apprenticeMetrics || {} as any),
+        napsPortalRecords: updatedRecords
+      };
+      setUser({ ...user, apprenticeMetrics: updatedMetrics });
+    }
+
+    await persistSubmissionToSupabase(updatedSub);
+    return newRecord;
+  };
+
+  const updateNAPSRecord = async (
+    submissionId: string, 
+    recordId: string, 
+    updates: Partial<NAPSPortalRecord>
+  ): Promise<void> => {
+    const targetSub = submissions.find(s => s.id === submissionId);
+    if (!targetSub) return;
+
+    const existingRecords = targetSub.naps_records || [];
+    const updatedRecords = existingRecords.map(r => r.id === recordId ? { ...r, ...updates } : r);
+
+    const updatedSub: FormSubmission = {
+      ...targetSub,
+      naps_records: updatedRecords,
+      last_active_at: new Date().toISOString()
+    };
+
+    const updatedSubmissions = submissions.map(s => s.id === submissionId ? updatedSub : s);
+    setSubmissions(updatedSubmissions);
+
+    if (user && (user.id === targetSub.client_id || user.email.toLowerCase() === targetSub.client_email.toLowerCase())) {
+      const updatedMetrics: ClientApprenticeMetrics = {
+        ...(user.apprenticeMetrics || {} as any),
+        napsPortalRecords: updatedRecords
+      };
+      setUser({ ...user, apprenticeMetrics: updatedMetrics });
+    }
+
+    await persistSubmissionToSupabase(updatedSub);
+  };
+
+  const deleteNAPSRecord = async (
+    submissionId: string, 
+    recordId: string
+  ): Promise<void> => {
+    const targetSub = submissions.find(s => s.id === submissionId);
+    if (!targetSub) return;
+
+    const existingRecords = targetSub.naps_records || [];
+    const updatedRecords = existingRecords.filter(r => r.id !== recordId);
+
+    const updatedSub: FormSubmission = {
+      ...targetSub,
+      naps_records: updatedRecords,
+      last_active_at: new Date().toISOString()
+    };
+
+    const updatedSubmissions = submissions.map(s => s.id === submissionId ? updatedSub : s);
+    setSubmissions(updatedSubmissions);
+
+    if (user && (user.id === targetSub.client_id || user.email.toLowerCase() === targetSub.client_email.toLowerCase())) {
+      const updatedMetrics: ClientApprenticeMetrics = {
+        ...(user.apprenticeMetrics || {} as any),
+        napsPortalRecords: updatedRecords
+      };
+      setUser({ ...user, apprenticeMetrics: updatedMetrics });
+    }
+
+    await persistSubmissionToSupabase(updatedSub);
+  };
+
+  const updateClientComplianceReport = async (
+    submissionId: string, 
+    updates: Partial<FormSubmission>
+  ): Promise<void> => {
+    const targetSub = submissions.find(s => s.id === submissionId);
+    if (!targetSub) return;
+
+    const updatedSub: FormSubmission = {
+      ...targetSub,
+      ...updates,
+      last_active_at: new Date().toISOString()
+    };
+
+    const updatedSubmissions = submissions.map(s => s.id === submissionId ? updatedSub : s);
+    setSubmissions(updatedSubmissions);
+
+    if (user && (user.id === targetSub.client_id || user.email.toLowerCase() === targetSub.client_email.toLowerCase())) {
+      const updatedMetrics: ClientApprenticeMetrics = {
+        ...(user.apprenticeMetrics || {} as any),
+        reportingMonth: updates.reporting_month || user.apprenticeMetrics?.reportingMonth,
+        napsPortalId: updates.naps_portal_id || user.apprenticeMetrics?.napsPortalId,
+        sanctionedQuota: updates.sanctioned_quota || user.apprenticeMetrics?.sanctionedQuota,
+        dbtAllocationNotUtilized: updates.dbt_allocation_not_utilized || user.apprenticeMetrics?.dbtAllocationNotUtilized,
+        invoices: updates.invoices || user.apprenticeMetrics?.invoices,
+        actionItems: updates.action_items || user.apprenticeMetrics?.actionItems
+      };
+      setUser({ ...user, apprenticeMetrics: updatedMetrics });
+    }
+
+    await persistSubmissionToSupabase(updatedSub);
+  };
+
   const syncDataToSupabase = async (): Promise<{ success: boolean; message: string }> => {
     if (!isSupabaseConfigured()) {
       return {
@@ -1259,7 +1407,11 @@ export const StoreProvider: React.FC<{ children: React.ReactNode }> = ({ childre
         setAdminSpoc,
         requiredDocuments,
         updateRequiredDocuments,
-        resetRequiredDocuments
+        resetRequiredDocuments,
+        addNAPSRecord,
+        updateNAPSRecord,
+        deleteNAPSRecord,
+        updateClientComplianceReport
       }}
     >
       {children}

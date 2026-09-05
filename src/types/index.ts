@@ -67,6 +67,7 @@ export interface ApprenticeRecord {
   stipendAmount: number;
   dbtEligibleAmount: number;
   contractStatus: 'Generated' | 'Signed' | 'Pending Verification';
+  contractCode?: string;
   attendanceRate: string;
   daysPresent?: number;
   totalWorkingDays?: number;
@@ -104,15 +105,70 @@ export interface DBTClaimRecord {
   remarks?: string;
 }
 
+export interface NAPSPortalRecord {
+  id: string;
+  establishmentCode: string;
+  ojtState: string;
+  ojtDistrict: string;
+  apprenticeCode: string;
+  contractCode: string;
+  jurisdiction: 'central' | 'state' | string;
+  contractStartDate: string;
+  contractEndDate: string;
+  contractType: 'optional' | 'designated' | string;
+  payoutMonth: string; // e.g. AUG-2026, JUL-2026
+  beneficiaryStatus: string; // e.g. created
+  beneficiaryId: string; // masked, e.g. *********7799
+  dbtProcessedToPfmsDate?: string; // e.g. 04-08-2026 or empty
+  candidateDbtConsent: 'Yes' | 'No' | string;
+  eKycStatus: 'Yes' | 'No' | string;
+  establishmentSharedStatus: 'paid' | 'pending' | string;
+  amount: number; // e.g. 1500.0
+  paymentStatus: 'PAID' | 'PENDING' | 'FAILED' | string;
+  paymentFailureReason?: string;
+  remarks?: string;
+  createdAt?: string;
+}
+
+export interface ComplianceInvoiceRecord {
+  id: string;
+  invoiceNo: string;
+  invoiceDate: string;
+  amount: number;
+  status: 'SUBMITTED' | 'PAID' | 'PENDING' | string;
+  paymentDate: string;
+  remarks?: string;
+}
+
+export interface ComplianceActionItem {
+  id: string;
+  observation: string;
+  actionRequired: string;
+  owner: string;
+  targetDate: string;
+  status?: string;
+}
+
 export interface ClientApprenticeMetrics {
   clientName: string;
   companyName: string;
+  reportingMonth?: string; // e.g. JULY, 2026
+  napsPortalId?: string; // e.g. E01232900003
   assignedCompanySpoc?: CompanyOperationsSPOC;
+  sanctionedQuota?: number; // e.g. 27
   totalApprenticesEligible: number;
   currentOnboardedApprentices: number;
   remainingNumbersLeft: number;
+  utilizationPercentage?: string;
+  onboardedThisMonth?: number; // e.g. 3
   dbtClaimedLastMonth: number;
+  dbtAllocationNotUtilized?: number; // e.g. 30000
   pendingAmountClaimable: number;
+  governmentApproval?: {
+    totalApproved: number;
+    approvedThisMonth: number;
+    pendingApproval: number;
+  };
   lastMonthPayroll: {
     totalDisbursed: number;
     stipendProcessedCount: number;
@@ -140,6 +196,9 @@ export interface ClientApprenticeMetrics {
   lastMonthOnboardedList: ApprenticeRecord[];
   dbtClaimsHistory?: DBTClaimRecord[];
   spocEmailLogs?: SPOCEmailLog[];
+  napsPortalRecords?: NAPSPortalRecord[];
+  invoices?: ComplianceInvoiceRecord[];
+  actionItems?: ComplianceActionItem[];
 }
 
 export interface UserProfile {
@@ -236,6 +295,13 @@ export interface FormSubmission {
   candidates?: ApprenticeRecord[];
   dbt_claims?: DBTClaimRecord[];
   spoc_logs?: SPOCEmailLog[];
+  naps_records?: NAPSPortalRecord[];
+  invoices?: ComplianceInvoiceRecord[];
+  action_items?: ComplianceActionItem[];
+  reporting_month?: string;
+  naps_portal_id?: string;
+  sanctioned_quota?: number;
+  dbt_allocation_not_utilized?: number;
 }
 
 export interface FunnelEvent {
