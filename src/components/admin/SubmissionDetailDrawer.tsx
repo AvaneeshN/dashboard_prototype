@@ -600,17 +600,43 @@ export const SubmissionDetailDrawer: React.FC<SubmissionDetailDrawerProps> = ({
                             </span>
                           </div>
 
-                          <div className="grid grid-cols-2 gap-2 pt-2 border-t border-zinc-200 text-[11px]">
+                          <div className="grid grid-cols-2 sm:grid-cols-3 gap-2 pt-2 border-t border-zinc-200 text-[11px]">
                             <div><span className="text-zinc-500">Role:</span> <strong className="text-zinc-800">{cand.tradeOrRole}</strong></div>
                             <div><span className="text-zinc-500">Stipend:</span> <strong className="text-zinc-800">₹{cand.stipendAmount.toLocaleString()}/mo</strong></div>
-                            <div><span className="text-zinc-500">Aadhaar:</span> <span className="font-mono">{cand.aadhaarNumber || '4523-XXXX-9901'}</span></div>
-                            <div><span className="text-zinc-500">Contract:</span> <span className="font-semibold text-emerald-700">{cand.contractStatus}</span></div>
+                            <div><span className="text-zinc-500">Aadhaar:</span> <span className="font-mono">{cand.aadhaarNumber || 'Not specified'}</span></div>
+                            <div><span className="text-zinc-500">Bank:</span> <strong className="text-zinc-800">{cand.bankName || 'Not recorded'}</strong></div>
+                            <div><span className="text-zinc-500">A/C No:</span> <span className="font-mono">{cand.bankAccountNumber || 'Not recorded'}</span></div>
+                            <div><span className="text-zinc-500">IFSC:</span> <span className="font-mono font-bold text-zinc-700">{cand.ifscCode || 'Not recorded'}</span></div>
                           </div>
 
                           {/* Candidate Attached Files Bar */}
                           <div className="pt-2 border-t border-zinc-200 flex items-center justify-between">
                             <span className="text-[10px] font-mono font-bold uppercase text-zinc-400">Attached Documents:</span>
                             <div className="flex items-center gap-1.5 flex-wrap">
+                              {/* Photo */}
+                              {(cand.documents?.photoDoc || cand.documents?.photoFile) && (
+                                <button
+                                  type="button"
+                                  onClick={() => setPreviewingDoc(cand.documents?.photoDoc || { name: cand.documents?.photoFile || 'Candidate Photo.jpg', type: 'image' })}
+                                  className="px-2 py-0.5 rounded-full text-[10px] font-mono bg-white hover:bg-zinc-200 border border-zinc-200 text-zinc-800 cursor-pointer flex items-center gap-1"
+                                >
+                                  <Eye className="w-2.5 h-2.5" />
+                                  <span>Photo</span>
+                                </button>
+                              )}
+
+                              {/* Signature */}
+                              {(cand.documents?.signatureDoc || cand.documents?.signatureFile) && (
+                                <button
+                                  type="button"
+                                  onClick={() => setPreviewingDoc(cand.documents?.signatureDoc || { name: cand.documents?.signatureFile || 'Candidate Signature.png', type: 'image' })}
+                                  className="px-2 py-0.5 rounded-full text-[10px] font-mono bg-white hover:bg-zinc-200 border border-zinc-200 text-zinc-800 cursor-pointer flex items-center gap-1"
+                                >
+                                  <Eye className="w-2.5 h-2.5" />
+                                  <span>Sign</span>
+                                </button>
+                              )}
+
                               {/* Aadhaar */}
                               <button
                                 type="button"
@@ -630,6 +656,18 @@ export const SubmissionDetailDrawer: React.FC<SubmissionDetailDrawerProps> = ({
                                 <Eye className="w-2.5 h-2.5" />
                                 <span>Degree</span>
                               </button>
+
+                              {/* Cheque / Bank Proof */}
+                              {(cand.documents?.bankProofDoc || cand.documents?.bankProofFile) && (
+                                <button
+                                  type="button"
+                                  onClick={() => setPreviewingDoc(cand.documents?.bankProofDoc || { name: cand.documents?.bankProofFile || 'Cancelled Cheque.pdf', type: 'pdf' })}
+                                  className="px-2 py-0.5 rounded-full text-[10px] font-mono bg-white hover:bg-zinc-200 border border-zinc-200 text-zinc-800 cursor-pointer flex items-center gap-1"
+                                >
+                                  <Eye className="w-2.5 h-2.5" />
+                                  <span>Cheque</span>
+                                </button>
+                              )}
 
                               {/* Resume */}
                               <button

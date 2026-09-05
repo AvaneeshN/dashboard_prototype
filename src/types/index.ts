@@ -71,6 +71,7 @@ export interface ApprenticeRecord {
   daysPresent?: number;
   totalWorkingDays?: number;
   status: 'Active' | 'Under Training' | 'Completed' | 'Terminated';
+  bankName?: string;
   bankAccountNumber?: string;
   ifscCode?: string;
   spocEmail?: string;
@@ -80,10 +81,14 @@ export interface ApprenticeRecord {
     educationDoc?: UploadedDocument;
     bankProofDoc?: UploadedDocument;
     resumeDoc?: UploadedDocument;
+    photoDoc?: UploadedDocument;
+    signatureDoc?: UploadedDocument;
     aadhaarFile?: string;
     educationFile?: string;
     bankProofFile?: string;
     resumeFile?: string;
+    photoFile?: string;
+    signatureFile?: string;
   };
 }
 

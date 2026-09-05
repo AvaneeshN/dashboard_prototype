@@ -103,14 +103,17 @@ export const ClientDashboard: React.FC = () => {
     stipendAmount: 18500,
     dbtEligibleAmount: 4500,
     joiningDate: new Date().toISOString().split('T')[0],
+    bankName: '',
     bankAccountNumber: '',
-    ifscCode: 'HDFC0001824',
+    ifscCode: '',
     spocEmail: '',
     spocName: ''
   });
 
   // Candidate Document State
   const [candidateDocs, setCandidateDocs] = useState<{
+    photoDoc?: UploadedDocument;
+    signatureDoc?: UploadedDocument;
     aadhaarDoc?: UploadedDocument;
     educationDoc?: UploadedDocument;
     bankProofDoc?: UploadedDocument;
@@ -224,7 +227,7 @@ export const ClientDashboard: React.FC = () => {
   // Handle Document File Change
   const handleDocFileSelect = async (
     file: File | null,
-    category: 'Aadhaar' | 'Education' | 'Bank Proof' | 'Resume'
+    category: 'Aadhaar' | 'Education' | 'Bank Proof' | 'Resume' | 'Photo' | 'Signature'
   ) => {
     if (!file) return;
     const doc = await processUploadedFile(file, category);
@@ -232,6 +235,8 @@ export const ClientDashboard: React.FC = () => {
     if (category === 'Education') setCandidateDocs(prev => ({ ...prev, educationDoc: doc }));
     if (category === 'Bank Proof') setCandidateDocs(prev => ({ ...prev, bankProofDoc: doc }));
     if (category === 'Resume') setCandidateDocs(prev => ({ ...prev, resumeDoc: doc }));
+    if (category === 'Photo') setCandidateDocs(prev => ({ ...prev, photoDoc: doc }));
+    if (category === 'Signature') setCandidateDocs(prev => ({ ...prev, signatureDoc: doc }));
   };
 
   // Handle Adding New Candidate & Triggering SPOC Email
@@ -254,15 +259,20 @@ export const ClientDashboard: React.FC = () => {
       daysPresent: 26,
       totalWorkingDays: 26,
       status: 'Active',
+      bankName: candidateForm.bankName || 'State Bank of India',
       bankAccountNumber: candidateForm.bankAccountNumber || '987654321012',
-      ifscCode: candidateForm.ifscCode || 'HDFC0001824',
+      ifscCode: candidateForm.ifscCode || 'SBIN0001824',
       spocEmail: candidateForm.spocEmail,
       spocName: candidateForm.spocName,
       documents: {
+        photoDoc: candidateDocs.photoDoc,
+        signatureDoc: candidateDocs.signatureDoc,
         aadhaarDoc: candidateDocs.aadhaarDoc,
         educationDoc: candidateDocs.educationDoc,
         bankProofDoc: candidateDocs.bankProofDoc,
         resumeDoc: candidateDocs.resumeDoc,
+        photoFile: candidateDocs.photoDoc?.name || 'candidate_photo.jpg',
+        signatureFile: candidateDocs.signatureDoc?.name || 'candidate_signature.png',
         aadhaarFile: candidateDocs.aadhaarDoc?.name || 'aadhaar_card_doc.pdf',
         educationFile: candidateDocs.educationDoc?.name || 'degree_marksheet.pdf',
         bankProofFile: candidateDocs.bankProofDoc?.name || 'bank_passbook_doc.pdf',
@@ -286,8 +296,9 @@ export const ClientDashboard: React.FC = () => {
       stipendAmount: 18500,
       dbtEligibleAmount: 4500,
       joiningDate: new Date().toISOString().split('T')[0],
+      bankName: '',
       bankAccountNumber: '',
-      ifscCode: 'HDFC0001824',
+      ifscCode: '',
       spocEmail: candidateForm.spocEmail,
       spocName: candidateForm.spocName
     });
@@ -329,8 +340,9 @@ export const ClientDashboard: React.FC = () => {
       stipendAmount: Number(activeSubmission?.responses?.stipendPerApprentice) || 18500,
       dbtEligibleAmount: 4500,
       joiningDate: activeSubmission?.responses?.proposedJoiningDate || new Date().toISOString().split('T')[0],
+      bankName: '',
       bankAccountNumber: '',
-      ifscCode: 'HDFC0001824',
+      ifscCode: '',
       spocEmail: designatedEmail,
       spocName: designatedName
     });
@@ -1020,7 +1032,14 @@ export const ClientDashboard: React.FC = () => {
 
                                 <td className="py-3.5 px-4 font-mono text-[11px] text-zinc-600">
                                   <div>{app.aadhaarNumber || '4523-XXXX-9912'}</div>
-                                  <div className="text-[10px] text-zinc-400">{app.ifscCode || 'HDFC0001824'}</div>
+                                  <div className="text-[10px] text-zinc-400">
+                                    {app.bankName ? `${app.bankName} · ` : ''}{app.ifscCode || 'HDFC0001824'}
+                                  </div>
+                                  {app.bankAccountNumber && (
+                                    <div className="text-[9px] text-zinc-400">
+                                      A/C {app.bankAccountNumber}
+                                    </div>
+                                  )}
                                 </td>
 
                                 <td className="py-3.5 px-4 font-bold text-zinc-900">
@@ -1033,7 +1052,29 @@ export const ClientDashboard: React.FC = () => {
 
                                 {/* Compliance Files Slot */}
                                 <td className="py-3.5 px-4">
-                                  <div className="flex items-center gap-1.5 flex-wrap">
+                                  <div className="flex items-center gap-1 flex-wrap">
+                                    {app.documents?.photoDoc || app.documents?.photoFile ? (
+                                      <button
+                                        type="button"
+                                        onClick={() => setPreviewingDoc(app.documents?.photoDoc || { name: app.documents?.photoFile || 'Candidate Photo.jpg', type: 'image' })}
+                                        className="px-2 py-0.5 rounded-full text-[10px] font-mono bg-zinc-100 hover:bg-zinc-200 text-zinc-800 border border-zinc-200 cursor-pointer"
+                                        title="View Candidate Photo"
+                                      >
+                                        Photo ↗
+                                      </button>
+                                    ) : null}
+
+                                    {app.documents?.signatureDoc || app.documents?.signatureFile ? (
+                                      <button
+                                        type="button"
+                                        onClick={() => setPreviewingDoc(app.documents?.signatureDoc || { name: app.documents?.signatureFile || 'Signature.jpg', type: 'image' })}
+                                        className="px-2 py-0.5 rounded-full text-[10px] font-mono bg-zinc-100 hover:bg-zinc-200 text-zinc-800 border border-zinc-200 cursor-pointer"
+                                        title="View Signature"
+                                      >
+                                        Sign ↗
+                                      </button>
+                                    ) : null}
+
                                     {app.documents?.aadhaarDoc || app.documents?.aadhaarFile ? (
                                       <button
                                         type="button"
@@ -1048,11 +1089,22 @@ export const ClientDashboard: React.FC = () => {
                                     {app.documents?.educationDoc || app.documents?.educationFile ? (
                                       <button
                                         type="button"
-                                        onClick={() => setPreviewingDoc(app.documents?.educationDoc || { name: app.documents?.educationFile || 'Degree.docx', type: 'docx' })}
+                                        onClick={() => setPreviewingDoc(app.documents?.educationDoc || { name: app.documents?.educationFile || 'Degree.pdf', type: 'pdf' })}
                                         className="px-2 py-0.5 rounded-full text-[10px] font-mono bg-zinc-100 hover:bg-zinc-200 text-zinc-800 border border-zinc-200 cursor-pointer"
                                         title="View Degree"
                                       >
                                         Degree ↗
+                                      </button>
+                                    ) : null}
+
+                                    {app.documents?.bankProofDoc || app.documents?.bankProofFile ? (
+                                      <button
+                                        type="button"
+                                        onClick={() => setPreviewingDoc(app.documents?.bankProofDoc || { name: app.documents?.bankProofFile || 'Bank Proof.pdf', type: 'pdf' })}
+                                        className="px-2 py-0.5 rounded-full text-[10px] font-mono bg-zinc-100 hover:bg-zinc-200 text-zinc-800 border border-zinc-200 cursor-pointer"
+                                        title="View Bank Proof / Cheque"
+                                      >
+                                        Cheque ↗
                                       </button>
                                     ) : null}
 
@@ -1339,23 +1391,114 @@ export const ClientDashboard: React.FC = () => {
                   </div>
                 </div>
 
-                {/* 2. Candidate Compliance Documents (.docx, .pdf, .txt) */}
+                {/* 2. Candidate Banking & Direct DBT Transfer Details */}
+                <div className="space-y-3 pt-2 border-t border-zinc-100">
+                  <span className="text-[11px] font-mono font-bold uppercase tracking-wider text-zinc-400 block">
+                    2. Candidate Banking Details (For Direct DBT Subsidy Disbursement)
+                  </span>
+
+                  <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                    <div>
+                      <label className="block font-bold text-zinc-700 text-xs mb-1">
+                        Bank Name *
+                      </label>
+                      <input
+                        type="text"
+                        required
+                        placeholder="e.g. State Bank of India"
+                        value={candidateForm.bankName}
+                        onChange={(e) => setCandidateForm({ ...candidateForm, bankName: e.target.value })}
+                        className="w-full px-3.5 py-2.5 rounded-2xl bg-zinc-50 border border-zinc-200 text-zinc-900 text-xs focus:outline-none focus:border-black font-medium"
+                      />
+                    </div>
+
+                    <div>
+                      <label className="block font-bold text-zinc-700 text-xs mb-1">
+                        Account Number *
+                      </label>
+                      <input
+                        type="text"
+                        required
+                        placeholder="e.g. 50100234567890"
+                        value={candidateForm.bankAccountNumber}
+                        onChange={(e) => setCandidateForm({ ...candidateForm, bankAccountNumber: e.target.value.replace(/[^0-9]/g, '') })}
+                        className="w-full px-3.5 py-2.5 rounded-2xl bg-zinc-50 border border-zinc-200 text-zinc-900 text-xs focus:outline-none focus:border-black font-mono font-semibold"
+                      />
+                    </div>
+
+                    <div>
+                      <label className="block font-bold text-zinc-700 text-xs mb-1">
+                        Bank IFSC Code *
+                      </label>
+                      <input
+                        type="text"
+                        required
+                        placeholder="e.g. SBIN0001824"
+                        value={candidateForm.ifscCode}
+                        onChange={(e) => setCandidateForm({ ...candidateForm, ifscCode: e.target.value.toUpperCase() })}
+                        className="w-full px-3.5 py-2.5 rounded-2xl bg-zinc-50 border border-zinc-200 text-zinc-900 text-xs focus:outline-none focus:border-black font-mono uppercase font-bold"
+                      />
+                    </div>
+                  </div>
+                </div>
+
+                {/* 3. Candidate Compliance & Verification Documents */}
                 <div className="space-y-2 pt-2 border-t border-zinc-100">
                   <span className="text-[11px] font-mono font-bold uppercase tracking-wider text-zinc-400 block">
-                    2. Upload Mandatory Candidate Documents (.docx, .pdf, .txt)
+                    3. Candidate Proofs & Verification Files (Photos, KYC & Certificates)
                   </span>
 
                   <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
-                    {/* Aadhaar Card */}
+                    {/* Candidate Passport Photo */}
                     <div className="p-3 rounded-2xl bg-zinc-50 border border-zinc-200 flex flex-col justify-between">
                       <div className="flex items-center justify-between mb-1.5">
-                        <span className="font-bold text-zinc-800 text-xs">Aadhaar Card Document *</span>
-                        <span className="text-[9px] font-mono px-1.5 py-0.5 rounded-full bg-zinc-200 text-zinc-700">PDF / DOCX / TXT</span>
+                        <span className="font-bold text-zinc-800 text-xs">Candidate Passport Photo *</span>
+                        <span className="text-[9px] font-mono px-1.5 py-0.5 rounded-full bg-zinc-200 text-zinc-700 font-bold">JPG / PNG</span>
                       </div>
                       <label className="p-2 rounded-xl bg-white border border-zinc-200 hover:border-black flex items-center gap-2 cursor-pointer transition-colors text-[11px]">
                         <UploadCloud className="w-3.5 h-3.5 text-zinc-400 shrink-0" />
                         <span className="truncate font-mono text-zinc-700">
-                          {candidateDocs.aadhaarDoc?.name || 'Attach Aadhaar (.pdf/.docx/.txt)'}
+                          {candidateDocs.photoDoc?.name || 'Attach Candidate Photo (.jpg/.png)'}
+                        </span>
+                        <input
+                          type="file"
+                          accept="image/*,.jpg,.jpeg,.png,.webp"
+                          className="hidden"
+                          onChange={(e) => handleDocFileSelect(e.target.files?.[0] || null, 'Photo')}
+                        />
+                      </label>
+                    </div>
+
+                    {/* Candidate Signature Photo */}
+                    <div className="p-3 rounded-2xl bg-zinc-50 border border-zinc-200 flex flex-col justify-between">
+                      <div className="flex items-center justify-between mb-1.5">
+                        <span className="font-bold text-zinc-800 text-xs">Candidate Signature Photo *</span>
+                        <span className="text-[9px] font-mono px-1.5 py-0.5 rounded-full bg-zinc-200 text-zinc-700 font-bold">JPG / PNG / PDF</span>
+                      </div>
+                      <label className="p-2 rounded-xl bg-white border border-zinc-200 hover:border-black flex items-center gap-2 cursor-pointer transition-colors text-[11px]">
+                        <UploadCloud className="w-3.5 h-3.5 text-zinc-400 shrink-0" />
+                        <span className="truncate font-mono text-zinc-700">
+                          {candidateDocs.signatureDoc?.name || 'Attach Signature (.jpg/.png/.pdf)'}
+                        </span>
+                        <input
+                          type="file"
+                          accept="image/*,.jpg,.jpeg,.png,.webp,.pdf"
+                          className="hidden"
+                          onChange={(e) => handleDocFileSelect(e.target.files?.[0] || null, 'Signature')}
+                        />
+                      </label>
+                    </div>
+
+                    {/* Aadhaar Card */}
+                    <div className="p-3 rounded-2xl bg-zinc-50 border border-zinc-200 flex flex-col justify-between">
+                      <div className="flex items-center justify-between mb-1.5">
+                        <span className="font-bold text-zinc-800 text-xs">Aadhaar Card Document *</span>
+                        <span className="text-[9px] font-mono px-1.5 py-0.5 rounded-full bg-zinc-200 text-zinc-700 font-bold">PDF / DOCX</span>
+                      </div>
+                      <label className="p-2 rounded-xl bg-white border border-zinc-200 hover:border-black flex items-center gap-2 cursor-pointer transition-colors text-[11px]">
+                        <UploadCloud className="w-3.5 h-3.5 text-zinc-400 shrink-0" />
+                        <span className="truncate font-mono text-zinc-700">
+                          {candidateDocs.aadhaarDoc?.name || 'Attach Aadhaar (.pdf/.docx/.jpg)'}
                         </span>
                         <input
                           type="file"
@@ -1370,12 +1513,12 @@ export const ClientDashboard: React.FC = () => {
                     <div className="p-3 rounded-2xl bg-zinc-50 border border-zinc-200 flex flex-col justify-between">
                       <div className="flex items-center justify-between mb-1.5">
                         <span className="font-bold text-zinc-800 text-xs">Degree / Marksheet *</span>
-                        <span className="text-[9px] font-mono px-1.5 py-0.5 rounded-full bg-zinc-200 text-zinc-700">PDF / DOCX / TXT</span>
+                        <span className="text-[9px] font-mono px-1.5 py-0.5 rounded-full bg-zinc-200 text-zinc-700 font-bold">PDF / DOCX</span>
                       </div>
                       <label className="p-2 rounded-xl bg-white border border-zinc-200 hover:border-black flex items-center gap-2 cursor-pointer transition-colors text-[11px]">
                         <UploadCloud className="w-3.5 h-3.5 text-zinc-400 shrink-0" />
                         <span className="truncate font-mono text-zinc-700">
-                          {candidateDocs.educationDoc?.name || 'Attach Degree (.pdf/.docx/.txt)'}
+                          {candidateDocs.educationDoc?.name || 'Attach Degree (.pdf/.docx/.jpg)'}
                         </span>
                         <input
                           type="file"
@@ -1386,16 +1529,16 @@ export const ClientDashboard: React.FC = () => {
                       </label>
                     </div>
 
-                    {/* Bank Passbook / Cheque */}
+                    {/* Bank Passbook / Cancelled Cheque */}
                     <div className="p-3 rounded-2xl bg-zinc-50 border border-zinc-200 flex flex-col justify-between">
                       <div className="flex items-center justify-between mb-1.5">
-                        <span className="font-bold text-zinc-800 text-xs">Bank Passbook / Cheque</span>
-                        <span className="text-[9px] font-mono px-1.5 py-0.5 rounded-full bg-zinc-200 text-zinc-700">PDF / DOCX / TXT</span>
+                        <span className="font-bold text-zinc-800 text-xs">Cancelled Cheque / Bank Proof *</span>
+                        <span className="text-[9px] font-mono px-1.5 py-0.5 rounded-full bg-zinc-200 text-zinc-700 font-bold">PDF / JPG / PNG</span>
                       </div>
                       <label className="p-2 rounded-xl bg-white border border-zinc-200 hover:border-black flex items-center gap-2 cursor-pointer transition-colors text-[11px]">
                         <UploadCloud className="w-3.5 h-3.5 text-zinc-400 shrink-0" />
                         <span className="truncate font-mono text-zinc-700">
-                          {candidateDocs.bankProofDoc?.name || 'Attach Bank Proof'}
+                          {candidateDocs.bankProofDoc?.name || 'Attach Cancelled Cheque (.pdf/.jpg)'}
                         </span>
                         <input
                           type="file"
@@ -1428,7 +1571,7 @@ export const ClientDashboard: React.FC = () => {
                   </div>
                 </div>
 
-                {/* 3. Automated SPOC Email Notification Setup */}
+                {/* 4. Automated SPOC Email Notification Setup */}
                 <div className="p-4 rounded-2xl bg-zinc-50 border border-zinc-200 space-y-2">
                   <div className="flex items-center justify-between">
                     <span className="font-bold text-zinc-900 text-xs flex items-center gap-1.5">

@@ -211,30 +211,43 @@ export const generateSPOCEmailHtml = (params: {
         docsToRender.push(item);
       }
     });
-  } else if (candidate?.documents) {
-    if (candidate.documents.aadhaarDoc || candidate.documents.aadhaarFile) {
-      docsToRender.push({
-        name: candidate.documents.aadhaarDoc?.name || candidate.documents.aadhaarFile || 'Aadhaar Card.pdf',
-        url: candidate.documents.aadhaarDoc?.storageUrl
-      });
-    }
-    if (candidate.documents.educationDoc || candidate.documents.educationFile) {
-      docsToRender.push({
-        name: candidate.documents.educationDoc?.name || candidate.documents.educationFile || 'Degree Marksheet.pdf',
-        url: candidate.documents.educationDoc?.storageUrl
-      });
-    }
-    if (candidate.documents.bankProofDoc || candidate.documents.bankProofFile) {
-      docsToRender.push({
-        name: candidate.documents.bankProofDoc?.name || candidate.documents.bankProofFile || 'Bank Passbook.pdf',
-        url: candidate.documents.bankProofDoc?.storageUrl
-      });
-    }
-    if (candidate.documents.resumeDoc || candidate.documents.resumeFile) {
-      docsToRender.push({
-        name: candidate.documents.resumeDoc?.name || candidate.documents.resumeFile || 'Candidate Resume.docx',
-        url: candidate.documents.resumeDoc?.storageUrl
-      });
+    if (candidate?.documents) {
+      if (candidate.documents.photoDoc || candidate.documents.photoFile) {
+        docsToRender.push({
+          name: candidate.documents.photoDoc?.name || candidate.documents.photoFile || 'Candidate Photo.jpg',
+          url: candidate.documents.photoDoc?.storageUrl
+        });
+      }
+      if (candidate.documents.signatureDoc || candidate.documents.signatureFile) {
+        docsToRender.push({
+          name: candidate.documents.signatureDoc?.name || candidate.documents.signatureFile || 'Candidate Signature.jpg',
+          url: candidate.documents.signatureDoc?.storageUrl
+        });
+      }
+      if (candidate.documents.aadhaarDoc || candidate.documents.aadhaarFile) {
+        docsToRender.push({
+          name: candidate.documents.aadhaarDoc?.name || candidate.documents.aadhaarFile || 'Aadhaar Card.pdf',
+          url: candidate.documents.aadhaarDoc?.storageUrl
+        });
+      }
+      if (candidate.documents.educationDoc || candidate.documents.educationFile) {
+        docsToRender.push({
+          name: candidate.documents.educationDoc?.name || candidate.documents.educationFile || 'Degree Marksheet.pdf',
+          url: candidate.documents.educationDoc?.storageUrl
+        });
+      }
+      if (candidate.documents.bankProofDoc || candidate.documents.bankProofFile) {
+        docsToRender.push({
+          name: candidate.documents.bankProofDoc?.name || candidate.documents.bankProofFile || 'Bank Passbook / Cheque.pdf',
+          url: candidate.documents.bankProofDoc?.storageUrl
+        });
+      }
+      if (candidate.documents.resumeDoc || candidate.documents.resumeFile) {
+        docsToRender.push({
+          name: candidate.documents.resumeDoc?.name || candidate.documents.resumeFile || 'Candidate Resume.docx',
+          url: candidate.documents.resumeDoc?.storageUrl
+        });
+      }
     }
   }
   
@@ -267,6 +280,11 @@ export const generateSPOCEmailHtml = (params: {
             <td style="padding: 5px 0; color: #71717a;">Aadhaar Number:</td>
             <td style="padding: 5px 0; font-family: monospace; color: #18181b;">${candidate.aadhaarNumber || 'Submitted'}</td>
           </tr>
+          ${candidate.bankAccountNumber ? `
+          <tr>
+            <td style="padding: 5px 0; color: #71717a;">Bank & Account:</td>
+            <td style="padding: 5px 0; font-family: monospace; color: #18181b;">${candidate.bankName ? `${candidate.bankName} · ` : ''}A/C ${candidate.bankAccountNumber} (IFSC: ${candidate.ifscCode || 'Logged'})</td>
+          </tr>` : ''}
           <tr>
             <td style="padding: 5px 0; color: #71717a;">Monthly Stipend:</td>
             <td style="padding: 5px 0; font-weight: 600; color: #18181b;">₹${(candidate.stipendAmount || 18500).toLocaleString()} / month</td>
