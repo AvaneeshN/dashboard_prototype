@@ -1294,7 +1294,8 @@ export const StoreProvider: React.FC<{ children: React.ReactNode }> = ({ childre
         sanctionedQuota: updates.sanctioned_quota || user.apprenticeMetrics?.sanctionedQuota,
         dbtAllocationNotUtilized: updates.dbt_allocation_not_utilized || user.apprenticeMetrics?.dbtAllocationNotUtilized,
         invoices: updates.invoices || user.apprenticeMetrics?.invoices,
-        actionItems: updates.action_items || user.apprenticeMetrics?.actionItems
+        actionItems: updates.action_items || user.apprenticeMetrics?.actionItems,
+        lastMonthOnboardedList: updates.candidates || user.apprenticeMetrics?.lastMonthOnboardedList
       };
       setUser({ ...user, apprenticeMetrics: updatedMetrics });
     }

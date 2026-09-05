@@ -68,6 +68,7 @@ export interface ApprenticeRecord {
   dbtEligibleAmount: number;
   contractStatus: 'Generated' | 'Signed' | 'Pending Verification';
   contractCode?: string;
+  apprenticeCode?: string;
   attendanceRate: string;
   daysPresent?: number;
   totalWorkingDays?: number;
@@ -107,6 +108,8 @@ export interface DBTClaimRecord {
 
 export interface NAPSPortalRecord {
   id: string;
+  candidateId?: string;
+  candidateName?: string;
   establishmentCode: string;
   ojtState: string;
   ojtDistrict: string;

@@ -640,9 +640,9 @@ export const ClientDashboard: React.FC = () => {
   ];
 
   return (
-    <div className="relative min-h-screen">
+    <div className="relative min-h-screen bg-[#f8fafc]/95">
       <NavyWaveBackground intensity="subtle" className="fixed inset-0 pointer-events-none -z-10" />
-      <div className="max-w-7xl mx-auto py-8 px-4 sm:px-6 lg:px-8 space-y-7 font-sans text-zinc-900">
+      <div className="relative z-10 max-w-7xl mx-auto py-8 px-4 sm:px-6 lg:px-8 space-y-7 font-sans text-zinc-900">
       
       {/* 1. Header Bar */}
       <div className="flex flex-col md:flex-row md:items-end justify-between gap-4 border-b border-zinc-200 pb-6">
@@ -1126,37 +1126,67 @@ export const ClientDashboard: React.FC = () => {
                               </td>
                             </tr>
                           ) : (
-                            displayedCandidatesList.map((app, idx) => (
-                              <tr key={app.id || idx} className="hover:bg-zinc-50/80 transition-colors">
-                                <td className="px-4 py-3 font-mono text-zinc-400 font-bold">{idx + 1}</td>
-                                <td className="px-4 py-3 font-bold text-zinc-900">{app.name}</td>
-                                <td className="px-4 py-3 font-mono font-semibold text-zinc-800">
-                                  <span className="px-2 py-0.5 rounded bg-zinc-100 border border-zinc-200">
-                                    {app.contractCode || 'CN Pending'}
-                                  </span>
-                                </td>
-                                <td className="px-4 py-3 text-zinc-600">{app.tradeOrRole}</td>
-                                <td className="px-4 py-3 font-mono text-zinc-500">{app.onboardingDate || '-'}</td>
-                                <td className="px-4 py-3">
-                                  <span className={`inline-flex items-center gap-1.5 px-2 py-0.5 rounded-full text-[10px] font-bold ${
-                                    app.contractStatus === 'Signed' || app.status === 'Active'
-                                      ? 'bg-emerald-50 text-emerald-700 border border-emerald-200'
-                                      : 'bg-amber-50 text-amber-700 border border-amber-200'
-                                  }`}>
-                                    <CheckCircle2 className="w-3 h-3 text-emerald-600" />
-                                    {app.contractStatus === 'Signed' || app.status === 'Active' ? 'Approved on NAPS Portal' : (app.contractStatus || 'Pending Verification')}
-                                  </span>
-                                </td>
-                                <td className="px-4 py-3 text-right">
-                                  <button
-                                    onClick={() => setSelectedContractCandidate(app as ApprenticeRecord)}
-                                    className="text-xs font-bold text-sky-700 hover:text-sky-900 cursor-pointer"
-                                  >
-                                    View Contract
-                                  </button>
-                                </td>
-                              </tr>
-                            ))
+                            displayedCandidatesList.map((app, idx) => {
+                              // Match CN from candidate record, or from NAPS registry
+                              const matchedNaps = effectiveNapsRecords.find(
+                                r => (r.candidateId && r.candidateId === app.id) ||
+                                     (r.candidateName && r.candidateName.toLowerCase() === app.name.toLowerCase()) ||
+                                     (r.contractCode && r.contractCode === app.contractCode)
+                              ) || (effectiveNapsRecords.length === 1 && displayedCandidatesList.length === 1 ? effectiveNapsRecords[0] : undefined);
+
+                              const resolvedCN = app.contractCode || matchedNaps?.contractCode;
+                              const isApproved = Boolean(resolvedCN && resolvedCN !== 'CN Pending');
+
+                              return (
+                                <tr key={app.id || idx} className="hover:bg-zinc-50/80 transition-colors">
+                                  <td className="px-4 py-3 font-mono text-zinc-400 font-bold">{idx + 1}</td>
+                                  <td className="px-4 py-3">
+                                    <div className="font-bold text-zinc-900">{app.name}</div>
+                                    <div className="font-mono text-[10px] text-zinc-400">{app.tradeOrRole}</div>
+                                  </td>
+                                  <td className="px-4 py-3 font-mono font-semibold text-zinc-800">
+                                    {isApproved ? (
+                                      <span className="px-2.5 py-1 rounded-md bg-emerald-50 border border-emerald-300 text-emerald-900 font-bold text-[11px] shadow-2xs">
+                                        {resolvedCN}
+                                      </span>
+                                    ) : (
+                                      <span className="px-2 py-0.5 rounded bg-amber-50 border border-amber-200 text-amber-800 text-[11px]">
+                                        CN Pending
+                                      </span>
+                                    )}
+                                  </td>
+                                  <td className="px-4 py-3 text-zinc-600">{app.tradeOrRole}</td>
+                                  <td className="px-4 py-3 font-mono text-zinc-500">{app.onboardingDate || '-'}</td>
+                                  <td className="px-4 py-3">
+                                    <span className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[10px] font-bold ${
+                                      isApproved
+                                        ? 'bg-emerald-100 text-emerald-800 border border-emerald-200'
+                                        : 'bg-amber-100 text-amber-800 border border-amber-200'
+                                    }`}>
+                                      {isApproved ? (
+                                        <>
+                                          <CheckCircle2 className="w-3 h-3 text-emerald-600" />
+                                          <span>Approved on NAPS Portal</span>
+                                        </>
+                                      ) : (
+                                        <>
+                                          <Clock className="w-3 h-3 text-amber-600" />
+                                          <span>Portal CN Allocation in Progress</span>
+                                        </>
+                                      )}
+                                    </span>
+                                  </td>
+                                  <td className="px-4 py-3 text-right">
+                                    <button
+                                      onClick={() => setSelectedContractCandidate(app as ApprenticeRecord)}
+                                      className="text-xs font-bold text-sky-700 hover:text-sky-900 cursor-pointer"
+                                    >
+                                      View Contract
+                                    </button>
+                                  </td>
+                                </tr>
+                              );
+                            })
                           )}
                         </tbody>
                       </table>
@@ -1454,10 +1484,10 @@ export const ClientDashboard: React.FC = () => {
                       <table className="w-full text-left text-xs text-zinc-700 whitespace-nowrap">
                         <thead className="bg-[#0a192f] text-white font-bold text-[11px] uppercase tracking-wider sticky top-0 z-10">
                           <tr>
+                            <th className="px-3.5 py-3">Candidate / Apprentice</th>
                             <th className="px-3.5 py-3">Establishment Code</th>
                             <th className="px-3.5 py-3">OJT State</th>
                             <th className="px-3.5 py-3">OJT District</th>
-                            <th className="px-3.5 py-3">Apprentice Code</th>
                             <th className="px-3.5 py-3">Contract Code</th>
                             <th className="px-3.5 py-3">Jurisdiction</th>
                             <th className="px-3.5 py-3">Contract Dates</th>
@@ -1482,13 +1512,20 @@ export const ClientDashboard: React.FC = () => {
                               </td>
                             </tr>
                           ) : (
-                            filteredNapsRecords.map((r) => (
-                              <tr key={r.id} className="hover:bg-zinc-50/90 transition-colors">
-                                <td className="px-3.5 py-3 font-bold text-zinc-900">{r.establishmentCode}</td>
-                                <td className="px-3.5 py-3 font-sans text-zinc-600">{r.ojtState}</td>
-                                <td className="px-3.5 py-3 font-sans text-zinc-600">{r.ojtDistrict}</td>
-                                <td className="px-3.5 py-3 font-bold text-sky-700">{r.apprenticeCode}</td>
-                                <td className="px-3.5 py-3 text-zinc-800">{r.contractCode}</td>
+                            filteredNapsRecords.map((r) => {
+                              const cand = candidateList.find(c => c.id === r.candidateId || c.contractCode === r.contractCode || (c.name && r.candidateName && c.name.toLowerCase() === r.candidateName.toLowerCase()));
+                              const candidateDisplayName = r.candidateName || cand?.name || 'Apprentice';
+
+                              return (
+                                <tr key={r.id} className="hover:bg-zinc-50/90 transition-colors">
+                                  <td className="px-3.5 py-3 font-sans">
+                                    <div className="font-bold text-zinc-900">{candidateDisplayName}</div>
+                                    <div className="font-mono text-[10px] text-sky-700 font-bold">{r.apprenticeCode}</div>
+                                  </td>
+                                  <td className="px-3.5 py-3 font-bold text-zinc-900">{r.establishmentCode}</td>
+                                  <td className="px-3.5 py-3 font-sans text-zinc-600">{r.ojtState}</td>
+                                  <td className="px-3.5 py-3 font-sans text-zinc-600">{r.ojtDistrict}</td>
+                                  <td className="px-3.5 py-3 font-mono font-bold text-zinc-800">{r.contractCode}</td>
                                 <td className="px-3.5 py-3 font-sans capitalize text-zinc-600">{r.jurisdiction}</td>
                                 <td className="px-3.5 py-3 text-zinc-500">
                                   {r.contractStartDate} → {r.contractEndDate}
@@ -1533,9 +1570,10 @@ export const ClientDashboard: React.FC = () => {
                                 </td>
                                 <td className="px-3.5 py-3 text-zinc-400">{r.paymentFailureReason || '-'}</td>
                               </tr>
-                            ))
-                          )}
-                        </tbody>
+                            );
+                          })
+                        )}
+                      </tbody>
                       </table>
                     </div>
                   </div>

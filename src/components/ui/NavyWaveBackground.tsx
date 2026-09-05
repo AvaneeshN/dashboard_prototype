@@ -38,36 +38,36 @@ export const NavyWaveBackground: React.FC<{
     const isSubtle = intensity === 'subtle';
     const waves: WaveLayer[] = [
       {
-        amplitude: isSubtle ? 18 : 28,
+        amplitude: isSubtle ? 14 : 28,
         frequency: 0.0022,
         speed: 0.008,
         phase: 0,
-        color: isSubtle ? 'rgba(10, 25, 47, 0.04)' : 'rgba(10, 25, 47, 0.07)',
-        verticalOffset: 0.72
+        color: isSubtle ? 'rgba(10, 25, 47, 0.03)' : 'rgba(10, 25, 47, 0.07)',
+        verticalOffset: isSubtle ? 0.92 : 0.72
       },
       {
-        amplitude: isSubtle ? 24 : 36,
+        amplitude: isSubtle ? 16 : 36,
         frequency: 0.0016,
         speed: -0.006,
         phase: 2,
-        color: isSubtle ? 'rgba(15, 39, 68, 0.05)' : 'rgba(15, 39, 68, 0.09)',
-        verticalOffset: 0.78
+        color: isSubtle ? 'rgba(15, 39, 68, 0.035)' : 'rgba(15, 39, 68, 0.09)',
+        verticalOffset: isSubtle ? 0.94 : 0.78
       },
       {
-        amplitude: isSubtle ? 20 : 32,
+        amplitude: isSubtle ? 14 : 32,
         frequency: 0.0028,
         speed: 0.011,
         phase: 4,
-        color: isSubtle ? 'rgba(22, 59, 101, 0.06)' : 'rgba(22, 59, 101, 0.11)',
-        verticalOffset: 0.84
+        color: isSubtle ? 'rgba(22, 59, 101, 0.04)' : 'rgba(22, 59, 101, 0.11)',
+        verticalOffset: isSubtle ? 0.96 : 0.84
       },
       {
-        amplitude: isSubtle ? 15 : 22,
+        amplitude: isSubtle ? 10 : 22,
         frequency: 0.0035,
         speed: -0.009,
         phase: 1,
-        color: isSubtle ? 'rgba(10, 30, 58, 0.08)' : 'rgba(10, 30, 58, 0.14)',
-        verticalOffset: 0.90
+        color: isSubtle ? 'rgba(10, 30, 58, 0.05)' : 'rgba(10, 30, 58, 0.14)',
+        verticalOffset: isSubtle ? 0.97 : 0.90
       }
     ];
 

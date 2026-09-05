@@ -8,7 +8,9 @@ import {
   UploadedDocument,
   NAPSPortalRecord,
   ComplianceInvoiceRecord,
-  ComplianceActionItem
+  ComplianceActionItem,
+  ApprenticeRecord,
+  CompanyOperationsSPOC
 } from '@/types';
 import { DocumentViewerModal } from '@/components/ui/DocumentViewerModal';
 import { downloadDocumentFile } from '@/lib/document-utils';
@@ -71,6 +73,8 @@ export const SubmissionDetailDrawer: React.FC<SubmissionDetailDrawerProps> = ({
   const [napsFormMonthFilter, setNapsFormMonthFilter] = useState<string>('all');
   const [napsSearchQuery, setNapsSearchQuery] = useState('');
   const [napsForm, setNapsForm] = useState<Omit<NAPSPortalRecord, 'id'>>({
+    candidateId: '',
+    candidateName: '',
     establishmentCode: 'E12253600040',
     ojtState: 'Telangana',
     ojtDistrict: 'Hyderabad',
@@ -114,6 +118,22 @@ export const SubmissionDetailDrawer: React.FC<SubmissionDetailDrawerProps> = ({
     }
   }, [submission?.id, submission?.assigned_company_spoc?.email, submission?.assigned_company_spoc?.name]);
 
+  const handleSaveSpoc = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!companySpocState.name || !companySpocState.email) return;
+
+    await assignCompanySpoc(submission!.id, {
+      name: companySpocState.name,
+      email: companySpocState.email,
+      phone: companySpocState.phone,
+      roleTitle: companySpocState.roleTitle
+    });
+
+    setIsEditingSpoc(false);
+    setSpocSaveSuccess(true);
+    setTimeout(() => setSpocSaveSuccess(false), 3000);
+  };
+
   // Close on Escape key press
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
@@ -132,17 +152,10 @@ export const SubmissionDetailDrawer: React.FC<SubmissionDetailDrawerProps> = ({
   const spocLogs = submission.spoc_logs || [];
   const napsRecords = submission.naps_records || [];
 
-  const handleSaveCompanySpoc = () => {
-    if (!companySpocState.name || !companySpocState.email) return;
-    assignCompanySpoc(submission.id, companySpocState);
-    setIsEditingSpoc(false);
-    setSpocSaveSuccess(true);
-    setTimeout(() => setSpocSaveSuccess(false), 4000);
-  };
-
   const filteredNapsRecords = napsRecords.filter(r => {
-    const matchesMonth = napsFormMonthFilter === 'all' || r.payoutMonth.toLowerCase() === napsFormMonthFilter.toLowerCase();
+    const matchesMonth = napsFormMonthFilter === 'all' || r.payoutMonth === napsFormMonthFilter;
     const matchesQuery = 
+      (r.candidateName && r.candidateName.toLowerCase().includes(napsSearchQuery.toLowerCase())) ||
       r.apprenticeCode.toLowerCase().includes(napsSearchQuery.toLowerCase()) ||
       r.contractCode.toLowerCase().includes(napsSearchQuery.toLowerCase()) ||
       r.beneficiaryId.toLowerCase().includes(napsSearchQuery.toLowerCase()) ||
@@ -152,16 +165,19 @@ export const SubmissionDetailDrawer: React.FC<SubmissionDetailDrawerProps> = ({
 
   const availableNapsMonths = Array.from(new Set(napsRecords.map(r => r.payoutMonth))).filter(Boolean);
 
-  const handleOpenAddNaps = () => {
+  const handleOpenAddNaps = (targetCandidate?: ApprenticeRecord) => {
     setEditingNapsRecord(null);
+    const defaultCand = targetCandidate || (candidateList.length === 1 ? candidateList[0] : undefined);
     setNapsForm({
+      candidateId: defaultCand?.id || '',
+      candidateName: defaultCand?.name || '',
       establishmentCode: napsRecords[0]?.establishmentCode || 'E12253600040',
       ojtState: napsRecords[0]?.ojtState || 'Telangana',
       ojtDistrict: napsRecords[0]?.ojtDistrict || 'Hyderabad',
-      apprenticeCode: '',
-      contractCode: '',
+      apprenticeCode: defaultCand?.apprenticeCode || '',
+      contractCode: defaultCand?.contractCode || '',
       jurisdiction: 'central',
-      contractStartDate: '2026-07-15',
+      contractStartDate: defaultCand?.onboardingDate || '2026-07-15',
       contractEndDate: '2027-07-14',
       contractType: 'optional',
       payoutMonth: 'AUG-2026',
@@ -181,6 +197,8 @@ export const SubmissionDetailDrawer: React.FC<SubmissionDetailDrawerProps> = ({
   const handleOpenEditNaps = (rec: NAPSPortalRecord) => {
     setEditingNapsRecord(rec);
     setNapsForm({
+      candidateId: rec.candidateId || '',
+      candidateName: rec.candidateName || '',
       establishmentCode: rec.establishmentCode,
       ojtState: rec.ojtState,
       ojtDistrict: rec.ojtDistrict,
@@ -213,6 +231,38 @@ export const SubmissionDetailDrawer: React.FC<SubmissionDetailDrawerProps> = ({
     } else {
       await addNAPSRecord(submission.id, napsForm);
     }
+
+    // Automatically sync contractCode, apprenticeCode, and contractStatus to candidate record
+    const targetCandidateId = napsForm.candidateId || (candidateList.length === 1 ? candidateList[0].id : null);
+    if (targetCandidateId) {
+      const updatedCandidates = candidateList.map(c => {
+        if (c.id === targetCandidateId) {
+          return {
+            ...c,
+            contractCode: napsForm.contractCode,
+            apprenticeCode: napsForm.apprenticeCode,
+            contractStatus: 'Signed' as const
+          };
+        }
+        return c;
+      });
+      await updateClientComplianceReport(submission.id, { candidates: updatedCandidates });
+    } else if (napsForm.candidateName) {
+      // Match by name if candidateId wasn't explicit
+      const updatedCandidates = candidateList.map(c => {
+        if (c.name.toLowerCase() === napsForm.candidateName?.toLowerCase()) {
+          return {
+            ...c,
+            contractCode: napsForm.contractCode,
+            apprenticeCode: napsForm.apprenticeCode,
+            contractStatus: 'Signed' as const
+          };
+        }
+        return c;
+      });
+      await updateClientComplianceReport(submission.id, { candidates: updatedCandidates });
+    }
+
     setShowNapsModal(false);
     setEditingNapsRecord(null);
   };
@@ -400,7 +450,7 @@ export const SubmissionDetailDrawer: React.FC<SubmissionDetailDrawerProps> = ({
                       <div className="pt-1 flex justify-end">
                         <button
                           type="button"
-                          onClick={handleSaveCompanySpoc}
+                          onClick={handleSaveSpoc}
                           className="px-3 py-1 rounded-full bg-black text-white hover:bg-zinc-800 text-xs font-bold cursor-pointer transition-all"
                         >
                           Save Client SPOC
@@ -565,7 +615,7 @@ export const SubmissionDetailDrawer: React.FC<SubmissionDetailDrawerProps> = ({
                     <div className="flex items-center gap-2 self-start sm:self-auto">
                       <button
                         type="button"
-                        onClick={handleOpenAddNaps}
+                        onClick={() => handleOpenAddNaps()}
                         className="px-3 py-1.5 rounded-full bg-amber-400 hover:bg-amber-300 text-zinc-950 font-bold text-xs flex items-center gap-1.5 cursor-pointer shadow-sm transition-all"
                       >
                         <Plus className="w-3.5 h-3.5" />
@@ -604,9 +654,9 @@ export const SubmissionDetailDrawer: React.FC<SubmissionDetailDrawerProps> = ({
                     <table className="w-full text-left text-[11px]">
                       <thead className="bg-[#112240] text-white uppercase tracking-wider text-[9px] font-mono whitespace-nowrap">
                         <tr>
+                          <th className="py-2.5 px-3">Candidate / Apprentice</th>
                           <th className="py-2.5 px-3">Establishment</th>
                           <th className="py-2.5 px-3">OJT State / Dist</th>
-                          <th className="py-2.5 px-3">Apprentice Code</th>
                           <th className="py-2.5 px-3">Contract Code</th>
                           <th className="py-2.5 px-3">Jurisdiction</th>
                           <th className="py-2.5 px-3">Contract Period</th>
@@ -624,10 +674,13 @@ export const SubmissionDetailDrawer: React.FC<SubmissionDetailDrawerProps> = ({
                         {filteredNapsRecords.length > 0 ? (
                           filteredNapsRecords.map((rec) => (
                             <tr key={rec.id} className="hover:bg-zinc-50/80 transition-colors">
+                              <td className="py-2 px-3">
+                                <div className="font-bold text-zinc-900">{rec.candidateName || candidateList.find(c => c.id === rec.candidateId || c.contractCode === rec.contractCode)?.name || 'Apprentice'}</div>
+                                <div className="font-mono text-[10px] text-zinc-500 font-bold">{rec.apprenticeCode}</div>
+                              </td>
                               <td className="py-2 px-3 font-mono font-bold text-zinc-800">{rec.establishmentCode}</td>
                               <td className="py-2 px-3 text-zinc-600">{rec.ojtState}, {rec.ojtDistrict}</td>
-                              <td className="py-2 px-3 font-mono text-zinc-900 font-bold">{rec.apprenticeCode}</td>
-                              <td className="py-2 px-3 font-mono text-zinc-700">{rec.contractCode}</td>
+                              <td className="py-2 px-3 font-mono text-zinc-700 font-bold">{rec.contractCode}</td>
                               <td className="py-2 px-3 uppercase text-[10px] text-zinc-500">{rec.jurisdiction}</td>
                               <td className="py-2 px-3 text-zinc-600 font-mono text-[10px]">{rec.contractStartDate} → {rec.contractEndDate}</td>
                               <td className="py-2 px-3 font-bold font-mono text-[#0a192f] bg-zinc-50">{rec.payoutMonth}</td>
@@ -701,7 +754,7 @@ export const SubmissionDetailDrawer: React.FC<SubmissionDetailDrawerProps> = ({
 
                   {/* Dynamic Company Documents List */}
                   {(() => {
-                    const dynamicEntries = Object.entries(companyDocs?.dynamicDocs || {});
+                    const dynamicEntries = Object.entries(companyDocs?.dynamicDocs || {}) as [string, UploadedDocument][];
                     if (dynamicEntries.length > 0) {
                       return (
                         <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 text-xs">
@@ -885,12 +938,32 @@ export const SubmissionDetailDrawer: React.FC<SubmissionDetailDrawerProps> = ({
                         <div key={cand.id} className="p-4 rounded-2xl bg-zinc-50 border border-zinc-200 text-xs space-y-3">
                           <div className="flex items-center justify-between">
                             <div>
-                              <div className="font-bold text-zinc-900 text-xs">{cand.name}</div>
+                              <div className="flex items-center gap-2">
+                                <span className="font-bold text-zinc-900 text-xs">{cand.name}</span>
+                                {cand.contractCode ? (
+                                  <span className="px-2 py-0.5 rounded-md text-[10px] font-mono font-bold bg-emerald-100 text-emerald-900 border border-emerald-300">
+                                    CN: {cand.contractCode}
+                                  </span>
+                                ) : (
+                                  <span className="px-2 py-0.5 rounded-md text-[10px] font-mono font-semibold bg-amber-100 text-amber-900 border border-amber-300">
+                                    CN Pending
+                                  </span>
+                                )}
+                              </div>
                               <div className="text-[10px] font-mono text-zinc-400">{cand.id} · {cand.email || 'Verified'} · {cand.phone || 'Phone Logged'}</div>
                             </div>
-                            <span className="px-2.5 py-0.5 rounded-full text-[10px] font-bold bg-zinc-900 text-white">
-                              {cand.status}
-                            </span>
+                            <div className="flex items-center gap-2">
+                              <button
+                                type="button"
+                                onClick={() => handleOpenAddNaps(cand)}
+                                className="px-2.5 py-1 rounded-xl bg-[#0a192f] text-white hover:bg-zinc-800 text-[10px] font-bold cursor-pointer transition-colors"
+                              >
+                                {cand.contractCode ? 'Edit CN / NAPS' : '+ Assign CN Number'}
+                              </button>
+                              <span className="px-2.5 py-0.5 rounded-full text-[10px] font-bold bg-zinc-900 text-white">
+                                {cand.status}
+                              </span>
+                            </div>
                           </div>
 
                           <div className="grid grid-cols-2 sm:grid-cols-3 gap-2 pt-2 border-t border-zinc-200 text-[11px]">
@@ -1102,6 +1175,50 @@ export const SubmissionDetailDrawer: React.FC<SubmissionDetailDrawerProps> = ({
               </div>
 
               <form onSubmit={handleSaveNapsForm} className="space-y-3.5 text-xs">
+                {/* Candidate Linkage Selector */}
+                {candidateList.length > 0 && (
+                  <div className="p-3 rounded-2xl bg-sky-50/80 border border-sky-200 space-y-1.5">
+                    <div className="flex items-center justify-between">
+                      <label className="text-[11px] font-bold text-sky-950 uppercase tracking-tight flex items-center gap-1.5">
+                        <Users className="w-3.5 h-3.5 text-sky-700" />
+                        <span>Link to Employee / Candidate</span>
+                      </label>
+                      <span className="text-[10px] text-sky-700 font-mono">Syncs CN directly to candidate profile</span>
+                    </div>
+                    <select
+                      value={napsForm.candidateId || ''}
+                      onChange={(e) => {
+                        const selId = e.target.value;
+                        const matched = candidateList.find(c => c.id === selId);
+                        if (matched) {
+                          setNapsForm({
+                            ...napsForm,
+                            candidateId: matched.id,
+                            candidateName: matched.name,
+                            apprenticeCode: matched.apprenticeCode || napsForm.apprenticeCode,
+                            contractCode: matched.contractCode || napsForm.contractCode,
+                            contractStartDate: matched.onboardingDate || napsForm.contractStartDate
+                          });
+                        } else {
+                          setNapsForm({
+                            ...napsForm,
+                            candidateId: '',
+                            candidateName: ''
+                          });
+                        }
+                      }}
+                      className="w-full px-3 py-2 rounded-xl bg-white border border-sky-300 text-zinc-900 font-medium text-xs focus:outline-none focus:border-sky-600"
+                    >
+                      <option value="">-- Select Candidate (Optional, Recommended) --</option>
+                      {candidateList.map(c => (
+                        <option key={c.id} value={c.id}>
+                          {c.name} ({c.tradeOrRole}) {c.contractCode ? `· Existing CN: ${c.contractCode}` : '· [No CN yet]'}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+                )}
+
                 <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
                   <div>
                     <label className="block text-[11px] font-bold text-zinc-700 mb-1">Establishment Code *</label>
