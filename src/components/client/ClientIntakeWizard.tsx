@@ -150,7 +150,7 @@ const INITIAL_FORM_STATE: IntakeFormData = {
 };
 
 export const ClientIntakeWizard: React.FC = () => {
-  const { user, getActiveClientSubmission, saveSubmissionStep, recordAbandonment } = useStore();
+  const { user, getActiveClientSubmission, saveSubmissionStep, recordAbandonment, requiredDocuments } = useStore();
   const [currentSection, setCurrentSection] = useState<number>(1);
   const [formData, setFormData] = useState<IntakeFormData>(INITIAL_FORM_STATE);
   const [isSaving, setIsSaving] = useState(false);
@@ -348,6 +348,22 @@ export const ClientIntakeWizard: React.FC = () => {
       if (!data.gstinNumber?.trim()) {
         errors.push({ field: 'Company GSTIN Number', sectionNumber: 4, sectionName: 'Verification & Submit' });
       }
+
+      // Dynamic validation for all configured mandatory compliance documents
+      requiredDocuments.forEach(docReq => {
+        if (docReq.mandatory) {
+          const uploaded = data.companyDocs?.dynamicDocs?.[docReq.id] ||
+            (docReq.id === 'gst' && (data.companyDocs?.gstDoc || data.companyDocs?.gstFileName)) ||
+            (docReq.id === 'cheque' && (data.companyDocs?.chequeDoc || data.companyDocs?.cancelledChequeFileName)) ||
+            (docReq.id === 'coi' && (data.companyDocs?.coiDoc || data.companyDocs?.coiFileName)) ||
+            (docReq.id === 'signatory' && (data.companyDocs?.signatoryDoc || data.companyDocs?.signatoryLetterFileName));
+
+          if (!uploaded) {
+            errors.push({ field: `${docReq.name} (Mandatory Document)`, sectionNumber: 4, sectionName: 'Verification & Submit' });
+          }
+        }
+      });
+
       if (!data.agreedToTerms) {
         errors.push({ field: 'Acceptance of Regulatory Declarations & Terms', sectionNumber: 4, sectionName: 'Verification & Submit' });
       }
@@ -1017,142 +1033,80 @@ export const ClientIntakeWizard: React.FC = () => {
 
                 {/* Structured Document Slots */}
                 <div className="space-y-2.5">
-                  <label className="block text-xs font-bold text-zinc-900">
-                    Mandatory Enterprise Compliance Files (PDF / DOCX / JPG)
-                  </label>
+                  <div className="flex items-center justify-between">
+                    <label className="block text-xs font-bold text-zinc-900">
+                      Corporate Compliance Files ({requiredDocuments.length} Requirements)
+                    </label>
+                    <span className="text-[10px] font-mono text-zinc-400">
+                      Files are securely stored in private cloud storage
+                    </span>
+                  </div>
 
                   <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                    {/* 1. COI */}
-                    <div className="p-4 rounded-2xl border border-zinc-200 bg-zinc-50 hover:border-zinc-300 transition-all flex flex-col justify-between">
-                      <div>
-                        <div className="flex items-center justify-between mb-1.5">
-                          <span className="text-xs font-bold text-zinc-900">Certificate of Incorporation (COI)</span>
-                          <span className="text-[10px] font-mono px-1.5 py-0.5 rounded-full bg-zinc-200 text-zinc-700 font-bold">Required</span>
+                    {requiredDocuments.map((docReq) => {
+                      const dynamicDoc = formData.companyDocs?.dynamicDocs?.[docReq.id];
+                      const uploadedFileName = dynamicDoc?.name ||
+                        (docReq.id === 'gst' ? formData.companyDocs?.gstFileName : '') ||
+                        (docReq.id === 'cheque' ? formData.companyDocs?.cancelledChequeFileName : '') ||
+                        (docReq.id === 'coi' ? formData.companyDocs?.coiFileName : '') ||
+                        (docReq.id === 'signatory' ? formData.companyDocs?.signatoryLetterFileName : '');
+
+                      return (
+                        <div key={docReq.id} className="p-4 rounded-2xl border border-zinc-200 bg-zinc-50 hover:border-zinc-300 transition-all flex flex-col justify-between">
+                          <div>
+                            <div className="flex items-center justify-between mb-1.5">
+                              <span className="text-xs font-bold text-zinc-900">
+                                {docReq.name} {docReq.mandatory && <span className="text-rose-600">*</span>}
+                              </span>
+                              {docReq.mandatory ? (
+                                <span className="text-[10px] font-mono px-1.5 py-0.5 rounded-full bg-rose-50 text-rose-700 border border-rose-200 font-bold">
+                                  Required *
+                                </span>
+                              ) : (
+                                <span className="text-[10px] font-mono px-1.5 py-0.5 rounded-full bg-zinc-200 text-zinc-700 font-bold">
+                                  Optional
+                                </span>
+                              )}
+                            </div>
+                            <p className="text-[11px] text-zinc-500 mb-3">{docReq.description}</p>
+                          </div>
+
+                          <label className="flex items-center gap-2 text-xs font-semibold text-zinc-700 hover:text-black cursor-pointer p-2 rounded-xl bg-white border border-zinc-200 hover:border-zinc-400 transition-all">
+                            <UploadCloud className="w-4 h-4 text-zinc-400 shrink-0" />
+                            <span className="truncate">
+                              {uploadedFileName || `Attach ${docReq.name} (${(docReq.allowedExtensions || ['.pdf', '.docx', '.jpg']).join('/')})`}
+                            </span>
+                            <input
+                              type="file"
+                              accept={docReq.allowedExtensions?.join(',') || '.pdf,.docx,.doc,.jpg,.jpeg,.png,.txt'}
+                              className="hidden"
+                              onChange={async (e) => {
+                                if (e.target.files?.[0]) {
+                                  const file = e.target.files[0];
+                                  const doc = await processUploadedFile(file, docReq.category);
+                                  const currentCompanyDocs = formData.companyDocs || {};
+                                  const currentDynamic = currentCompanyDocs.dynamicDocs || {};
+
+                                  const updatedDocs = {
+                                    ...currentCompanyDocs,
+                                    dynamicDocs: {
+                                      ...currentDynamic,
+                                      [docReq.id]: doc
+                                    },
+                                    ...(docReq.id === 'gst' ? { gstFileName: file.name, gstDoc: doc } : {}),
+                                    ...(docReq.id === 'cheque' ? { cancelledChequeFileName: file.name, chequeDoc: doc } : {}),
+                                    ...(docReq.id === 'coi' ? { coiFileName: file.name, coiDoc: doc } : {}),
+                                    ...(docReq.id === 'signatory' ? { signatoryLetterFileName: file.name, signatoryDoc: doc } : {})
+                                  };
+
+                                  updateField('companyDocs', updatedDocs);
+                                }
+                              }}
+                            />
+                          </label>
                         </div>
-                        <p className="text-[11px] text-zinc-500 mb-3">Proof of registered corporate entity.</p>
-                      </div>
-
-                      <label className="flex items-center gap-2 text-xs font-semibold text-zinc-700 hover:text-black cursor-pointer p-2 rounded-xl bg-white border border-zinc-200">
-                        <UploadCloud className="w-4 h-4 text-zinc-400 shrink-0" />
-                        <span className="truncate">
-                          {formData.companyDocs?.coiFileName || 'Attach COI PDF'}
-                        </span>
-                        <input
-                          type="file"
-                          className="hidden"
-                          onChange={async (e) => {
-                            if (e.target.files?.[0]) {
-                              const file = e.target.files[0];
-                              const doc = await processUploadedFile(file, 'COI');
-                              updateField('companyDocs', { 
-                                ...(formData.companyDocs || {}), 
-                                coiFileName: file.name,
-                                coiDoc: doc 
-                              });
-                            }
-                          }}
-                        />
-                      </label>
-                    </div>
-
-                    {/* 2. GST Certificate */}
-                    <div className="p-4 rounded-2xl border border-zinc-200 bg-zinc-50 hover:border-zinc-300 transition-all flex flex-col justify-between">
-                      <div>
-                        <div className="flex items-center justify-between mb-1.5">
-                          <span className="text-xs font-bold text-zinc-900">Company PAN & GST Certificate</span>
-                          <span className="text-[10px] font-mono px-1.5 py-0.5 rounded-full bg-zinc-200 text-zinc-700 font-bold">Required</span>
-                        </div>
-                        <p className="text-[11px] text-zinc-500 mb-3">Government tax and invoice reconciliation.</p>
-                      </div>
-
-                      <label className="flex items-center gap-2 text-xs font-semibold text-zinc-700 hover:text-black cursor-pointer p-2 rounded-xl bg-white border border-zinc-200">
-                        <UploadCloud className="w-4 h-4 text-zinc-400 shrink-0" />
-                        <span className="truncate">
-                          {formData.companyDocs?.gstFileName || 'Attach GST/PAN Document'}
-                        </span>
-                        <input
-                          type="file"
-                          className="hidden"
-                          onChange={async (e) => {
-                            if (e.target.files?.[0]) {
-                              const file = e.target.files[0];
-                              const doc = await processUploadedFile(file, 'GST');
-                              updateField('companyDocs', { 
-                                ...(formData.companyDocs || {}), 
-                                gstFileName: file.name,
-                                gstDoc: doc 
-                              });
-                            }
-                          }}
-                        />
-                      </label>
-                    </div>
-
-                    {/* 3. Authorized Signatory Letter */}
-                    <div className="p-4 rounded-2xl border border-zinc-200 bg-zinc-50 hover:border-zinc-300 transition-all flex flex-col justify-between">
-                      <div>
-                        <div className="flex items-center justify-between mb-1.5">
-                          <span className="text-xs font-bold text-zinc-900">Signatory Authorization Letter</span>
-                          <span className="text-[10px] font-mono px-1.5 py-0.5 rounded-full bg-zinc-200 text-zinc-700 font-bold">Required</span>
-                        </div>
-                        <p className="text-[11px] text-zinc-500 mb-3">Authorization to execute legal apprentice contracts.</p>
-                      </div>
-
-                      <label className="flex items-center gap-2 text-xs font-semibold text-zinc-700 hover:text-black cursor-pointer p-2 rounded-xl bg-white border border-zinc-200">
-                        <UploadCloud className="w-4 h-4 text-zinc-400 shrink-0" />
-                        <span className="truncate">
-                          {formData.companyDocs?.signatoryLetterFileName || 'Attach Signatory Letter'}
-                        </span>
-                        <input
-                          type="file"
-                          className="hidden"
-                          onChange={async (e) => {
-                            if (e.target.files?.[0]) {
-                              const file = e.target.files[0];
-                              const doc = await processUploadedFile(file, 'Signatory Letter');
-                              updateField('companyDocs', { 
-                                ...(formData.companyDocs || {}), 
-                                signatoryLetterFileName: file.name,
-                                signatoryDoc: doc 
-                              });
-                            }
-                          }}
-                        />
-                      </label>
-                    </div>
-
-                    {/* 4. Bank Proof */}
-                    <div className="p-4 rounded-2xl border border-zinc-200 bg-zinc-50 hover:border-zinc-300 transition-all flex flex-col justify-between">
-                      <div>
-                        <div className="flex items-center justify-between mb-1.5">
-                          <span className="text-xs font-bold text-zinc-900">Cancelled Cheque / Bank Proof</span>
-                          <span className="text-[10px] font-mono px-1.5 py-0.5 rounded-full bg-zinc-200 text-zinc-700 font-bold">Required</span>
-                        </div>
-                        <p className="text-[11px] text-zinc-500 mb-3">Bank details for DBT credits and payroll reconciliation.</p>
-                      </div>
-
-                      <label className="flex items-center gap-2 text-xs font-semibold text-zinc-700 hover:text-black cursor-pointer p-2 rounded-xl bg-white border border-zinc-200">
-                        <UploadCloud className="w-4 h-4 text-zinc-400 shrink-0" />
-                        <span className="truncate">
-                          {formData.companyDocs?.cancelledChequeFileName || 'Attach Cancelled Cheque'}
-                        </span>
-                        <input
-                          type="file"
-                          className="hidden"
-                          onChange={async (e) => {
-                            if (e.target.files?.[0]) {
-                              const file = e.target.files[0];
-                              const doc = await processUploadedFile(file, 'Cheque');
-                              updateField('companyDocs', { 
-                                ...(formData.companyDocs || {}), 
-                                cancelledChequeFileName: file.name,
-                                chequeDoc: doc 
-                              });
-                            }
-                          }}
-                        />
-                      </label>
-                    </div>
+                      );
+                    })}
                   </div>
                 </div>
 

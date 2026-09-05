@@ -12,10 +12,46 @@ import {
   DBTClaimRecord, 
   ClientApprenticeMetrics,
   SPOCEmailLog,
-  CompanyOperationsSPOC
+  CompanyOperationsSPOC,
+  RequiredDocumentConfig
 } from '@/types';
 import { INITIAL_PROFILES, INITIAL_SUBMISSIONS, INITIAL_LOGIN_LOGS } from './mock-data';
 import { createClient, isSupabaseConfigured } from '@/lib/supabase/client';
+
+export const DEFAULT_REQUIRED_DOCUMENTS: RequiredDocumentConfig[] = [
+  {
+    id: 'agreement',
+    name: 'Apprenticeship Service Agreement',
+    category: 'Agreement',
+    description: 'Executed apprenticeship training agreement or master service engagement contract.',
+    mandatory: true,
+    allowedExtensions: ['.pdf', '.docx', '.doc']
+  },
+  {
+    id: 'gst',
+    name: 'GST Registration Certificate',
+    category: 'GST',
+    description: 'Official Goods and Services Tax registration certificate (Form GST REG-06).',
+    mandatory: true,
+    allowedExtensions: ['.pdf', '.jpg', '.jpeg', '.png']
+  },
+  {
+    id: 'pan',
+    name: 'Company PAN Card',
+    category: 'PAN',
+    description: 'Permanent Account Number card issued by the Income Tax Department for entity verification.',
+    mandatory: true,
+    allowedExtensions: ['.pdf', '.jpg', '.jpeg', '.png']
+  },
+  {
+    id: 'cheque',
+    name: 'Cancelled Cheque / Bank Proof',
+    category: 'Cheque',
+    description: 'Bank passbook copy or cancelled cheque for direct DBT subsidy reimbursements and stipend reconciliation.',
+    mandatory: true,
+    allowedExtensions: ['.pdf', '.jpg', '.jpeg', '.png']
+  }
+];
 
 interface AuthState {
   user: UserProfile | null;
@@ -43,6 +79,11 @@ interface AuthState {
   assignCompanySpoc: (submissionId: string, spocData: { name: string; email: string; phone?: string; roleTitle?: string }) => void;
   adminSpoc: CompanyOperationsSPOC | null;
   setAdminSpoc: (spocData: { name: string; email: string; phone?: string; roleTitle?: string }) => void;
+
+  // Dynamic Required Intake Documents Configuration
+  requiredDocuments: RequiredDocumentConfig[];
+  updateRequiredDocuments: (docs: RequiredDocumentConfig[]) => Promise<void>;
+  resetRequiredDocuments: () => Promise<void>;
 }
 
 const StoreContext = createContext<AuthState | null>(null);
@@ -104,6 +145,58 @@ export const StoreProvider: React.FC<{ children: React.ReactNode }> = ({ childre
     }
   };
 
+  // Dynamic Required Intake Documents Configuration State
+  const [requiredDocuments, setRequiredDocumentsState] = useState<RequiredDocumentConfig[]>(() => {
+    if (typeof window !== 'undefined') {
+      try {
+        const saved = localStorage.getItem('portal_required_intake_documents');
+        if (saved) {
+          const parsed = JSON.parse(saved);
+          if (Array.isArray(parsed) && parsed.length > 0) return parsed;
+        }
+      } catch (e) {}
+    }
+    return DEFAULT_REQUIRED_DOCUMENTS;
+  });
+
+  const updateRequiredDocuments = async (docs: RequiredDocumentConfig[]) => {
+    setRequiredDocumentsState(docs);
+    if (typeof window !== 'undefined') {
+      try {
+        localStorage.setItem('portal_required_intake_documents', JSON.stringify(docs));
+      } catch (e) {}
+    }
+
+    if (isSupabaseConfigured()) {
+      try {
+        const supabase = createClient();
+        const configRecord: FormSubmission = {
+          id: 'system_intake_config',
+          client_id: 'system-admin',
+          client_name: 'Intake Document Configuration',
+          client_email: 'admin@platform.com',
+          company_name: 'Platform Settings',
+          status: 'approved',
+          current_step: 4,
+          total_steps: 4,
+          completion_percentage: 100,
+          time_spent_seconds: 0,
+          responses: { requiredDocuments: docs as any },
+          candidates: [],
+          started_at: new Date().toISOString(),
+          last_active_at: new Date().toISOString()
+        };
+        await supabase.from('form_submissions').upsert([configRecord]);
+      } catch (err) {
+        console.error('[ERROR] Failed to persist required documents to Supabase:', err);
+      }
+    }
+  };
+
+  const resetRequiredDocuments = async () => {
+    await updateRequiredDocuments(DEFAULT_REQUIRED_DOCUMENTS);
+  };
+
   // Initialize ONLY from Supabase Cloud Database (0 localStorage reliance)
   useEffect(() => {
     const initData = async () => {
@@ -148,8 +241,20 @@ export const StoreProvider: React.FC<{ children: React.ReactNode }> = ({ childre
             }
           }
 
-          // Filter out internal system record from client intakes registry
-          const activeSubmissions = allRemoteSubs.filter(s => s.id !== 'system_admin_config');
+          // Hydrate dynamic intake document requirements from Supabase DB
+          const systemIntakeRecord = allRemoteSubs.find(s => s.id === 'system_intake_config');
+          if (systemIntakeRecord?.responses && Array.isArray((systemIntakeRecord.responses as any).requiredDocuments)) {
+            const docs = (systemIntakeRecord.responses as any).requiredDocuments as RequiredDocumentConfig[];
+            setRequiredDocumentsState(docs);
+            if (typeof window !== 'undefined') {
+              try {
+                localStorage.setItem('portal_required_intake_documents', JSON.stringify(docs));
+              } catch (e) {}
+            }
+          }
+
+          // Filter out internal system records from client intakes registry
+          const activeSubmissions = allRemoteSubs.filter(s => s.id !== 'system_admin_config' && s.id !== 'system_intake_config');
           setSubmissions(activeSubmissions);
 
           // 2. Fetch live user profiles
@@ -1151,7 +1256,10 @@ export const StoreProvider: React.FC<{ children: React.ReactNode }> = ({ childre
         triggerSPOCEmail,
         assignCompanySpoc,
         adminSpoc,
-        setAdminSpoc
+        setAdminSpoc,
+        requiredDocuments,
+        updateRequiredDocuments,
+        resetRequiredDocuments
       }}
     >
       {children}

@@ -22,6 +22,11 @@ import {
   ShieldCheck,
   BarChart2,
   FileSpreadsheet,
+  FileCheck,
+  Plus,
+  Trash2,
+  Edit3,
+  RotateCcw,
   LayoutDashboard,
   ArrowUpRight,
   Mail,
@@ -36,11 +41,23 @@ import {
   Tooltip 
 } from 'recharts';
 import { motion, AnimatePresence } from 'framer-motion';
+import { RequiredDocumentConfig } from '@/types';
 
-type AdminTab = 'telemetry' | 'intakes' | 'security';
+type AdminTab = 'telemetry' | 'intakes' | 'requirements' | 'security';
 
 export const AdminDashboard: React.FC = () => {
-  const { user, submissions, loginLogs, updateSubmissionStatus, syncDataToSupabase, adminSpoc, setAdminSpoc } = useStore();
+  const { 
+    user, 
+    submissions, 
+    loginLogs, 
+    updateSubmissionStatus, 
+    syncDataToSupabase, 
+    adminSpoc, 
+    setAdminSpoc,
+    requiredDocuments,
+    updateRequiredDocuments,
+    resetRequiredDocuments
+  } = useStore();
   const [activeTab, setActiveTab] = useState<AdminTab>('telemetry');
   const [searchQuery, setSearchQuery] = useState('');
   const [statusFilter, setStatusFilter] = useState<string>('all');
@@ -54,6 +71,84 @@ export const AdminDashboard: React.FC = () => {
   const [adminSpocName, setAdminSpocName] = useState(adminSpoc?.name || '');
   const [adminSpocEmail, setAdminSpocEmail] = useState(adminSpoc?.email || '');
   const [adminSpocPhone, setAdminSpocPhone] = useState(adminSpoc?.phone || '');
+
+  // Dynamic Required Documents Management State & Modal
+  const [showDocModal, setShowDocModal] = useState(false);
+  const [editingDoc, setEditingDoc] = useState<RequiredDocumentConfig | null>(null);
+  const [docSaveNotice, setDocSaveNotice] = useState<string | null>(null);
+  const [docForm, setDocForm] = useState<{
+    name: string;
+    category: string;
+    description: string;
+    mandatory: boolean;
+    allowedExtensions: string[];
+  }>({
+    name: '',
+    category: '',
+    description: '',
+    mandatory: true,
+    allowedExtensions: ['.pdf', '.docx', '.jpg', '.jpeg', '.png']
+  });
+
+  const handleToggleMandatory = async (docId: string) => {
+    const updated = requiredDocuments.map(d => d.id === docId ? { ...d, mandatory: !d.mandatory } : d);
+    await updateRequiredDocuments(updated);
+    setDocSaveNotice('Document requirement status updated and synced to cloud.');
+    setTimeout(() => setDocSaveNotice(null), 4000);
+  };
+
+  const handleDeleteDoc = async (docId: string) => {
+    if (requiredDocuments.length <= 1) {
+      alert('At least one compliance document requirement must remain configured.');
+      return;
+    }
+    const updated = requiredDocuments.filter(d => d.id !== docId);
+    await updateRequiredDocuments(updated);
+    setDocSaveNotice('Document requirement removed from client intake form.');
+    setTimeout(() => setDocSaveNotice(null), 4000);
+  };
+
+  const handleResetDocs = async () => {
+    if (confirm('Reset document requirements to standard defaults (Agreement, GST, PAN, Cancelled Cheque)?')) {
+      await resetRequiredDocuments();
+      setDocSaveNotice('Reset to standard compliance documents (Agreement, GST, PAN, Cancelled Cheque).');
+      setTimeout(() => setDocSaveNotice(null), 4000);
+    }
+  };
+
+  const handleSaveDocForm = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!docForm.name.trim() || !docForm.category.trim()) return;
+
+    let updated: RequiredDocumentConfig[];
+    if (editingDoc) {
+      updated = requiredDocuments.map(d => d.id === editingDoc.id ? {
+        ...d,
+        name: docForm.name.trim(),
+        category: docForm.category.trim(),
+        description: docForm.description.trim(),
+        mandatory: docForm.mandatory,
+        allowedExtensions: docForm.allowedExtensions
+      } : d);
+    } else {
+      const newId = docForm.category.toLowerCase().replace(/[^a-z0-9]/g, '_') + '_' + Date.now().toString().slice(-4);
+      const newDoc: RequiredDocumentConfig = {
+        id: newId,
+        name: docForm.name.trim(),
+        category: docForm.category.trim(),
+        description: docForm.description.trim(),
+        mandatory: docForm.mandatory,
+        allowedExtensions: docForm.allowedExtensions
+      };
+      updated = [...requiredDocuments, newDoc];
+    }
+
+    await updateRequiredDocuments(updated);
+    setShowDocModal(false);
+    setEditingDoc(null);
+    setDocSaveNotice(`Document requirement "${docForm.name}" synced to database.`);
+    setTimeout(() => setDocSaveNotice(null), 4000);
+  };
 
   // Synchronize when adminSpoc changes
   useEffect(() => {
@@ -185,6 +280,7 @@ export const AdminDashboard: React.FC = () => {
   const adminTabs = [
     { id: 'telemetry', label: 'Executive Telemetry & Funnel', icon: <LayoutDashboard className="w-3.5 h-3.5" /> },
     { id: 'intakes', label: `Client Intakes (${submissions.length})`, icon: <FileSpreadsheet className="w-3.5 h-3.5" /> },
+    { id: 'requirements', label: `Document Requirements (${requiredDocuments.length})`, icon: <FileCheck className="w-3.5 h-3.5" /> },
     { id: 'security', label: `Security Audit Log (${loginLogs.length})`, icon: <ShieldCheck className="w-3.5 h-3.5" /> }
   ];
 
@@ -549,7 +645,157 @@ export const AdminDashboard: React.FC = () => {
             </motion.div>
           )}
 
-          {/* TAB 3: Security & Login Audit Log */}
+          {/* TAB 3: Document Requirements Management */}
+          {activeTab === 'requirements' && (
+            <motion.div
+              key="requirements"
+              initial={{ opacity: 0, y: 8 }}
+              animate={{ opacity: 1, y: 0 }}
+              exit={{ opacity: 0, y: -8 }}
+              transition={{ duration: 0.2 }}
+            >
+              <GlassCard className="p-6 space-y-6">
+                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b border-zinc-200 pb-5">
+                  <div>
+                    <h3 className="text-xs font-extrabold uppercase tracking-wider text-zinc-900 font-mono">
+                      CLIENT INTAKE COMPLIANCE DOCUMENT REQUIREMENTS
+                    </h3>
+                    <p className="text-xs text-zinc-500 mt-0.5 font-medium">
+                      Configure corporate compliance documents required during intake. Clients dynamically see these upload cards in Section 4.
+                    </p>
+                  </div>
+
+                  <div className="flex flex-wrap items-center gap-2">
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setEditingDoc(null);
+                        setDocForm({
+                          name: '',
+                          category: '',
+                          description: '',
+                          mandatory: true,
+                          allowedExtensions: ['.pdf', '.docx', '.jpg', '.jpeg', '.png']
+                        });
+                        setShowDocModal(true);
+                      }}
+                      className="px-4 py-2 rounded-full bg-black text-white hover:bg-zinc-800 text-xs font-bold flex items-center gap-1.5 transition-all cursor-pointer shadow-xs"
+                    >
+                      <Plus className="w-3.5 h-3.5" />
+                      <span>Add Required Document</span>
+                    </button>
+
+                    <button
+                      type="button"
+                      onClick={handleResetDocs}
+                      className="px-3.5 py-2 rounded-full bg-zinc-100 hover:bg-zinc-200 text-zinc-700 text-xs font-bold flex items-center gap-1.5 transition-all cursor-pointer border border-zinc-200"
+                      title="Reset to Standard Defaults (Agreement, GST, PAN, Cheque)"
+                    >
+                      <RotateCcw className="w-3 h-3 text-zinc-500" />
+                      <span>Reset Defaults</span>
+                    </button>
+                  </div>
+                </div>
+
+                {docSaveNotice && (
+                  <div className="p-3.5 rounded-2xl bg-emerald-50 border border-emerald-200 text-emerald-900 text-xs font-medium flex items-center justify-between">
+                    <span>{docSaveNotice}</span>
+                    <button onClick={() => setDocSaveNotice(null)} className="text-emerald-700 hover:text-emerald-900 text-xs font-bold cursor-pointer">Dismiss</button>
+                  </div>
+                )}
+
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  {requiredDocuments.map((docReq, index) => (
+                    <div
+                      key={docReq.id}
+                      className="p-5 rounded-3xl bg-white border border-zinc-200 shadow-xs flex flex-col justify-between space-y-4 hover:border-zinc-300 transition-all"
+                    >
+                      <div className="space-y-2">
+                        <div className="flex items-start justify-between gap-2">
+                          <div className="flex items-center gap-2.5">
+                            <div className="w-8 h-8 rounded-xl bg-zinc-100 border border-zinc-200 flex items-center justify-center text-[11px] font-mono font-bold text-zinc-700">
+                              0{index + 1}
+                            </div>
+                            <div>
+                              <h4 className="text-sm font-bold text-zinc-900 leading-tight">
+                                {docReq.name}
+                              </h4>
+                              <span className="text-[10px] font-mono text-zinc-400">
+                                Storage Bucket Category: <strong className="text-zinc-700 font-semibold">{docReq.category}</strong>
+                              </span>
+                            </div>
+                          </div>
+
+                          <button
+                            type="button"
+                            onClick={() => handleToggleMandatory(docReq.id)}
+                            className="cursor-pointer"
+                            title="Click to toggle Mandatory / Optional"
+                          >
+                            {docReq.mandatory ? (
+                              <span className="px-2.5 py-0.5 rounded-full text-[10px] font-bold bg-rose-50 text-rose-700 border border-rose-200 hover:bg-rose-100 transition-colors">
+                                Mandatory (*)
+                              </span>
+                            ) : (
+                              <span className="px-2.5 py-0.5 rounded-full text-[10px] font-bold bg-zinc-100 text-zinc-600 border border-zinc-200 hover:bg-zinc-200 transition-colors">
+                                Optional
+                              </span>
+                            )}
+                          </button>
+                        </div>
+
+                        <p className="text-xs text-zinc-500 leading-relaxed">
+                          {docReq.description}
+                        </p>
+
+                        <div className="text-[10px] font-mono text-zinc-400">
+                          Formats: {(docReq.allowedExtensions || ['.pdf', '.docx', '.jpg']).join(', ')}
+                        </div>
+                      </div>
+
+                      <div className="pt-3 border-t border-zinc-100 flex items-center justify-between text-xs">
+                        <span className="text-[11px] text-zinc-400">
+                          {docReq.mandatory ? 'Enforced during client submission' : 'Client may submit without this file'}
+                        </span>
+
+                        <div className="flex items-center gap-1.5">
+                          <button
+                            type="button"
+                            onClick={() => {
+                              setEditingDoc(docReq);
+                              setDocForm({
+                                name: docReq.name,
+                                category: docReq.category,
+                                description: docReq.description,
+                                mandatory: docReq.mandatory,
+                                allowedExtensions: docReq.allowedExtensions || ['.pdf', '.docx', '.jpg']
+                              });
+                              setShowDocModal(true);
+                            }}
+                            className="p-1.5 rounded-xl hover:bg-zinc-100 text-zinc-600 hover:text-black transition-colors cursor-pointer"
+                            title="Edit requirement"
+                          >
+                            <Edit3 className="w-3.5 h-3.5" />
+                          </button>
+
+                          <button
+                            type="button"
+                            onClick={() => handleDeleteDoc(docReq.id)}
+                            className="p-1.5 rounded-xl hover:bg-rose-50 text-zinc-400 hover:text-rose-600 transition-colors cursor-pointer"
+                            title="Remove requirement"
+                          >
+                            <Trash2 className="w-3.5 h-3.5" />
+                          </button>
+                        </div>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </GlassCard>
+            </motion.div>
+          )}
+
+          {/* TAB 4: Security & Login Audit Log */}
           {activeTab === 'security' && (
             <motion.div
               key="security"
@@ -743,6 +989,118 @@ export const AdminDashboard: React.FC = () => {
                     className="px-5 py-2 rounded-full text-xs font-bold bg-black text-white hover:bg-zinc-800 transition-all cursor-pointer shadow-sm"
                   >
                     Save Operations SPOC
+                  </button>
+                </div>
+              </form>
+            </motion.div>
+          </div>
+        )}
+      </AnimatePresence>
+
+      {/* Document Requirement Configuration Modal */}
+      <AnimatePresence>
+        {showDocModal && (
+          <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-xs font-sans">
+            <motion.div
+              initial={{ opacity: 0, scale: 0.95 }}
+              animate={{ opacity: 1, scale: 1 }}
+              exit={{ opacity: 0, scale: 0.95 }}
+              className="bg-white rounded-3xl border border-zinc-200 shadow-2xl p-6 sm:p-7 max-w-lg w-full space-y-5"
+            >
+              <div className="flex items-center justify-between border-b border-zinc-100 pb-3">
+                <div>
+                  <h3 className="text-sm font-bold text-zinc-900 uppercase font-mono">
+                    {editingDoc ? 'Edit Document Requirement' : 'Add Compliance Document Requirement'}
+                  </h3>
+                  <p className="text-xs text-zinc-500 mt-0.5">
+                    Configure the compliance file requested from clients during intake.
+                  </p>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => setShowDocModal(false)}
+                  className="w-7 h-7 rounded-full hover:bg-zinc-100 flex items-center justify-center text-zinc-400 hover:text-black cursor-pointer"
+                >
+                  <X className="w-4 h-4" />
+                </button>
+              </div>
+
+              <form onSubmit={handleSaveDocForm} className="space-y-4 text-xs">
+                <div>
+                  <label className="block text-[11px] font-bold text-zinc-700 mb-1">
+                    Document Title *
+                  </label>
+                  <input
+                    type="text"
+                    required
+                    value={docForm.name}
+                    onChange={(e) => setDocForm({ ...docForm, name: e.target.value })}
+                    placeholder="e.g. MSME Registration Certificate"
+                    className="w-full px-3.5 py-2.5 rounded-xl bg-zinc-50 border border-zinc-200 text-zinc-900 focus:outline-none focus:border-black font-medium"
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-[11px] font-bold text-zinc-700 mb-1">
+                    Storage Category / Bucket Folder *
+                  </label>
+                  <input
+                    type="text"
+                    required
+                    value={docForm.category}
+                    onChange={(e) => setDocForm({ ...docForm, category: e.target.value.replace(/[^a-zA-Z0-9_-]/g, '_') })}
+                    placeholder="e.g. MSME"
+                    className="w-full px-3.5 py-2.5 rounded-xl bg-zinc-50 border border-zinc-200 text-zinc-900 focus:outline-none focus:border-black font-mono uppercase"
+                  />
+                  <span className="text-[10px] text-zinc-400 mt-0.5 block">
+                    Uploads will be saved in Supabase Storage under <code>documents/{docForm.category || 'Category'}/</code>
+                  </span>
+                </div>
+
+                <div>
+                  <label className="block text-[11px] font-bold text-zinc-700 mb-1">
+                    Description & Guidance *
+                  </label>
+                  <textarea
+                    rows={2}
+                    required
+                    value={docForm.description}
+                    onChange={(e) => setDocForm({ ...docForm, description: e.target.value })}
+                    placeholder="e.g. Official Udyam registration certificate verifying MSME enterprise classification."
+                    className="w-full px-3.5 py-2.5 rounded-xl bg-zinc-50 border border-zinc-200 text-zinc-900 focus:outline-none focus:border-black font-medium resize-none"
+                  />
+                </div>
+
+                <label className="flex items-start gap-3 p-3.5 rounded-2xl bg-zinc-50 border border-zinc-200 cursor-pointer">
+                  <input
+                    type="checkbox"
+                    checked={docForm.mandatory}
+                    onChange={(e) => setDocForm({ ...docForm, mandatory: e.target.checked })}
+                    className="w-4 h-4 rounded text-black focus:ring-black border-zinc-300 mt-0.5"
+                  />
+                  <div>
+                    <span className="text-xs font-bold text-zinc-900 block">
+                      Mark as Mandatory (*)
+                    </span>
+                    <span className="text-[11px] text-zinc-500 font-medium">
+                      Clients will not be allowed to submit the intake form until this file is attached.
+                    </span>
+                  </div>
+                </label>
+
+                <div className="flex items-center justify-end gap-2 pt-2 border-t border-zinc-100">
+                  <button
+                    type="button"
+                    onClick={() => setShowDocModal(false)}
+                    className="px-4 py-2 rounded-full text-xs font-bold text-zinc-600 hover:text-black cursor-pointer"
+                  >
+                    Cancel
+                  </button>
+                  <button
+                    type="submit"
+                    className="px-5 py-2 rounded-full text-xs font-bold bg-black text-white hover:bg-zinc-800 transition-all cursor-pointer shadow-sm"
+                  >
+                    {editingDoc ? 'Save Updates' : 'Add Document'}
                   </button>
                 </div>
               </form>

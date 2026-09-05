@@ -406,131 +406,176 @@ export const SubmissionDetailDrawer: React.FC<SubmissionDetailDrawerProps> = ({
                     )}
                   </div>
 
-                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 text-xs">
-                    {/* COI */}
-                    <div className="p-4 rounded-2xl border border-zinc-200 bg-zinc-50 space-y-2 flex flex-col justify-between">
-                      <div>
-                        <div className="flex items-center justify-between mb-1">
-                          <span className="font-bold text-zinc-900">Certificate of Incorporation</span>
-                          <span className="px-2 py-0.5 rounded-full text-[9px] font-bold bg-emerald-100 text-emerald-800">Verified</span>
+                  {/* Dynamic Company Documents List */}
+                  {(() => {
+                    const dynamicEntries = Object.entries(companyDocs?.dynamicDocs || {});
+                    if (dynamicEntries.length > 0) {
+                      return (
+                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 text-xs">
+                          {dynamicEntries.map(([key, doc]) => (
+                            <div key={key} className="p-4 rounded-2xl border border-zinc-200 bg-zinc-50 space-y-2 flex flex-col justify-between">
+                              <div>
+                                <div className="flex items-center justify-between mb-1">
+                                  <span className="font-bold text-zinc-900">{doc.category || key.toUpperCase()}</span>
+                                  <span className="px-2 py-0.5 rounded-full text-[9px] font-bold bg-emerald-100 text-emerald-800">Attached</span>
+                                </div>
+                                <div className="font-mono text-zinc-600 text-[11px] truncate mb-2" title={doc.name}>
+                                  {doc.name}
+                                </div>
+                              </div>
+                              <div className="flex items-center gap-1.5 pt-2 border-t border-zinc-200">
+                                <button
+                                  type="button"
+                                  onClick={() => setPreviewingDoc(doc)}
+                                  className="flex-1 py-1.5 rounded-xl bg-white hover:bg-zinc-100 border border-zinc-200 text-zinc-800 text-[11px] font-bold flex items-center justify-center gap-1 cursor-pointer"
+                                >
+                                  <Eye className="w-3 h-3" />
+                                  <span>View</span>
+                                </button>
+                                <button
+                                  type="button"
+                                  onClick={() => downloadDocumentFile(doc)}
+                                  className="p-1.5 rounded-xl bg-black text-white hover:bg-zinc-800 cursor-pointer"
+                                  title={`Download ${doc.name}`}
+                                >
+                                  <Download className="w-3.5 h-3.5" />
+                                </button>
+                              </div>
+                            </div>
+                          ))}
                         </div>
-                        <div className="font-mono text-zinc-600 text-[11px] truncate mb-2">
-                          {companyDocs.coiFileName || 'certificate_of_incorporation.pdf'}
-                        </div>
-                      </div>
-                      <div className="flex items-center gap-1.5 pt-2 border-t border-zinc-200">
-                        <button
-                          type="button"
-                          onClick={() => setPreviewingDoc(companyDocs.coiDoc || { name: companyDocs.coiFileName || 'certificate_of_incorporation.pdf', type: 'pdf' })}
-                          className="flex-1 py-1.5 rounded-xl bg-white hover:bg-zinc-100 border border-zinc-200 text-zinc-800 text-[11px] font-bold flex items-center justify-center gap-1 cursor-pointer"
-                        >
-                          <Eye className="w-3 h-3" />
-                          <span>View</span>
-                        </button>
-                        <button
-                          type="button"
-                          onClick={() => downloadDocumentFile(companyDocs.coiDoc || { name: companyDocs.coiFileName || 'certificate_of_incorporation.pdf', type: 'pdf' })}
-                          className="p-1.5 rounded-xl bg-black text-white hover:bg-zinc-800 cursor-pointer"
-                          title="Download COI"
-                        >
-                          <Download className="w-3.5 h-3.5" />
-                        </button>
-                      </div>
-                    </div>
+                      );
+                    }
 
-                    {/* GST */}
-                    <div className="p-4 rounded-2xl border border-zinc-200 bg-zinc-50 space-y-2 flex flex-col justify-between">
-                      <div>
-                        <div className="flex items-center justify-between mb-1">
-                          <span className="font-bold text-zinc-900">GST & PAN Document</span>
-                          <span className="px-2 py-0.5 rounded-full text-[9px] font-bold bg-emerald-100 text-emerald-800">Verified</span>
+                    // Fallback to legacy fields if dynamicDocs not yet populated
+                    return (
+                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 text-xs">
+                        {/* COI */}
+                        <div className="p-4 rounded-2xl border border-zinc-200 bg-zinc-50 space-y-2 flex flex-col justify-between">
+                          <div>
+                            <div className="flex items-center justify-between mb-1">
+                              <span className="font-bold text-zinc-900">Certificate of Incorporation</span>
+                              <span className="px-2 py-0.5 rounded-full text-[9px] font-bold bg-emerald-100 text-emerald-800">Verified</span>
+                            </div>
+                            <div className="font-mono text-zinc-600 text-[11px] truncate mb-2">
+                              {companyDocs.coiFileName || 'certificate_of_incorporation.pdf'}
+                            </div>
+                          </div>
+                          <div className="flex items-center gap-1.5 pt-2 border-t border-zinc-200">
+                            <button
+                              type="button"
+                              onClick={() => setPreviewingDoc(companyDocs.coiDoc || { name: companyDocs.coiFileName || 'certificate_of_incorporation.pdf', type: 'pdf' })}
+                              className="flex-1 py-1.5 rounded-xl bg-white hover:bg-zinc-100 border border-zinc-200 text-zinc-800 text-[11px] font-bold flex items-center justify-center gap-1 cursor-pointer"
+                            >
+                              <Eye className="w-3 h-3" />
+                              <span>View</span>
+                            </button>
+                            <button
+                              type="button"
+                              onClick={() => downloadDocumentFile(companyDocs.coiDoc || { name: companyDocs.coiFileName || 'certificate_of_incorporation.pdf', type: 'pdf' })}
+                              className="p-1.5 rounded-xl bg-black text-white hover:bg-zinc-800 cursor-pointer"
+                              title="Download COI"
+                            >
+                              <Download className="w-3.5 h-3.5" />
+                            </button>
+                          </div>
                         </div>
-                        <div className="font-mono text-zinc-600 text-[11px] truncate mb-2">
-                          {companyDocs.gstFileName || 'company_gst_registration.pdf'}
-                        </div>
-                      </div>
-                      <div className="flex items-center gap-1.5 pt-2 border-t border-zinc-200">
-                        <button
-                          type="button"
-                          onClick={() => setPreviewingDoc(companyDocs.gstDoc || { name: companyDocs.gstFileName || 'company_gst_registration.pdf', type: 'pdf' })}
-                          className="flex-1 py-1.5 rounded-xl bg-white hover:bg-zinc-100 border border-zinc-200 text-zinc-800 text-[11px] font-bold flex items-center justify-center gap-1 cursor-pointer"
-                        >
-                          <Eye className="w-3 h-3" />
-                          <span>View</span>
-                        </button>
-                        <button
-                          type="button"
-                          onClick={() => downloadDocumentFile(companyDocs.gstDoc || { name: companyDocs.gstFileName || 'company_gst_registration.pdf', type: 'pdf' })}
-                          className="p-1.5 rounded-xl bg-black text-white hover:bg-zinc-800 cursor-pointer"
-                          title="Download GST"
-                        >
-                          <Download className="w-3.5 h-3.5" />
-                        </button>
-                      </div>
-                    </div>
 
-                    {/* Signatory Letter */}
-                    <div className="p-4 rounded-2xl border border-zinc-200 bg-zinc-50 space-y-2 flex flex-col justify-between">
-                      <div>
-                        <div className="flex items-center justify-between mb-1">
-                          <span className="font-bold text-zinc-900">Signatory Authorization</span>
-                          <span className="px-2 py-0.5 rounded-full text-[9px] font-bold bg-emerald-100 text-emerald-800">Verified</span>
+                        {/* GST */}
+                        <div className="p-4 rounded-2xl border border-zinc-200 bg-zinc-50 space-y-2 flex flex-col justify-between">
+                          <div>
+                            <div className="flex items-center justify-between mb-1">
+                              <span className="font-bold text-zinc-900">GST Registration</span>
+                              <span className="px-2 py-0.5 rounded-full text-[9px] font-bold bg-emerald-100 text-emerald-800">Verified</span>
+                            </div>
+                            <div className="font-mono text-zinc-600 text-[11px] truncate mb-2">
+                              {companyDocs.gstFileName || 'company_gst_registration.pdf'}
+                            </div>
+                          </div>
+                          <div className="flex items-center gap-1.5 pt-2 border-t border-zinc-200">
+                            <button
+                              type="button"
+                              onClick={() => setPreviewingDoc(companyDocs.gstDoc || { name: companyDocs.gstFileName || 'company_gst_registration.pdf', type: 'pdf' })}
+                              className="flex-1 py-1.5 rounded-xl bg-white hover:bg-zinc-100 border border-zinc-200 text-zinc-800 text-[11px] font-bold flex items-center justify-center gap-1 cursor-pointer"
+                            >
+                              <Eye className="w-3 h-3" />
+                              <span>View</span>
+                            </button>
+                            <button
+                              type="button"
+                              onClick={() => downloadDocumentFile(companyDocs.gstDoc || { name: companyDocs.gstFileName || 'company_gst_registration.pdf', type: 'pdf' })}
+                              className="p-1.5 rounded-xl bg-black text-white hover:bg-zinc-800 cursor-pointer"
+                              title="Download GST"
+                            >
+                              <Download className="w-3.5 h-3.5" />
+                            </button>
+                          </div>
                         </div>
-                        <div className="font-mono text-zinc-600 text-[11px] truncate mb-2">
-                          {companyDocs.signatoryLetterFileName || 'board_authorization_letter.pdf'}
-                        </div>
-                      </div>
-                      <div className="flex items-center gap-1.5 pt-2 border-t border-zinc-200">
-                        <button
-                          type="button"
-                          onClick={() => setPreviewingDoc(companyDocs.signatoryDoc || { name: companyDocs.signatoryLetterFileName || 'board_authorization_letter.pdf', type: 'pdf' })}
-                          className="flex-1 py-1.5 rounded-xl bg-white hover:bg-zinc-100 border border-zinc-200 text-zinc-800 text-[11px] font-bold flex items-center justify-center gap-1 cursor-pointer"
-                        >
-                          <Eye className="w-3 h-3" />
-                          <span>View</span>
-                        </button>
-                        <button
-                          type="button"
-                          onClick={() => downloadDocumentFile(companyDocs.signatoryDoc || { name: companyDocs.signatoryLetterFileName || 'board_authorization_letter.pdf', type: 'pdf' })}
-                          className="p-1.5 rounded-xl bg-black text-white hover:bg-zinc-800 cursor-pointer"
-                          title="Download Signatory Letter"
-                        >
-                          <Download className="w-3.5 h-3.5" />
-                        </button>
-                      </div>
-                    </div>
 
-                    {/* Bank Proof */}
-                    <div className="p-4 rounded-2xl border border-zinc-200 bg-zinc-50 space-y-2 flex flex-col justify-between">
-                      <div>
-                        <div className="flex items-center justify-between mb-1">
-                          <span className="font-bold text-zinc-900">Cancelled Cheque / Bank</span>
-                          <span className="px-2 py-0.5 rounded-full text-[9px] font-bold bg-emerald-100 text-emerald-800">Verified</span>
+                        {/* Signatory Letter */}
+                        <div className="p-4 rounded-2xl border border-zinc-200 bg-zinc-50 space-y-2 flex flex-col justify-between">
+                          <div>
+                            <div className="flex items-center justify-between mb-1">
+                              <span className="font-bold text-zinc-900">Signatory Authorization</span>
+                              <span className="px-2 py-0.5 rounded-full text-[9px] font-bold bg-emerald-100 text-emerald-800">Verified</span>
+                            </div>
+                            <div className="font-mono text-zinc-600 text-[11px] truncate mb-2">
+                              {companyDocs.signatoryLetterFileName || 'board_authorization_letter.pdf'}
+                            </div>
+                          </div>
+                          <div className="flex items-center gap-1.5 pt-2 border-t border-zinc-200">
+                            <button
+                              type="button"
+                              onClick={() => setPreviewingDoc(companyDocs.signatoryDoc || { name: companyDocs.signatoryLetterFileName || 'board_authorization_letter.pdf', type: 'pdf' })}
+                              className="flex-1 py-1.5 rounded-xl bg-white hover:bg-zinc-100 border border-zinc-200 text-zinc-800 text-[11px] font-bold flex items-center justify-center gap-1 cursor-pointer"
+                            >
+                              <Eye className="w-3 h-3" />
+                              <span>View</span>
+                            </button>
+                            <button
+                              type="button"
+                              onClick={() => downloadDocumentFile(companyDocs.signatoryDoc || { name: companyDocs.signatoryLetterFileName || 'board_authorization_letter.pdf', type: 'pdf' })}
+                              className="p-1.5 rounded-xl bg-black text-white hover:bg-zinc-800 cursor-pointer"
+                              title="Download Signatory Letter"
+                            >
+                              <Download className="w-3.5 h-3.5" />
+                            </button>
+                          </div>
                         </div>
-                        <div className="font-mono text-zinc-600 text-[11px] truncate mb-2">
-                          {companyDocs.cancelledChequeFileName || 'company_bank_proof.pdf'}
+
+                        {/* Bank Proof */}
+                        <div className="p-4 rounded-2xl border border-zinc-200 bg-zinc-50 space-y-2 flex flex-col justify-between">
+                          <div>
+                            <div className="flex items-center justify-between mb-1">
+                              <span className="font-bold text-zinc-900">Cancelled Cheque / Bank</span>
+                              <span className="px-2 py-0.5 rounded-full text-[9px] font-bold bg-emerald-100 text-emerald-800">Verified</span>
+                            </div>
+                            <div className="font-mono text-zinc-600 text-[11px] truncate mb-2">
+                              {companyDocs.cancelledChequeFileName || 'company_bank_proof.pdf'}
+                            </div>
+                          </div>
+                          <div className="flex items-center gap-1.5 pt-2 border-t border-zinc-200">
+                            <button
+                              type="button"
+                              onClick={() => setPreviewingDoc(companyDocs.chequeDoc || { name: companyDocs.cancelledChequeFileName || 'company_bank_proof.pdf', type: 'pdf' })}
+                              className="flex-1 py-1.5 rounded-xl bg-white hover:bg-zinc-100 border border-zinc-200 text-zinc-800 text-[11px] font-bold flex items-center justify-center gap-1 cursor-pointer"
+                            >
+                              <Eye className="w-3 h-3" />
+                              <span>View</span>
+                            </button>
+                            <button
+                              type="button"
+                              onClick={() => downloadDocumentFile(companyDocs.chequeDoc || { name: companyDocs.cancelledChequeFileName || 'company_bank_proof.pdf', type: 'pdf' })}
+                              className="p-1.5 rounded-xl bg-black text-white hover:bg-zinc-800 cursor-pointer"
+                              title="Download Bank Proof"
+                            >
+                              <Download className="w-3.5 h-3.5" />
+                            </button>
+                          </div>
                         </div>
                       </div>
-                      <div className="flex items-center gap-1.5 pt-2 border-t border-zinc-200">
-                        <button
-                          type="button"
-                          onClick={() => setPreviewingDoc(companyDocs.chequeDoc || { name: companyDocs.cancelledChequeFileName || 'company_bank_proof.pdf', type: 'pdf' })}
-                          className="flex-1 py-1.5 rounded-xl bg-white hover:bg-zinc-100 border border-zinc-200 text-zinc-800 text-[11px] font-bold flex items-center justify-center gap-1 cursor-pointer"
-                        >
-                          <Eye className="w-3 h-3" />
-                          <span>View</span>
-                        </button>
-                        <button
-                          type="button"
-                          onClick={() => downloadDocumentFile(companyDocs.chequeDoc || { name: companyDocs.cancelledChequeFileName || 'company_bank_proof.pdf', type: 'pdf' })}
-                          className="p-1.5 rounded-xl bg-black text-white hover:bg-zinc-800 cursor-pointer"
-                          title="Download Bank Proof"
-                        >
-                          <Download className="w-3.5 h-3.5" />
-                        </button>
-                      </div>
-                    </div>
-                  </div>
+                    );
+                  })()}
                 </div>
               )}
 

@@ -9,11 +9,20 @@ export type SubmissionStatus =
   | 'rejected' 
   | 'abandoned';
 
+export interface RequiredDocumentConfig {
+  id: string;
+  name: string;
+  category: string;
+  description: string;
+  mandatory: boolean;
+  allowedExtensions?: string[];
+}
+
 export interface UploadedDocument {
   id: string;
   name: string;
   type: 'pdf' | 'docx' | 'txt' | 'image' | 'other';
-  category: 'Aadhaar' | 'Education' | 'Bank Proof' | 'Resume' | 'COI' | 'GST' | 'Signatory Letter' | 'Cheque' | 'General';
+  category: 'Aadhaar' | 'Education' | 'Bank Proof' | 'Resume' | 'Agreement' | 'GST' | 'PAN' | 'Cheque' | 'COI' | 'Signatory Letter' | 'General' | (string & {});
   sizeFormatted: string;
   dataUrl?: string;
   storageUrl?: string;
@@ -151,6 +160,7 @@ export interface IntakeCompanyDocs {
   cancelledChequeFileName?: string;
   chequeDoc?: UploadedDocument;
   epfoRegistrationCode?: string;
+  dynamicDocs?: Record<string, UploadedDocument>;
 }
 
 export interface IntakeFormData {
@@ -191,6 +201,7 @@ export interface IntakeFormData {
 
   // Step 4: Documents & Final Verification
   companyDocs?: IntakeCompanyDocs;
+  requiredDocuments?: RequiredDocumentConfig[];
   hasBrandGuidelines?: boolean;
   projectDescription?: string;
   uploadedFileName?: string;

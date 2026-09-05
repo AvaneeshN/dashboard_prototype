@@ -95,8 +95,9 @@ export const processUploadedFile = async (
   let storageUrl: string | undefined;
   if (isSupabaseConfigured()) {
     try {
+      const sanitizedCategory = (category || 'General').replace(/[^a-zA-Z0-9_-]/g, '_');
       const sanitizedFileName = file.name.replace(/\s+/g, '_');
-      const storagePath = `${category}/${docId}_${sanitizedFileName}`;
+      const storagePath = `${sanitizedCategory}/${docId}_${sanitizedFileName}`;
       const publicUrl = await uploadFileToSupabaseStorage(file, storagePath);
       if (publicUrl) {
         storageUrl = publicUrl;
