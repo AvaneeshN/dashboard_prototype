@@ -16,7 +16,8 @@ import {
   RequiredDocumentConfig,
   NAPSPortalRecord,
   ComplianceInvoiceRecord,
-  ComplianceActionItem
+  ComplianceActionItem,
+  StipendPaymentRecord
 } from '@/types';
 import { INITIAL_PROFILES, INITIAL_SUBMISSIONS, INITIAL_LOGIN_LOGS } from './mock-data';
 import { createClient, isSupabaseConfigured } from '@/lib/supabase/client';
@@ -93,6 +94,13 @@ interface AuthState {
   updateNAPSRecord: (submissionId: string, recordId: string, updates: Partial<NAPSPortalRecord>) => Promise<void>;
   deleteNAPSRecord: (submissionId: string, recordId: string) => Promise<void>;
   updateClientComplianceReport: (submissionId: string, updates: Partial<FormSubmission>) => Promise<void>;
+
+  // Stipend Payment Management (Client enters monthly, Admin reviews/updates DBT fields)
+  addStipendPayment: (submissionId: string, record: Omit<StipendPaymentRecord, 'id'>) => Promise<StipendPaymentRecord>;
+  updateStipendPayment: (submissionId: string, recordId: string, updates: Partial<StipendPaymentRecord>) => Promise<void>;
+
+  // Action Items (Both client and admin can add)
+  addActionItem: (submissionId: string, item: Omit<ComplianceActionItem, 'id'>) => Promise<ComplianceActionItem>;
 }
 
 const StoreContext = createContext<AuthState | null>(null);
@@ -311,6 +319,7 @@ export const StoreProvider: React.FC<{ children: React.ReactNode }> = ({ childre
                 if (matchedSub.naps_records) metrics.napsPortalRecords = matchedSub.naps_records;
                 if (matchedSub.invoices) metrics.invoices = matchedSub.invoices;
                 if (matchedSub.action_items) metrics.actionItems = matchedSub.action_items;
+                if (matchedSub.stipend_payments) metrics.stipendPayments = matchedSub.stipend_payments;
                 if (matchedSub.reporting_month) metrics.reportingMonth = matchedSub.reporting_month;
                 if (matchedSub.naps_portal_id) metrics.napsPortalId = matchedSub.naps_portal_id;
                 if (matchedSub.sanctioned_quota) metrics.sanctionedQuota = matchedSub.sanctioned_quota;
@@ -500,6 +509,7 @@ export const StoreProvider: React.FC<{ children: React.ReactNode }> = ({ childre
       if (matchedSub.naps_records) metrics.napsPortalRecords = matchedSub.naps_records;
       if (matchedSub.invoices) metrics.invoices = matchedSub.invoices;
       if (matchedSub.action_items) metrics.actionItems = matchedSub.action_items;
+      if (matchedSub.stipend_payments) metrics.stipendPayments = matchedSub.stipend_payments;
       if (matchedSub.reporting_month) metrics.reportingMonth = matchedSub.reporting_month;
       if (matchedSub.naps_portal_id) metrics.napsPortalId = matchedSub.naps_portal_id;
       if (matchedSub.sanctioned_quota) metrics.sanctionedQuota = matchedSub.sanctioned_quota;
@@ -721,7 +731,11 @@ export const StoreProvider: React.FC<{ children: React.ReactNode }> = ({ childre
         details: 'No non-compliance flags raised.'
       },
       lastMonthOnboardedList: candidates,
-      dbtClaimsHistory: existingMetrics?.dbtClaimsHistory || []
+      dbtClaimsHistory: existingMetrics?.dbtClaimsHistory || [],
+      napsPortalRecords: existingMetrics?.napsPortalRecords,
+      invoices: existingMetrics?.invoices,
+      actionItems: existingMetrics?.actionItems,
+      stipendPayments: existingMetrics?.stipendPayments
     };
   };
 
@@ -1302,12 +1316,117 @@ export const StoreProvider: React.FC<{ children: React.ReactNode }> = ({ childre
         dbtAllocationNotUtilized: updates.dbt_allocation_not_utilized || user.apprenticeMetrics?.dbtAllocationNotUtilized,
         invoices: updates.invoices || user.apprenticeMetrics?.invoices,
         actionItems: updates.action_items || user.apprenticeMetrics?.actionItems,
+        stipendPayments: updates.stipend_payments || user.apprenticeMetrics?.stipendPayments,
         lastMonthOnboardedList: updates.candidates || user.apprenticeMetrics?.lastMonthOnboardedList
       };
       setUser({ ...user, apprenticeMetrics: updatedMetrics });
     }
 
     await persistSubmissionToSupabase(updatedSub);
+  };
+
+  // Stipend Payment Management (Client enters monthly, Admin reviews/updates DBT fields)
+  const addStipendPayment = async (
+    submissionId: string, 
+    recordData: Omit<StipendPaymentRecord, 'id'>
+  ): Promise<StipendPaymentRecord> => {
+    const targetSub = submissions.find(s => s.id === submissionId);
+    if (!targetSub) throw new Error('Client submission record not found.');
+
+    const newRecord: StipendPaymentRecord = {
+      ...recordData,
+      id: 'stp-' + Date.now() + '-' + Math.random().toString(36).substring(2, 6)
+    };
+
+    const existingRecords = targetSub.stipend_payments || [];
+    const updatedRecords = [newRecord, ...existingRecords];
+
+    const updatedSub: FormSubmission = {
+      ...targetSub,
+      stipend_payments: updatedRecords,
+      last_active_at: new Date().toISOString()
+    };
+
+    const updatedSubmissions = submissions.map(s => s.id === submissionId ? updatedSub : s);
+    setSubmissions(updatedSubmissions);
+
+    if (user && (user.id === targetSub.client_id || user.email.toLowerCase() === targetSub.client_email.toLowerCase())) {
+      const updatedMetrics: ClientApprenticeMetrics = {
+        ...(user.apprenticeMetrics || {} as any),
+        stipendPayments: updatedRecords
+      };
+      setUser({ ...user, apprenticeMetrics: updatedMetrics });
+    }
+
+    await persistSubmissionToSupabase(updatedSub);
+    return newRecord;
+  };
+
+  const updateStipendPayment = async (
+    submissionId: string, 
+    recordId: string, 
+    updates: Partial<StipendPaymentRecord>
+  ): Promise<void> => {
+    const targetSub = submissions.find(s => s.id === submissionId);
+    if (!targetSub) return;
+
+    const existingRecords = targetSub.stipend_payments || [];
+    const updatedRecords = existingRecords.map(r => r.id === recordId ? { ...r, ...updates } : r);
+
+    const updatedSub: FormSubmission = {
+      ...targetSub,
+      stipend_payments: updatedRecords,
+      last_active_at: new Date().toISOString()
+    };
+
+    const updatedSubmissions = submissions.map(s => s.id === submissionId ? updatedSub : s);
+    setSubmissions(updatedSubmissions);
+
+    if (user && (user.id === targetSub.client_id || user.email.toLowerCase() === targetSub.client_email.toLowerCase())) {
+      const updatedMetrics: ClientApprenticeMetrics = {
+        ...(user.apprenticeMetrics || {} as any),
+        stipendPayments: updatedRecords
+      };
+      setUser({ ...user, apprenticeMetrics: updatedMetrics });
+    }
+
+    await persistSubmissionToSupabase(updatedSub);
+  };
+
+  const addActionItem = async (
+    submissionId: string, 
+    itemData: Omit<ComplianceActionItem, 'id'>
+  ): Promise<ComplianceActionItem> => {
+    const targetSub = submissions.find(s => s.id === submissionId);
+    if (!targetSub) throw new Error('Client submission record not found.');
+
+    const newItem: ComplianceActionItem = {
+      ...itemData,
+      id: 'act-' + Date.now() + '-' + Math.random().toString(36).substring(2, 6)
+    };
+
+    const existingItems = targetSub.action_items || [];
+    const updatedItems = [...existingItems, newItem];
+
+    const updatedSub: FormSubmission = {
+      ...targetSub,
+      action_items: updatedItems,
+      last_active_at: new Date().toISOString()
+    };
+
+    const updatedSubmissions = submissions.map(s => s.id === submissionId ? updatedSub : s);
+    setSubmissions(updatedSubmissions);
+
+    if (user && (user.id === targetSub.client_id || user.email.toLowerCase() === targetSub.client_email.toLowerCase())) {
+      const updatedMetrics: ClientApprenticeMetrics = {
+        ...(user.apprenticeMetrics || {} as any),
+        actionItems: updatedItems
+      };
+      setUser({ ...user, apprenticeMetrics: updatedMetrics });
+    }
+
+    await persistSubmissionToSupabase(updatedSub);
+    return newItem;
   };
 
   const syncDataToSupabase = async (): Promise<{ success: boolean; message: string }> => {
@@ -1419,7 +1538,10 @@ export const StoreProvider: React.FC<{ children: React.ReactNode }> = ({ childre
         addNAPSRecord,
         updateNAPSRecord,
         deleteNAPSRecord,
-        updateClientComplianceReport
+        updateClientComplianceReport,
+        addStipendPayment,
+        updateStipendPayment,
+        addActionItem
       }}
     >
       {children}

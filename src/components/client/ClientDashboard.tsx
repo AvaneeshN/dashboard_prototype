@@ -2,7 +2,7 @@
 
 import React, { useState, useEffect, useMemo } from 'react';
 import { useStore } from '@/lib/store';
-import { ApprenticeRecord, UploadedDocument, SPOCEmailLog, NAPSPortalRecord, ComplianceInvoiceRecord, ComplianceActionItem, ClientApprenticeMetrics, DBTClaimRecord } from '@/types';
+import { ApprenticeRecord, UploadedDocument, SPOCEmailLog, NAPSPortalRecord, ComplianceInvoiceRecord, ComplianceActionItem, ClientApprenticeMetrics, DBTClaimRecord, StipendPaymentRecord } from '@/types';
 import { GlassCard } from '@/components/ui/GlassCard';
 import { ClientIntakeWizard } from './ClientIntakeWizard';
 import { DocumentViewerModal } from '@/components/ui/DocumentViewerModal';
@@ -45,7 +45,8 @@ import {
   FileCheck2,
   Paperclip,
   Table,
-  Filter
+  Filter,
+  Lock
 } from 'lucide-react';
 import { 
   ResponsiveContainer, 
@@ -96,7 +97,9 @@ export const ClientDashboard: React.FC = () => {
     updateApprentice, 
     processMonthlyPayrollBatch, 
     fileDBTClaim,
-    assignCompanySpoc
+    assignCompanySpoc,
+    addStipendPayment,
+    addActionItem
   } = useStore();
 
   const [activeTab, setActiveTab] = useState<ClientViewTab>('compliance_report');
@@ -119,6 +122,28 @@ export const ClientDashboard: React.FC = () => {
   const [showDBTClaimModal, setShowDBTClaimModal] = useState(false);
   const [selectedContractCandidate, setSelectedContractCandidate] = useState<ApprenticeRecord | null>(null);
   const [previewingDoc, setPreviewingDoc] = useState<any>(null);
+
+  // Stipend Payment Modal States
+  const [showStipendModal, setShowStipendModal] = useState(false);
+  const [stipendSubmitting, setStipendSubmitting] = useState(false);
+  const [stipendSuccessMsg, setStipendSuccessMsg] = useState<string | null>(null);
+  const [stipendForm, setStipendForm] = useState({
+    month: 'JUNE',
+    year: '2026',
+    stipendPaidByEmployer: 94634,
+    datePaid: '2026-07-10',
+    remarks: ''
+  });
+
+  // Action Item Modal States
+  const [showActionItemModal, setShowActionItemModal] = useState(false);
+  const [actionItemSubmitting, setActionItemSubmitting] = useState(false);
+  const [actionItemForm, setActionItemForm] = useState({
+    observation: '',
+    actionRequired: '',
+    owner: '',
+    targetDate: ''
+  });
 
   // SPOC State & Modal
   const [showSpocModal, setShowSpocModal] = useState(false);
@@ -270,17 +295,71 @@ export const ClientDashboard: React.FC = () => {
     return [];
   }, [activeSubmission, user?.apprenticeMetrics?.napsPortalRecords]);
 
+  const effectiveStipendPayments: StipendPaymentRecord[] = useMemo(() => {
+    if (activeSubmission?.stipend_payments && activeSubmission.stipend_payments.length > 0) {
+      return activeSubmission.stipend_payments;
+    }
+    if (user?.apprenticeMetrics?.stipendPayments && user.apprenticeMetrics.stipendPayments.length > 0) {
+      return user.apprenticeMetrics.stipendPayments;
+    }
+    // Default initial demonstration record matching reference image
+    return [
+      {
+        id: 'stp-default-june-2026',
+        month: 'JUNE',
+        year: '2026',
+        stipendPaidByEmployer: 94634,
+        datePaid: '10-07-2026',
+        dbtByGovt: 10500,
+        dbtReleaseDate: 'UNDER PROCESS',
+        status: 'UNDER PROCESS',
+        remarks: '',
+        submittedByClient: true,
+        submittedAt: '2026-07-10T10:00:00.000Z'
+      }
+    ];
+  }, [activeSubmission?.stipend_payments, user?.apprenticeMetrics?.stipendPayments]);
+
+  const displayedStipendPayments = useMemo(() => {
+    return effectiveStipendPayments.filter(p => {
+      const pMonth = (p.month || '').toUpperCase();
+      const pYear = (p.year || '').toString();
+      if (selectedReportMonth !== 'all' && !pMonth.includes(selectedReportMonth)) return false;
+      if (selectedReportYear !== 'all' && !pYear.includes(selectedReportYear)) return false;
+      return true;
+    });
+  }, [effectiveStipendPayments, selectedReportMonth, selectedReportYear]);
+
   const effectiveInvoices: ComplianceInvoiceRecord[] = useMemo(() => {
-    if (activeSubmission) return activeSubmission.invoices || [];
-    if (user?.apprenticeMetrics?.invoices) return user.apprenticeMetrics.invoices;
-    return [];
-  }, [activeSubmission, user?.apprenticeMetrics?.invoices]);
+    if (activeSubmission?.invoices && activeSubmission.invoices.length > 0) return activeSubmission.invoices;
+    if (user?.apprenticeMetrics?.invoices && user.apprenticeMetrics.invoices.length > 0) return user.apprenticeMetrics.invoices;
+    return [
+      {
+        id: 'inv-default-1',
+        invoiceNo: 'WFP/26/0004',
+        invoiceDate: '13-07-2026',
+        amount: 3304,
+        status: 'SUBMITTED',
+        paymentDate: '16-07-2026',
+        remarks: ''
+      }
+    ];
+  }, [activeSubmission?.invoices, user?.apprenticeMetrics?.invoices]);
 
   const effectiveActionItems: ComplianceActionItem[] = useMemo(() => {
-    if (activeSubmission) return activeSubmission.action_items || [];
-    if (user?.apprenticeMetrics?.actionItems) return user.apprenticeMetrics.actionItems;
-    return [];
-  }, [activeSubmission, user?.apprenticeMetrics?.actionItems]);
+    if (activeSubmission?.action_items && activeSubmission.action_items.length > 0) return activeSubmission.action_items;
+    if (user?.apprenticeMetrics?.actionItems && user.apprenticeMetrics.actionItems.length > 0) return user.apprenticeMetrics.actionItems;
+    return [
+      {
+        id: 'act-default-1',
+        observation: 'Bank Account Correction',
+        actionRequired: "Soumya's account mismatch",
+        owner: 'WorkForce2047',
+        targetDate: 'Closed & Updated in the Portal',
+        status: 'RESOLVED'
+      }
+    ];
+  }, [activeSubmission?.action_items, user?.apprenticeMetrics?.actionItems]);
 
   const effectiveCandidatesList: ApprenticeRecord[] = useMemo(() => {
     return candidateList;
@@ -646,6 +725,56 @@ export const ClientDashboard: React.FC = () => {
     setShowSpocModal(false);
     setClaimSuccessAlert(`Designated SPOC updated: ${cleanName} (${cleanEmail}). All onboarding documents will be dispatched to this address.`);
     setTimeout(() => setClaimSuccessAlert(null), 6000);
+  };
+
+  const handleSubmitStipend = async (e: React.FormEvent) => {
+    e.preventDefault();
+    const subId = activeSubmission?.id || 'sub-' + (user?.id || 'client');
+    setStipendSubmitting(true);
+    try {
+      await addStipendPayment(subId, {
+        month: stipendForm.month,
+        year: stipendForm.year,
+        stipendPaidByEmployer: Number(stipendForm.stipendPaidByEmployer),
+        datePaid: stipendForm.datePaid,
+        dbtByGovt: 0,
+        dbtReleaseDate: 'UNDER PROCESS',
+        status: 'SUBMITTED',
+        remarks: stipendForm.remarks || 'Awaiting portal verification & DBT filing',
+        submittedByClient: true,
+        submittedAt: new Date().toISOString()
+      });
+      setShowStipendModal(false);
+      setStipendSuccessMsg(`Monthly stipend for ${stipendForm.month} ${stipendForm.year} submitted successfully and locked.`);
+      setTimeout(() => setStipendSuccessMsg(null), 5000);
+    } catch (err) {
+      console.error('Submit stipend error:', err);
+    } finally {
+      setStipendSubmitting(false);
+    }
+  };
+
+  const handleSubmitActionItem = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!actionItemForm.observation || !actionItemForm.actionRequired) return;
+    const subId = activeSubmission?.id || 'sub-' + (user?.id || 'client');
+    setActionItemSubmitting(true);
+    try {
+      await addActionItem(subId, {
+        observation: actionItemForm.observation,
+        actionRequired: actionItemForm.actionRequired,
+        owner: actionItemForm.owner || clientDisplayName,
+        targetDate: actionItemForm.targetDate || 'Pending Review',
+        status: 'ACTIVE',
+        addedBy: 'client'
+      });
+      setShowActionItemModal(false);
+      setActionItemForm({ observation: '', actionRequired: '', owner: '', targetDate: '' });
+    } catch (err) {
+      console.error('Submit action item error:', err);
+    } finally {
+      setActionItemSubmitting(false);
+    }
   };
 
   const tabs = [
@@ -1210,47 +1339,87 @@ export const ClientDashboard: React.FC = () => {
                     </div>
                   </div>
 
-                  {/* Section 4: Stipend Payment & DBT Status */}
+                  {/* Section 4: Stipend Payment & DBT (Direct Benefit Transfer) Status */}
                   <div className="rounded-3xl bg-white border border-zinc-200 p-6 sm:p-7 shadow-sm space-y-4">
-                    <div className="flex items-center justify-between border-b border-zinc-200 pb-3">
+                    <div className="flex flex-col sm:flex-row sm:items-center justify-between border-b border-zinc-200 pb-3 gap-2">
                       <div className="flex items-center gap-2">
                         <div className="w-2.5 h-2.5 rounded-full bg-[#0a192f]"></div>
-                        <h3 className="text-sm font-extrabold uppercase tracking-wider text-zinc-900">
-                          4. Stipend Payment & DBT Status
-                        </h3>
+                        <div>
+                          <h3 className="text-sm font-extrabold uppercase tracking-wider text-zinc-900">
+                            4. STIPEND PAYMENT & DBT (DIRECT BENEFIT TRANSFER) STATUS
+                          </h3>
+                        </div>
                       </div>
-                      <span className="text-xs text-zinc-500 font-mono">DBT Subsidy ₹1,500 / candidate / month</span>
+                      <div className="flex items-center gap-2 flex-wrap">
+                        <span className="text-xs text-zinc-500 font-mono hidden md:inline">DBT Subsidy ₹1,500 / candidate / month</span>
+                        <button
+                          type="button"
+                          onClick={() => setShowStipendModal(true)}
+                          className="px-3.5 py-1.5 rounded-xl bg-[#0a192f] hover:bg-[#102a4c] text-white text-xs font-bold flex items-center gap-1.5 shadow-sm transition-all cursor-pointer"
+                        >
+                          <Plus className="w-3.5 h-3.5" />
+                          <span>+ Submit Monthly Stipend</span>
+                        </button>
+                      </div>
                     </div>
+
+                    {stipendSuccessMsg && (
+                      <div className="p-3 rounded-2xl bg-emerald-50 border border-emerald-200 text-emerald-800 text-xs font-semibold flex items-center justify-between">
+                        <span>{stipendSuccessMsg}</span>
+                        <button onClick={() => setStipendSuccessMsg(null)} className="text-emerald-600 hover:text-emerald-900">
+                          <X className="w-3.5 h-3.5" />
+                        </button>
+                      </div>
+                    )}
 
                     <div className="overflow-x-auto rounded-2xl border border-zinc-200">
                       <table className="w-full text-left text-xs text-zinc-700">
-                        <thead className="bg-zinc-50 border-b border-zinc-200 font-bold text-[11px] uppercase tracking-wider text-zinc-500">
+                        <thead className="bg-[#0a192f] text-white font-bold text-[11px] uppercase tracking-wider">
                           <tr>
                             <th className="px-4 py-3">Month</th>
-                            <th className="px-4 py-3">Stipend Paid by Employer</th>
+                            <th className="px-4 py-3">Stipend Paid by Employer (₹)</th>
                             <th className="px-4 py-3">Date Paid</th>
-                            <th className="px-4 py-3">DBT by Govt.</th>
+                            <th className="px-4 py-3">DBT by Govt. (₹)</th>
                             <th className="px-4 py-3">DBT Release Date</th>
-                            <th className="px-4 py-3">Remarks / PFMS Status</th>
+                            <th className="px-4 py-3">Status</th>
+                            <th className="px-4 py-3">Remarks</th>
                           </tr>
                         </thead>
                         <tbody className="divide-y divide-zinc-200 font-mono">
-                          {monthlyNapsSummary.length === 0 ? (
+                          {displayedStipendPayments.length === 0 ? (
                             <tr>
-                              <td colSpan={6} className="px-4 py-8 text-center text-zinc-400 font-sans font-medium">
-                                No monthly stipend and DBT disbursements recorded yet for this establishment.
+                              <td colSpan={7} className="px-4 py-8 text-center text-zinc-400 font-sans font-medium">
+                                No monthly stipend disbursements recorded for this cycle. Click "+ Submit Monthly Stipend" to enter paid amounts.
                               </td>
                             </tr>
                           ) : (
-                            monthlyNapsSummary.map((mRow, mIdx) => (
-                              <tr key={mIdx} className="hover:bg-zinc-50/80 transition-colors">
-                                <td className="px-4 py-3 font-bold text-zinc-900 font-sans">{mRow.month}</td>
-                                <td className="px-4 py-3 font-bold text-zinc-800">₹{mRow.stipendPaid.toLocaleString('en-IN')}</td>
-                                <td className="px-4 py-3 text-zinc-500">{mRow.datePaid}</td>
-                                <td className="px-4 py-3 font-bold text-emerald-700">₹{mRow.dbtGovt.toLocaleString('en-IN')}</td>
-                                <td className="px-4 py-3 text-zinc-500">{mRow.dbtReleaseDate}</td>
+                            displayedStipendPayments.map((p, mIdx) => (
+                              <tr key={p.id || mIdx} className="hover:bg-zinc-50/80 transition-colors">
+                                <td className="px-4 py-3 font-bold text-zinc-900 font-sans uppercase">
+                                  {p.month} {p.year && p.year !== 'all' ? p.year : ''}
+                                </td>
+                                <td className="px-4 py-3 font-bold text-zinc-800">
+                                  {p.stipendPaidByEmployer ? p.stipendPaidByEmployer.toLocaleString('en-IN') : '-'}
+                                </td>
+                                <td className="px-4 py-3 text-zinc-600 font-semibold">{p.datePaid || '-'}</td>
+                                <td className="px-4 py-3 font-bold text-emerald-700">
+                                  {p.dbtByGovt && p.dbtByGovt > 0 ? p.dbtByGovt.toLocaleString('en-IN') : '0'}
+                                </td>
+                                <td className="px-4 py-3">
+                                  {p.dbtReleaseDate === 'UNDER PROCESS' ? (
+                                    <span className="font-bold text-amber-600">UNDER PROCESS</span>
+                                  ) : (
+                                    <span className="text-zinc-600">{p.dbtReleaseDate || '-'}</span>
+                                  )}
+                                </td>
+                                <td className="px-4 py-3">
+                                  <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[10px] font-bold bg-zinc-100 text-zinc-700 border border-zinc-200">
+                                    <Lock className="w-2.5 h-2.5 text-zinc-400" />
+                                    <span>{p.status || 'SUBMITTED'}</span>
+                                  </span>
+                                </td>
                                 <td className="px-4 py-3 font-sans text-xs text-zinc-600">
-                                  {mRow.remarks}
+                                  {p.remarks || ''}
                                 </td>
                               </tr>
                             ))
@@ -1318,14 +1487,24 @@ export const ClientDashboard: React.FC = () => {
 
                   {/* Section 6: Remarks / Action Items */}
                   <div className="rounded-3xl bg-white border border-zinc-200 p-6 sm:p-7 shadow-sm space-y-4">
-                    <div className="flex items-center justify-between border-b border-zinc-200 pb-3">
+                    <div className="flex flex-col sm:flex-row sm:items-center justify-between border-b border-zinc-200 pb-3 gap-2">
                       <div className="flex items-center gap-2">
                         <div className="w-2.5 h-2.5 rounded-full bg-[#0a192f]"></div>
                         <h3 className="text-sm font-extrabold uppercase tracking-wider text-zinc-900">
-                          6. Remarks / Action Items
+                          6. REMARKS / ACTION ITEMS
                         </h3>
                       </div>
-                      <span className="text-xs text-zinc-500 font-mono">Governance & Timeline</span>
+                      <div className="flex items-center gap-2">
+                        <span className="text-xs text-zinc-500 font-mono hidden md:inline">Governance & Resolution Tracker</span>
+                        <button
+                          type="button"
+                          onClick={() => setShowActionItemModal(true)}
+                          className="px-3.5 py-1.5 rounded-xl bg-white hover:bg-zinc-100 border border-zinc-300 text-zinc-800 text-xs font-bold flex items-center gap-1.5 shadow-xs transition-all cursor-pointer"
+                        >
+                          <Plus className="w-3.5 h-3.5" />
+                          <span>+ Add Remark / Action Item</span>
+                        </button>
+                      </div>
                     </div>
 
                     <div className="overflow-x-auto rounded-2xl border border-zinc-200">
@@ -2604,6 +2783,235 @@ export const ClientDashboard: React.FC = () => {
                     className="px-5 py-2 rounded-full text-xs font-bold bg-black text-white hover:bg-zinc-800 transition-all cursor-pointer shadow-sm"
                   >
                     Save Designated SPOC
+                  </button>
+                </div>
+              </form>
+            </motion.div>
+          </div>
+        )}
+      </AnimatePresence>
+
+      {/* MODAL 7: Submit Monthly Stipend Disbursement (Locked Entry) */}
+      <AnimatePresence>
+        {showStipendModal && (
+          <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-xs font-sans">
+            <motion.div
+              initial={{ scale: 0.95, opacity: 0 }}
+              animate={{ scale: 1, opacity: 1 }}
+              exit={{ scale: 0.95, opacity: 0 }}
+              className="w-full max-w-lg bg-white rounded-3xl border border-zinc-200 shadow-2xl overflow-hidden"
+            >
+              <div className="bg-[#0a192f] text-white p-6 flex items-center justify-between">
+                <div className="flex items-center gap-3">
+                  <div className="w-10 h-10 rounded-2xl bg-white/10 flex items-center justify-center border border-white/15">
+                    <CreditCard className="w-5 h-5 text-amber-400" />
+                  </div>
+                  <div>
+                    <h3 className="text-base font-bold text-white">Record Monthly Stipend Disbursement</h3>
+                    <p className="text-xs text-zinc-300">Section 4 Employer Paid Stipend Entry for NAPS Portal</p>
+                  </div>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => setShowStipendModal(false)}
+                  className="w-8 h-8 rounded-full bg-white/10 hover:bg-white/20 flex items-center justify-center text-white cursor-pointer transition-colors"
+                >
+                  <X className="w-4 h-4" />
+                </button>
+              </div>
+
+              <form onSubmit={handleSubmitStipend} className="p-6 space-y-4 text-xs">
+                <div className="p-3.5 rounded-2xl bg-amber-50 border border-amber-200 flex items-start gap-2.5">
+                  <Lock className="w-4 h-4 text-amber-700 shrink-0 mt-0.5" />
+                  <div className="text-[11px] text-amber-900 leading-relaxed">
+                    <strong>Locked upon submission:</strong> In compliance with the Apprenticeship Act & NAPS audit procedures, monthly stipend entries are locked once submitted. The compliance team verifies your disbursement on the government portal and enters DBT approval details.
+                  </div>
+                </div>
+
+                <div className="grid grid-cols-2 gap-3">
+                  <div>
+                    <label className="block text-[11px] font-bold text-zinc-700 mb-1">Disbursement Month *</label>
+                    <select
+                      value={stipendForm.month}
+                      onChange={(e) => setStipendForm({ ...stipendForm, month: e.target.value })}
+                      className="w-full px-3 py-2 rounded-xl bg-zinc-50 border border-zinc-200 text-zinc-900 font-bold focus:outline-none focus:border-black cursor-pointer"
+                      required
+                    >
+                      {ALL_REPORT_MONTHS.filter(m => m.value !== 'all').map(m => (
+                        <option key={m.value} value={m.full || m.label.toUpperCase()}>{m.label}</option>
+                      ))}
+                    </select>
+                  </div>
+                  <div>
+                    <label className="block text-[11px] font-bold text-zinc-700 mb-1">Calendar Year *</label>
+                    <select
+                      value={stipendForm.year}
+                      onChange={(e) => setStipendForm({ ...stipendForm, year: e.target.value })}
+                      className="w-full px-3 py-2 rounded-xl bg-zinc-50 border border-zinc-200 text-zinc-900 font-bold font-mono focus:outline-none focus:border-black cursor-pointer"
+                      required
+                    >
+                      {ALL_REPORT_YEARS.filter(y => y.value !== 'all').map(y => (
+                        <option key={y.value} value={y.value}>{y.label}</option>
+                      ))}
+                    </select>
+                  </div>
+                </div>
+
+                <div>
+                  <label className="block text-[11px] font-bold text-zinc-700 mb-1">Stipend Paid by Employer (₹) *</label>
+                  <div className="relative">
+                    <span className="absolute left-3 top-2.5 text-zinc-400 font-bold">₹</span>
+                    <input
+                      type="number"
+                      min="1"
+                      step="1"
+                      value={stipendForm.stipendPaidByEmployer}
+                      onChange={(e) => setStipendForm({ ...stipendForm, stipendPaidByEmployer: Number(e.target.value) })}
+                      className="w-full pl-7 pr-3 py-2 rounded-xl bg-zinc-50 border border-zinc-200 text-zinc-900 font-bold font-mono text-sm focus:outline-none focus:border-black"
+                      placeholder="e.g. 94634"
+                      required
+                    />
+                  </div>
+                  <p className="text-[10px] text-zinc-500 mt-1">Total aggregate net stipend disbursed by employer to active apprentices for this month.</p>
+                </div>
+
+                <div>
+                  <label className="block text-[11px] font-bold text-zinc-700 mb-1">Date Paid to Apprentices *</label>
+                  <input
+                    type="date"
+                    value={stipendForm.datePaid}
+                    onChange={(e) => setStipendForm({ ...stipendForm, datePaid: e.target.value })}
+                    className="w-full px-3 py-2 rounded-xl bg-zinc-50 border border-zinc-200 text-zinc-900 font-medium text-xs focus:outline-none focus:border-black"
+                    required
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-[11px] font-bold text-zinc-700 mb-1">Remarks / Transaction Reference (Optional)</label>
+                  <textarea
+                    rows={2}
+                    value={stipendForm.remarks}
+                    onChange={(e) => setStipendForm({ ...stipendForm, remarks: e.target.value })}
+                    placeholder="e.g. Corporate NEFT/RTGS batch transfer completed"
+                    className="w-full px-3 py-2 rounded-xl bg-zinc-50 border border-zinc-200 text-zinc-900 text-xs focus:outline-none focus:border-black"
+                  />
+                </div>
+
+                <div className="pt-3 border-t border-zinc-200 flex items-center justify-end gap-2">
+                  <button
+                    type="button"
+                    onClick={() => setShowStipendModal(false)}
+                    className="px-4 py-2 rounded-xl bg-zinc-100 hover:bg-zinc-200 text-zinc-700 font-bold cursor-pointer transition-colors"
+                  >
+                    Cancel
+                  </button>
+                  <button
+                    type="submit"
+                    disabled={stipendSubmitting}
+                    className="px-5 py-2 rounded-xl bg-[#0a192f] hover:bg-[#102a4c] text-white font-bold flex items-center gap-1.5 shadow-md cursor-pointer transition-all disabled:opacity-50"
+                  >
+                    <Lock className="w-3.5 h-3.5" />
+                    <span>{stipendSubmitting ? 'Submitting & Locking...' : 'Submit & Lock Entry'}</span>
+                  </button>
+                </div>
+              </form>
+            </motion.div>
+          </div>
+        )}
+      </AnimatePresence>
+
+      {/* MODAL 8: Add Compliance Action Item / Remark (Both Client & Admin) */}
+      <AnimatePresence>
+        {showActionItemModal && (
+          <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-xs font-sans">
+            <motion.div
+              initial={{ scale: 0.95, opacity: 0 }}
+              animate={{ scale: 1, opacity: 1 }}
+              exit={{ scale: 0.95, opacity: 0 }}
+              className="w-full max-w-lg bg-white rounded-3xl border border-zinc-200 shadow-2xl overflow-hidden"
+            >
+              <div className="bg-[#0a192f] text-white p-6 flex items-center justify-between">
+                <div className="flex items-center gap-3">
+                  <div className="w-10 h-10 rounded-2xl bg-white/10 flex items-center justify-center border border-white/15">
+                    <ClipboardList className="w-5 h-5 text-amber-400" />
+                  </div>
+                  <div>
+                    <h3 className="text-base font-bold text-white">Add Compliance Remark / Action Item</h3>
+                    <p className="text-xs text-zinc-300">Section 6 Governance & Timeline Item</p>
+                  </div>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => setShowActionItemModal(false)}
+                  className="w-8 h-8 rounded-full bg-white/10 hover:bg-white/20 flex items-center justify-center text-white cursor-pointer transition-colors"
+                >
+                  <X className="w-4 h-4" />
+                </button>
+              </div>
+
+              <form onSubmit={handleSubmitActionItem} className="p-6 space-y-4 text-xs">
+                <div>
+                  <label className="block text-[11px] font-bold text-zinc-700 mb-1">Observation / Remark *</label>
+                  <input
+                    type="text"
+                    value={actionItemForm.observation}
+                    onChange={(e) => setActionItemForm({ ...actionItemForm, observation: e.target.value })}
+                    placeholder="e.g. Bank Account Correction, Address Proof Mismatch"
+                    className="w-full px-3 py-2 rounded-xl bg-zinc-50 border border-zinc-200 text-zinc-900 text-xs font-semibold focus:outline-none focus:border-black"
+                    required
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-[11px] font-bold text-zinc-700 mb-1">Action Required *</label>
+                  <textarea
+                    rows={2}
+                    value={actionItemForm.actionRequired}
+                    onChange={(e) => setActionItemForm({ ...actionItemForm, actionRequired: e.target.value })}
+                    placeholder="e.g. Soumya's account mismatch, upload cancelled cheque"
+                    className="w-full px-3 py-2 rounded-xl bg-zinc-50 border border-zinc-200 text-zinc-900 text-xs focus:outline-none focus:border-black"
+                    required
+                  />
+                </div>
+
+                <div className="grid grid-cols-2 gap-3">
+                  <div>
+                    <label className="block text-[11px] font-bold text-zinc-700 mb-1">Owner / Assigned To</label>
+                    <input
+                      type="text"
+                      value={actionItemForm.owner}
+                      onChange={(e) => setActionItemForm({ ...actionItemForm, owner: e.target.value })}
+                      placeholder={clientDisplayName || 'Client Company'}
+                      className="w-full px-3 py-2 rounded-xl bg-zinc-50 border border-zinc-200 text-zinc-900 text-xs focus:outline-none focus:border-black"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-[11px] font-bold text-zinc-700 mb-1">Target Date / Status</label>
+                    <input
+                      type="text"
+                      value={actionItemForm.targetDate}
+                      onChange={(e) => setActionItemForm({ ...actionItemForm, targetDate: e.target.value })}
+                      placeholder="e.g. 25-07-2026 or Closed & Updated"
+                      className="w-full px-3 py-2 rounded-xl bg-zinc-50 border border-zinc-200 text-zinc-900 text-xs focus:outline-none focus:border-black"
+                    />
+                  </div>
+                </div>
+
+                <div className="pt-3 border-t border-zinc-200 flex items-center justify-end gap-2">
+                  <button
+                    type="button"
+                    onClick={() => setShowActionItemModal(false)}
+                    className="px-4 py-2 rounded-xl bg-zinc-100 hover:bg-zinc-200 text-zinc-700 font-bold cursor-pointer transition-colors"
+                  >
+                    Cancel
+                  </button>
+                  <button
+                    type="submit"
+                    disabled={actionItemSubmitting}
+                    className="px-5 py-2 rounded-xl bg-[#0a192f] hover:bg-[#102a4c] text-white font-bold flex items-center gap-1.5 shadow-md cursor-pointer transition-all disabled:opacity-50"
+                  >
+                    <Plus className="w-3.5 h-3.5" />
+                    <span>{actionItemSubmitting ? 'Saving...' : 'Add Action Item'}</span>
                   </button>
                 </div>
               </form>

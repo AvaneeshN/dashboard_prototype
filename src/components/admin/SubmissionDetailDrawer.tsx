@@ -10,7 +10,8 @@ import {
   ComplianceInvoiceRecord,
   ComplianceActionItem,
   ApprenticeRecord,
-  CompanyOperationsSPOC
+  CompanyOperationsSPOC,
+  StipendPaymentRecord
 } from '@/types';
 import { DocumentViewerModal } from '@/components/ui/DocumentViewerModal';
 import { downloadDocumentFile } from '@/lib/document-utils';
@@ -41,7 +42,8 @@ import {
   Plus,
   Trash2,
   Edit2,
-  Copy
+  Copy,
+  Lock
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 
@@ -62,10 +64,35 @@ export const SubmissionDetailDrawer: React.FC<SubmissionDetailDrawerProps> = ({
     addNAPSRecord,
     updateNAPSRecord,
     deleteNAPSRecord,
-    updateClientComplianceReport
+    updateClientComplianceReport,
+    addStipendPayment,
+    updateStipendPayment,
+    addActionItem
   } = useStore();
   const [activeTab, setActiveTab] = useState<'application' | 'documents' | 'candidates' | 'dbt_claims' | 'spoc_logs' | 'naps_portal'>('application');
   const [previewingDoc, setPreviewingDoc] = useState<any>(null);
+
+  // Stipend Payment Management States (Admin DBT Entry & Review)
+  const [editingStipendRecord, setEditingStipendRecord] = useState<StipendPaymentRecord | null>(null);
+  const [stipendAdminForm, setStipendAdminForm] = useState({
+    dbtByGovt: 10500,
+    dbtReleaseDate: 'UNDER PROCESS',
+    status: 'UNDER PROCESS',
+    remarks: ''
+  });
+  const [savingStipendAdmin, setSavingStipendAdmin] = useState(false);
+  const [stipendAdminSuccess, setStipendAdminSuccess] = useState<string | null>(null);
+  const [showAdminAddStipend, setShowAdminAddStipend] = useState(false);
+  const [adminNewStipend, setAdminNewStipend] = useState({
+    month: 'JUNE',
+    year: '2026',
+    stipendPaidByEmployer: 94634,
+    datePaid: '10-07-2026',
+    dbtByGovt: 10500,
+    dbtReleaseDate: 'UNDER PROCESS',
+    status: 'UNDER PROCESS',
+    remarks: ''
+  });
 
   // NAPS Record Modal States
   const [showNapsModal, setShowNapsModal] = useState(false);
@@ -151,6 +178,81 @@ export const SubmissionDetailDrawer: React.FC<SubmissionDetailDrawerProps> = ({
   const dbtClaims = submission.dbt_claims || [];
   const spocLogs = submission.spoc_logs || [];
   const napsRecords = submission.naps_records || [];
+  const stipendPayments: StipendPaymentRecord[] = submission.stipend_payments && submission.stipend_payments.length > 0 
+    ? submission.stipend_payments 
+    : [
+        {
+          id: 'stp-default-june-2026',
+          month: 'JUNE',
+          year: '2026',
+          stipendPaidByEmployer: 94634,
+          datePaid: '10-07-2026',
+          dbtByGovt: 10500,
+          dbtReleaseDate: 'UNDER PROCESS',
+          status: 'UNDER PROCESS',
+          remarks: '',
+          submittedByClient: true,
+          submittedAt: '2026-07-10T10:00:00.000Z'
+        }
+      ];
+
+  const handleOpenEditStipend = (rec: StipendPaymentRecord) => {
+    setEditingStipendRecord(rec);
+    setStipendAdminForm({
+      dbtByGovt: rec.dbtByGovt || 0,
+      dbtReleaseDate: rec.dbtReleaseDate || 'UNDER PROCESS',
+      status: rec.status || 'UNDER PROCESS',
+      remarks: rec.remarks || ''
+    });
+  };
+
+  const handleSaveStipendAdmin = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!submission || !editingStipendRecord) return;
+    setSavingStipendAdmin(true);
+    try {
+      await updateStipendPayment(submission.id, editingStipendRecord.id, {
+        dbtByGovt: Number(stipendAdminForm.dbtByGovt),
+        dbtReleaseDate: stipendAdminForm.dbtReleaseDate,
+        status: stipendAdminForm.status,
+        remarks: stipendAdminForm.remarks,
+        reviewedByAdmin: true,
+        reviewedAt: new Date().toISOString()
+      });
+      setEditingStipendRecord(null);
+      setStipendAdminSuccess('DBT details and remarks saved. The client compliance report has been updated.');
+      setTimeout(() => setStipendAdminSuccess(null), 4000);
+    } catch (err) {
+      console.error('Error updating stipend:', err);
+    } finally {
+      setSavingStipendAdmin(false);
+    }
+  };
+
+  const handleAdminCreateStipend = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!submission) return;
+    try {
+      await addStipendPayment(submission.id, {
+        month: adminNewStipend.month,
+        year: adminNewStipend.year,
+        stipendPaidByEmployer: Number(adminNewStipend.stipendPaidByEmployer),
+        datePaid: adminNewStipend.datePaid,
+        dbtByGovt: Number(adminNewStipend.dbtByGovt),
+        dbtReleaseDate: adminNewStipend.dbtReleaseDate,
+        status: adminNewStipend.status,
+        remarks: adminNewStipend.remarks,
+        submittedByClient: false,
+        reviewedByAdmin: true,
+        reviewedAt: new Date().toISOString()
+      });
+      setShowAdminAddStipend(false);
+      setStipendAdminSuccess(`Monthly stipend record for ${adminNewStipend.month} ${adminNewStipend.year} created successfully.`);
+      setTimeout(() => setStipendAdminSuccess(null), 4000);
+    } catch (err) {
+      console.error('Error creating stipend:', err);
+    }
+  };
 
   const filteredNapsRecords = napsRecords.filter(r => {
     const matchesMonth = napsFormMonthFilter === 'all' || r.payoutMonth === napsFormMonthFilter;
@@ -621,6 +723,99 @@ export const SubmissionDetailDrawer: React.FC<SubmissionDetailDrawerProps> = ({
                         <Plus className="w-3.5 h-3.5" />
                         <span>+ Add Monthly Record</span>
                       </button>
+                    </div>
+                  </div>
+
+                  {/* Card: Client Monthly Stipend Payment Submissions (Section 4 Review & Govt. DBT Fill) */}
+                  <div className="p-4 sm:p-5 rounded-2xl bg-white border border-zinc-200 shadow-xs space-y-3">
+                    <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 border-b border-zinc-100 pb-3">
+                      <div className="flex items-center gap-2">
+                        <CreditCard className="w-4 h-4 text-emerald-600" />
+                        <div>
+                          <h4 className="text-xs font-bold text-zinc-900 uppercase font-mono">
+                            Client Monthly Stipend Disbursements & Govt. DBT Approval (Section 4)
+                          </h4>
+                          <p className="text-[11px] text-zinc-500">
+                            Client enters stipend paid + payment date. Admin reviews, verifies on NAPS portal, and fills DBT govt subsidy and PFMS release date.
+                          </p>
+                        </div>
+                      </div>
+                      <button
+                        type="button"
+                        onClick={() => setShowAdminAddStipend(true)}
+                        className="px-3 py-1 rounded-full bg-zinc-100 hover:bg-zinc-200 text-zinc-800 text-xs font-bold flex items-center gap-1 cursor-pointer transition-colors shrink-0"
+                      >
+                        <Plus className="w-3.5 h-3.5" />
+                        <span>+ Add Month (Admin)</span>
+                      </button>
+                    </div>
+
+                    {stipendAdminSuccess && (
+                      <div className="p-2.5 rounded-xl bg-emerald-50 border border-emerald-200 text-emerald-800 text-xs font-semibold flex items-center justify-between">
+                        <span>{stipendAdminSuccess}</span>
+                        <button onClick={() => setStipendAdminSuccess(null)} className="text-emerald-600 hover:text-emerald-900">
+                          <X className="w-3.5 h-3.5" />
+                        </button>
+                      </div>
+                    )}
+
+                    <div className="overflow-x-auto rounded-xl border border-zinc-200">
+                      <table className="w-full text-left text-[11px]">
+                        <thead className="bg-[#0a192f] text-white uppercase tracking-wider text-[9px] font-mono whitespace-nowrap">
+                          <tr>
+                            <th className="py-2 px-3">Month</th>
+                            <th className="py-2 px-3">Stipend Paid by Employer</th>
+                            <th className="py-2 px-3">Date Paid</th>
+                            <th className="py-2 px-3">DBT by Govt. (₹)</th>
+                            <th className="py-2 px-3">DBT Release Date</th>
+                            <th className="py-2 px-3">Status</th>
+                            <th className="py-2 px-3">Remarks</th>
+                            <th className="py-2 px-3 text-right">Action</th>
+                          </tr>
+                        </thead>
+                        <tbody className="divide-y divide-zinc-100 font-medium whitespace-nowrap">
+                          {stipendPayments.length > 0 ? (
+                            stipendPayments.map((p) => (
+                              <tr key={p.id} className="hover:bg-zinc-50/80 transition-colors">
+                                <td className="py-2 px-3 font-bold font-sans text-zinc-900">
+                                  {p.month} {p.year && p.year !== 'all' ? p.year : ''}
+                                  {p.submittedByClient && (
+                                    <span className="ml-1.5 px-1.5 py-0.5 rounded text-[9px] bg-blue-50 text-blue-700 border border-blue-200 font-normal">Client</span>
+                                  )}
+                                </td>
+                                <td className="py-2 px-3 font-mono font-bold text-zinc-900">₹{p.stipendPaidByEmployer?.toLocaleString('en-IN') || '-'}</td>
+                                <td className="py-2 px-3 font-mono text-zinc-600">{p.datePaid || '-'}</td>
+                                <td className="py-2 px-3 font-mono font-bold text-emerald-700">₹{p.dbtByGovt?.toLocaleString('en-IN') || '0'}</td>
+                                <td className="py-2 px-3 font-mono text-zinc-600">{p.dbtReleaseDate || '-'}</td>
+                                <td className="py-2 px-3">
+                                  <span className={`px-2 py-0.5 rounded-full text-[9px] font-bold ${
+                                    p.status === 'DBT RELEASED' ? 'bg-emerald-100 text-emerald-800' :
+                                    p.status === 'UNDER PROCESS' ? 'bg-amber-100 text-amber-800' : 'bg-blue-100 text-blue-800'
+                                  }`}>
+                                    {p.status || 'SUBMITTED'}
+                                  </span>
+                                </td>
+                                <td className="py-2 px-3 text-zinc-600 font-sans max-w-xs truncate">{p.remarks || '-'}</td>
+                                <td className="py-2 px-3 text-right">
+                                  <button
+                                    type="button"
+                                    onClick={() => handleOpenEditStipend(p)}
+                                    className="px-2.5 py-1 rounded-lg bg-[#0a192f] text-white hover:bg-zinc-800 text-[10px] font-bold cursor-pointer transition-colors"
+                                  >
+                                    Edit DBT & Remarks
+                                  </button>
+                                </td>
+                              </tr>
+                            ))
+                          ) : (
+                            <tr>
+                              <td colSpan={8} className="py-6 text-center text-zinc-400">
+                                No monthly stipend entries logged yet for this client.
+                              </td>
+                            </tr>
+                          )}
+                        </tbody>
+                      </table>
                     </div>
                   </div>
 
@@ -1452,6 +1647,252 @@ export const SubmissionDetailDrawer: React.FC<SubmissionDetailDrawerProps> = ({
                     className="px-5 py-2 rounded-full bg-[#0a192f] text-white hover:bg-zinc-800 text-xs font-bold cursor-pointer transition-all shadow-sm"
                   >
                     {editingNapsRecord ? 'Save Record Changes' : 'Add to Client DBT Registry'}
+                  </button>
+                </div>
+              </form>
+            </motion.div>
+          </div>
+        )}
+      </AnimatePresence>
+
+      {/* Modal: Admin Edit Stipend DBT & Remarks */}
+      <AnimatePresence>
+        {editingStipendRecord && (
+          <div className="fixed inset-0 z-[130] flex items-center justify-center p-4 bg-black/60 backdrop-blur-xs font-sans">
+            <motion.div
+              initial={{ scale: 0.95, opacity: 0 }}
+              animate={{ scale: 1, opacity: 1 }}
+              exit={{ scale: 0.95, opacity: 0 }}
+              className="w-full max-w-md bg-white rounded-3xl border border-zinc-200 shadow-2xl overflow-hidden"
+            >
+              <div className="bg-[#0a192f] text-white p-5 flex items-center justify-between">
+                <div>
+                  <h4 className="text-sm font-bold text-white">
+                    Update DBT Approval: {editingStipendRecord.month} {editingStipendRecord.year}
+                  </h4>
+                  <p className="text-[11px] text-zinc-300">
+                    Employer Paid: ₹{editingStipendRecord.stipendPaidByEmployer?.toLocaleString('en-IN')} on {editingStipendRecord.datePaid}
+                  </p>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => setEditingStipendRecord(null)}
+                  className="w-7 h-7 rounded-full bg-white/10 hover:bg-white/20 flex items-center justify-center text-white cursor-pointer"
+                >
+                  <X className="w-3.5 h-3.5" />
+                </button>
+              </div>
+
+              <form onSubmit={handleSaveStipendAdmin} className="p-5 space-y-3.5 text-xs">
+                <div>
+                  <label className="block text-[11px] font-bold text-zinc-700 mb-1">Govt. DBT Approved Amount (₹) *</label>
+                  <input
+                    type="number"
+                    min="0"
+                    value={stipendAdminForm.dbtByGovt}
+                    onChange={(e) => setStipendAdminForm({ ...stipendAdminForm, dbtByGovt: Number(e.target.value) })}
+                    placeholder="e.g. 10500"
+                    className="w-full px-3 py-2 rounded-xl bg-zinc-50 border border-zinc-200 text-zinc-900 font-bold font-mono text-sm focus:outline-none focus:border-black"
+                    required
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-[11px] font-bold text-zinc-700 mb-1">DBT Release Date / PFMS Status *</label>
+                  <input
+                    type="text"
+                    value={stipendAdminForm.dbtReleaseDate}
+                    onChange={(e) => setStipendAdminForm({ ...stipendAdminForm, dbtReleaseDate: e.target.value })}
+                    placeholder="e.g. UNDER PROCESS or 18-07-2026"
+                    className="w-full px-3 py-2 rounded-xl bg-zinc-50 border border-zinc-200 text-zinc-900 font-semibold focus:outline-none focus:border-black"
+                    required
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-[11px] font-bold text-zinc-700 mb-1">Status Badge *</label>
+                  <select
+                    value={stipendAdminForm.status}
+                    onChange={(e) => setStipendAdminForm({ ...stipendAdminForm, status: e.target.value })}
+                    className="w-full px-3 py-2 rounded-xl bg-zinc-50 border border-zinc-200 text-zinc-900 font-bold focus:outline-none focus:border-black cursor-pointer"
+                  >
+                    <option value="SUBMITTED">SUBMITTED (Pending NAPS Verification)</option>
+                    <option value="UNDER PROCESS">UNDER PROCESS (Claim filed with Govt)</option>
+                    <option value="DBT RELEASED">DBT RELEASED (Disbursed via PFMS)</option>
+                    <option value="PENDING">PENDING (Action required)</option>
+                  </select>
+                </div>
+
+                <div>
+                  <label className="block text-[11px] font-bold text-zinc-700 mb-1">Admin Remarks / Audit Notes</label>
+                  <textarea
+                    rows={2}
+                    value={stipendAdminForm.remarks}
+                    onChange={(e) => setStipendAdminForm({ ...stipendAdminForm, remarks: e.target.value })}
+                    placeholder="e.g. DBT credited to 7 candidates via PFMS batch 2026-07-18"
+                    className="w-full px-3 py-2 rounded-xl bg-zinc-50 border border-zinc-200 text-zinc-900 focus:outline-none focus:border-black"
+                  />
+                </div>
+
+                <div className="pt-3 border-t border-zinc-200 flex items-center justify-end gap-2">
+                  <button
+                    type="button"
+                    onClick={() => setEditingStipendRecord(null)}
+                    className="px-4 py-2 rounded-xl bg-zinc-100 hover:bg-zinc-200 text-zinc-700 font-bold cursor-pointer"
+                  >
+                    Cancel
+                  </button>
+                  <button
+                    type="submit"
+                    disabled={savingStipendAdmin}
+                    className="px-5 py-2 rounded-xl bg-[#0a192f] hover:bg-[#102a4c] text-white font-bold cursor-pointer transition-all disabled:opacity-50"
+                  >
+                    {savingStipendAdmin ? 'Saving...' : 'Save & Publish to Client'}
+                  </button>
+                </div>
+              </form>
+            </motion.div>
+          </div>
+        )}
+      </AnimatePresence>
+
+      {/* Modal: Admin Add Stipend Month */}
+      <AnimatePresence>
+        {showAdminAddStipend && (
+          <div className="fixed inset-0 z-[130] flex items-center justify-center p-4 bg-black/60 backdrop-blur-xs font-sans">
+            <motion.div
+              initial={{ scale: 0.95, opacity: 0 }}
+              animate={{ scale: 1, opacity: 1 }}
+              exit={{ scale: 0.95, opacity: 0 }}
+              className="w-full max-w-md bg-white rounded-3xl border border-zinc-200 shadow-2xl overflow-hidden"
+            >
+              <div className="bg-[#0a192f] text-white p-5 flex items-center justify-between">
+                <div>
+                  <h4 className="text-sm font-bold text-white">Record Monthly Stipend Disbursement</h4>
+                  <p className="text-[11px] text-zinc-300">Admin entry on behalf of client</p>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => setShowAdminAddStipend(false)}
+                  className="w-7 h-7 rounded-full bg-white/10 hover:bg-white/20 flex items-center justify-center text-white cursor-pointer"
+                >
+                  <X className="w-3.5 h-3.5" />
+                </button>
+              </div>
+
+              <form onSubmit={handleAdminCreateStipend} className="p-5 space-y-3 text-xs">
+                <div className="grid grid-cols-2 gap-2.5">
+                  <div>
+                    <label className="block text-[11px] font-bold text-zinc-700 mb-1">Month *</label>
+                    <input
+                      type="text"
+                      value={adminNewStipend.month}
+                      onChange={(e) => setAdminNewStipend({ ...adminNewStipend, month: e.target.value.toUpperCase() })}
+                      placeholder="e.g. JUNE"
+                      className="w-full px-3 py-1.5 rounded-xl bg-zinc-50 border border-zinc-200 font-bold focus:outline-none focus:border-black uppercase"
+                      required
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-[11px] font-bold text-zinc-700 mb-1">Year *</label>
+                    <input
+                      type="text"
+                      value={adminNewStipend.year}
+                      onChange={(e) => setAdminNewStipend({ ...adminNewStipend, year: e.target.value })}
+                      placeholder="2026"
+                      className="w-full px-3 py-1.5 rounded-xl bg-zinc-50 border border-zinc-200 font-mono font-bold focus:outline-none focus:border-black"
+                      required
+                    />
+                  </div>
+                </div>
+
+                <div>
+                  <label className="block text-[11px] font-bold text-zinc-700 mb-1">Stipend Paid by Employer (₹) *</label>
+                  <input
+                    type="number"
+                    min="0"
+                    value={adminNewStipend.stipendPaidByEmployer}
+                    onChange={(e) => setAdminNewStipend({ ...adminNewStipend, stipendPaidByEmployer: Number(e.target.value) })}
+                    placeholder="e.g. 94634"
+                    className="w-full px-3 py-1.5 rounded-xl bg-zinc-50 border border-zinc-200 font-bold font-mono focus:outline-none focus:border-black"
+                    required
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-[11px] font-bold text-zinc-700 mb-1">Date Paid *</label>
+                  <input
+                    type="text"
+                    value={adminNewStipend.datePaid}
+                    onChange={(e) => setAdminNewStipend({ ...adminNewStipend, datePaid: e.target.value })}
+                    placeholder="10-07-2026"
+                    className="w-full px-3 py-1.5 rounded-xl bg-zinc-50 border border-zinc-200 font-mono focus:outline-none focus:border-black"
+                    required
+                  />
+                </div>
+
+                <div className="grid grid-cols-2 gap-2.5">
+                  <div>
+                    <label className="block text-[11px] font-bold text-zinc-700 mb-1">DBT by Govt. (₹)</label>
+                    <input
+                      type="number"
+                      min="0"
+                      value={adminNewStipend.dbtByGovt}
+                      onChange={(e) => setAdminNewStipend({ ...adminNewStipend, dbtByGovt: Number(e.target.value) })}
+                      placeholder="10500"
+                      className="w-full px-3 py-1.5 rounded-xl bg-zinc-50 border border-zinc-200 font-bold font-mono focus:outline-none focus:border-black"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-[11px] font-bold text-zinc-700 mb-1">Release Date</label>
+                    <input
+                      type="text"
+                      value={adminNewStipend.dbtReleaseDate}
+                      onChange={(e) => setAdminNewStipend({ ...adminNewStipend, dbtReleaseDate: e.target.value })}
+                      placeholder="UNDER PROCESS"
+                      className="w-full px-3 py-1.5 rounded-xl bg-zinc-50 border border-zinc-200 focus:outline-none focus:border-black"
+                    />
+                  </div>
+                </div>
+
+                <div>
+                  <label className="block text-[11px] font-bold text-zinc-700 mb-1">Status</label>
+                  <select
+                    value={adminNewStipend.status}
+                    onChange={(e) => setAdminNewStipend({ ...adminNewStipend, status: e.target.value })}
+                    className="w-full px-3 py-1.5 rounded-xl bg-zinc-50 border border-zinc-200 font-bold focus:outline-none focus:border-black"
+                  >
+                    <option value="SUBMITTED">SUBMITTED</option>
+                    <option value="UNDER PROCESS">UNDER PROCESS</option>
+                    <option value="DBT RELEASED">DBT RELEASED</option>
+                    <option value="PENDING">PENDING</option>
+                  </select>
+                </div>
+
+                <div>
+                  <label className="block text-[11px] font-bold text-zinc-700 mb-1">Remarks</label>
+                  <input
+                    type="text"
+                    value={adminNewStipend.remarks}
+                    onChange={(e) => setAdminNewStipend({ ...adminNewStipend, remarks: e.target.value })}
+                    placeholder="Admin remarks"
+                    className="w-full px-3 py-1.5 rounded-xl bg-zinc-50 border border-zinc-200 focus:outline-none focus:border-black"
+                  />
+                </div>
+
+                <div className="pt-2 border-t border-zinc-200 flex items-center justify-end gap-2">
+                  <button
+                    type="button"
+                    onClick={() => setShowAdminAddStipend(false)}
+                    className="px-3.5 py-1.5 rounded-xl bg-zinc-100 hover:bg-zinc-200 text-zinc-700 font-bold cursor-pointer"
+                  >
+                    Cancel
+                  </button>
+                  <button
+                    type="submit"
+                    className="px-4 py-1.5 rounded-xl bg-[#0a192f] hover:bg-[#102a4c] text-white font-bold cursor-pointer transition-all"
+                  >
+                    Create Record
                   </button>
                 </div>
               </form>

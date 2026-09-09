@@ -150,6 +150,23 @@ export interface ComplianceActionItem {
   owner: string;
   targetDate: string;
   status?: string;
+  addedBy?: 'client' | 'admin';
+}
+
+export interface StipendPaymentRecord {
+  id: string;
+  month: string;                    // e.g. "JUNE", "JULY"
+  year: string;                     // e.g. "2026"
+  stipendPaidByEmployer: number;    // Amount client paid (Rs)
+  datePaid: string;                 // Date client paid stipend (DD-MM-YYYY)
+  dbtByGovt: number;               // Filled by admin after NAPS approval
+  dbtReleaseDate: string;           // Filled by admin
+  status: 'SUBMITTED' | 'UNDER PROCESS' | 'DBT RELEASED' | 'PENDING' | string;
+  remarks: string;                  // Admin remarks
+  submittedByClient: boolean;       // true = client entered this row
+  submittedAt?: string;             // ISO timestamp when client submitted
+  reviewedByAdmin?: boolean;
+  reviewedAt?: string;
 }
 
 export interface ClientApprenticeMetrics {
@@ -202,6 +219,7 @@ export interface ClientApprenticeMetrics {
   napsPortalRecords?: NAPSPortalRecord[];
   invoices?: ComplianceInvoiceRecord[];
   actionItems?: ComplianceActionItem[];
+  stipendPayments?: StipendPaymentRecord[];
 }
 
 export interface UserProfile {
@@ -301,6 +319,7 @@ export interface FormSubmission {
   naps_records?: NAPSPortalRecord[];
   invoices?: ComplianceInvoiceRecord[];
   action_items?: ComplianceActionItem[];
+  stipend_payments?: StipendPaymentRecord[];
   reporting_month?: string;
   naps_portal_id?: string;
   sanctioned_quota?: number;
