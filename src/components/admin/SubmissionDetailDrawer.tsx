@@ -84,11 +84,11 @@ export const SubmissionDetailDrawer: React.FC<SubmissionDetailDrawerProps> = ({
   const [stipendAdminSuccess, setStipendAdminSuccess] = useState<string | null>(null);
   const [showAdminAddStipend, setShowAdminAddStipend] = useState(false);
   const [adminNewStipend, setAdminNewStipend] = useState({
-    month: 'JUNE',
+    month: 'JANUARY',
     year: '2026',
-    stipendPaidByEmployer: 94634,
-    datePaid: '10-07-2026',
-    dbtByGovt: 10500,
+    stipendPaidByEmployer: '' as unknown as number,
+    datePaid: '',
+    dbtByGovt: 0,
     dbtReleaseDate: 'UNDER PROCESS',
     status: 'UNDER PROCESS',
     remarks: ''
@@ -178,23 +178,7 @@ export const SubmissionDetailDrawer: React.FC<SubmissionDetailDrawerProps> = ({
   const dbtClaims = submission.dbt_claims || [];
   const spocLogs = submission.spoc_logs || [];
   const napsRecords = submission.naps_records || [];
-  const stipendPayments: StipendPaymentRecord[] = submission.stipend_payments && submission.stipend_payments.length > 0 
-    ? submission.stipend_payments 
-    : [
-        {
-          id: 'stp-default-june-2026',
-          month: 'JUNE',
-          year: '2026',
-          stipendPaidByEmployer: 94634,
-          datePaid: '10-07-2026',
-          dbtByGovt: 10500,
-          dbtReleaseDate: 'UNDER PROCESS',
-          status: 'UNDER PROCESS',
-          remarks: '',
-          submittedByClient: true,
-          submittedAt: '2026-07-10T10:00:00.000Z'
-        }
-      ];
+  const stipendPayments: StipendPaymentRecord[] = submission.stipend_payments || [];
 
   const handleOpenEditStipend = (rec: StipendPaymentRecord) => {
     setEditingStipendRecord(rec);

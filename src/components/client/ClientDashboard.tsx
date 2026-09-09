@@ -128,10 +128,10 @@ export const ClientDashboard: React.FC = () => {
   const [stipendSubmitting, setStipendSubmitting] = useState(false);
   const [stipendSuccessMsg, setStipendSuccessMsg] = useState<string | null>(null);
   const [stipendForm, setStipendForm] = useState({
-    month: 'JUNE',
+    month: 'JANUARY',
     year: '2026',
-    stipendPaidByEmployer: 94634,
-    datePaid: '2026-07-10',
+    stipendPaidByEmployer: '' as unknown as number,
+    datePaid: '',
     remarks: ''
   });
 
@@ -302,22 +302,7 @@ export const ClientDashboard: React.FC = () => {
     if (user?.apprenticeMetrics?.stipendPayments && user.apprenticeMetrics.stipendPayments.length > 0) {
       return user.apprenticeMetrics.stipendPayments;
     }
-    // Default initial demonstration record matching reference image
-    return [
-      {
-        id: 'stp-default-june-2026',
-        month: 'JUNE',
-        year: '2026',
-        stipendPaidByEmployer: 94634,
-        datePaid: '10-07-2026',
-        dbtByGovt: 10500,
-        dbtReleaseDate: 'UNDER PROCESS',
-        status: 'UNDER PROCESS',
-        remarks: '',
-        submittedByClient: true,
-        submittedAt: '2026-07-10T10:00:00.000Z'
-      }
-    ];
+    return [];
   }, [activeSubmission?.stipend_payments, user?.apprenticeMetrics?.stipendPayments]);
 
   const displayedStipendPayments = useMemo(() => {
@@ -333,32 +318,13 @@ export const ClientDashboard: React.FC = () => {
   const effectiveInvoices: ComplianceInvoiceRecord[] = useMemo(() => {
     if (activeSubmission?.invoices && activeSubmission.invoices.length > 0) return activeSubmission.invoices;
     if (user?.apprenticeMetrics?.invoices && user.apprenticeMetrics.invoices.length > 0) return user.apprenticeMetrics.invoices;
-    return [
-      {
-        id: 'inv-default-1',
-        invoiceNo: 'WFP/26/0004',
-        invoiceDate: '13-07-2026',
-        amount: 3304,
-        status: 'SUBMITTED',
-        paymentDate: '16-07-2026',
-        remarks: ''
-      }
-    ];
+    return [];
   }, [activeSubmission?.invoices, user?.apprenticeMetrics?.invoices]);
 
   const effectiveActionItems: ComplianceActionItem[] = useMemo(() => {
     if (activeSubmission?.action_items && activeSubmission.action_items.length > 0) return activeSubmission.action_items;
     if (user?.apprenticeMetrics?.actionItems && user.apprenticeMetrics.actionItems.length > 0) return user.apprenticeMetrics.actionItems;
-    return [
-      {
-        id: 'act-default-1',
-        observation: 'Bank Account Correction',
-        actionRequired: "Soumya's account mismatch",
-        owner: 'WorkForce2047',
-        targetDate: 'Closed & Updated in the Portal',
-        status: 'RESOLVED'
-      }
-    ];
+    return [];
   }, [activeSubmission?.action_items, user?.apprenticeMetrics?.actionItems]);
 
   const effectiveCandidatesList: ApprenticeRecord[] = useMemo(() => {
