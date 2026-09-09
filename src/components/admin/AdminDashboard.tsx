@@ -293,14 +293,14 @@ export const AdminDashboard: React.FC = () => {
           <div className="flex items-center gap-2 mb-2">
             <span className="text-lg leading-none">✦</span>
             <span className="font-mono text-xs font-semibold uppercase tracking-wider text-zinc-500">
-              Admin Telemetry
+              Admin DBT Dashboard
             </span>
           </div>
           <h1 className="text-3xl sm:text-4xl font-extrabold tracking-tight text-zinc-900">
-            Administration & Telemetry
+            DBT Administration Dashboard
           </h1>
           <p className="text-xs text-zinc-500 mt-1 font-medium">
-            Intake funnel telemetry, candidate onboarding quotas, and security audit logs.
+            DBT disbursement telemetry, client intake funnel, candidate quotas, and security audit logs.
           </p>
         </div>
 

@@ -62,7 +62,7 @@ export const Navbar: React.FC = () => {
                 Console
               </span>
               <span className="text-[10px] font-mono uppercase px-2 py-0.5 rounded-full bg-[#112240] text-amber-300 border border-amber-400/30">
-                {user.role === 'admin' ? 'Administration' : 'Client Portal'}
+                {user.role === 'admin' ? 'DBT Admin Portal' : 'Client Portal'}
               </span>
             </div>
           </div>

@@ -353,7 +353,7 @@ export const SubmissionDetailDrawer: React.FC<SubmissionDetailDrawerProps> = ({
             <div className="px-6 py-2.5 bg-zinc-50 border-b border-zinc-200 flex items-center gap-1.5 overflow-x-auto">
               {[
                 { id: 'application', label: 'Intake Application' },
-                { id: 'naps_portal', label: `NAPS Government Portal (${napsRecords.length})` },
+                { id: 'naps_portal', label: `DBT Dashboard (${napsRecords.length})` },
                 { id: 'documents', label: 'Company Documents' },
                 { id: 'candidates', label: `Apprentices (${candidateList.length})` },
                 { id: 'dbt_claims', label: `DBT Claims (${dbtClaims.length})` },
@@ -604,11 +604,11 @@ export const SubmissionDetailDrawer: React.FC<SubmissionDetailDrawerProps> = ({
                       <div className="flex items-center gap-2">
                         <Table className="w-4 h-4 text-amber-300" />
                         <h4 className="text-xs font-bold uppercase tracking-wider font-mono">
-                          NAPS Portal Apprenticeship & DBT Registry
+                          DBT Dashboard & Government NAPS Registry
                         </h4>
                       </div>
                       <p className="text-[11px] text-zinc-300 mt-0.5">
-                        Client-specific records verified against NAPS / PFMS portal. Records update the client's live view.
+                        Client-specific records verified against DBT / PFMS / NAPS portal. Records update the client's live view.
                       </p>
                     </div>
 
@@ -732,7 +732,7 @@ export const SubmissionDetailDrawer: React.FC<SubmissionDetailDrawerProps> = ({
                         ) : (
                           <tr>
                             <td colSpan={14} className="py-8 text-center text-zinc-400">
-                              No NAPS portal records logged for this client yet. Click "+ Add Monthly Record" to enter government registry rows.
+                              No DBT dashboard records logged for this client yet. Click "+ Add Monthly Record" to enter government registry rows.
                             </td>
                           </tr>
                         )}
@@ -958,7 +958,7 @@ export const SubmissionDetailDrawer: React.FC<SubmissionDetailDrawerProps> = ({
                                 onClick={() => handleOpenAddNaps(cand)}
                                 className="px-2.5 py-1 rounded-xl bg-[#0a192f] text-white hover:bg-zinc-800 text-[10px] font-bold cursor-pointer transition-colors"
                               >
-                                {cand.contractCode ? 'Edit CN / NAPS' : '+ Assign CN Number'}
+                                {cand.contractCode ? 'Edit CN / DBT Record' : '+ Assign CN Number'}
                               </button>
                               <span className="px-2.5 py-0.5 rounded-full text-[10px] font-bold bg-zinc-900 text-white">
                                 {cand.status}
@@ -1160,7 +1160,7 @@ export const SubmissionDetailDrawer: React.FC<SubmissionDetailDrawerProps> = ({
                   </div>
                   <div>
                     <h3 className="text-sm font-extrabold text-zinc-900 uppercase font-mono">
-                      {editingNapsRecord ? 'Edit NAPS Portal Record' : 'Add NAPS Government Portal Record'}
+                      {editingNapsRecord ? 'Edit DBT & NAPS Record' : 'Add DBT & NAPS Portal Record'}
                     </h3>
                     <p className="text-[10px] text-zinc-500 font-mono">Client: {submission.company_name || submission.client_name}</p>
                   </div>
@@ -1451,7 +1451,7 @@ export const SubmissionDetailDrawer: React.FC<SubmissionDetailDrawerProps> = ({
                     type="submit"
                     className="px-5 py-2 rounded-full bg-[#0a192f] text-white hover:bg-zinc-800 text-xs font-bold cursor-pointer transition-all shadow-sm"
                   >
-                    {editingNapsRecord ? 'Save Record Changes' : 'Add to Client NAPS Registry'}
+                    {editingNapsRecord ? 'Save Record Changes' : 'Add to Client DBT Registry'}
                   </button>
                 </div>
               </form>
