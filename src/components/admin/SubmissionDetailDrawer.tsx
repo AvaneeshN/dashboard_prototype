@@ -75,24 +75,24 @@ export const SubmissionDetailDrawer: React.FC<SubmissionDetailDrawerProps> = ({
   const [napsForm, setNapsForm] = useState<Omit<NAPSPortalRecord, 'id'>>({
     candidateId: '',
     candidateName: '',
-    establishmentCode: 'E12253600040',
-    ojtState: 'Telangana',
-    ojtDistrict: 'Hyderabad',
+    establishmentCode: '',
+    ojtState: '',
+    ojtDistrict: '',
     apprenticeCode: '',
     contractCode: '',
     jurisdiction: 'central',
-    contractStartDate: '2026-07-15',
-    contractEndDate: '2027-07-14',
+    contractStartDate: '',
+    contractEndDate: '',
     contractType: 'optional',
-    payoutMonth: 'AUG-2026',
+    payoutMonth: '',
     beneficiaryStatus: 'created',
-    beneficiaryId: '*********7799',
+    beneficiaryId: '',
     dbtProcessedToPfmsDate: '',
     candidateDbtConsent: 'Yes',
     eKycStatus: 'Yes',
-    establishmentSharedStatus: 'paid',
-    amount: 1500.0,
-    paymentStatus: 'PAID',
+    establishmentSharedStatus: 'pending',
+    amount: 0,
+    paymentStatus: 'PENDING',
     paymentFailureReason: ''
   });
 
@@ -167,28 +167,28 @@ export const SubmissionDetailDrawer: React.FC<SubmissionDetailDrawerProps> = ({
 
   const handleOpenAddNaps = (targetCandidate?: ApprenticeRecord) => {
     setEditingNapsRecord(null);
-    const defaultCand = targetCandidate || (candidateList.length === 1 ? candidateList[0] : undefined);
+    const cand = targetCandidate;
     setNapsForm({
-      candidateId: defaultCand?.id || '',
-      candidateName: defaultCand?.name || '',
-      establishmentCode: napsRecords[0]?.establishmentCode || 'E12253600040',
-      ojtState: napsRecords[0]?.ojtState || 'Telangana',
-      ojtDistrict: napsRecords[0]?.ojtDistrict || 'Hyderabad',
-      apprenticeCode: defaultCand?.apprenticeCode || '',
-      contractCode: defaultCand?.contractCode || '',
+      candidateId: cand?.id || '',
+      candidateName: cand?.name || '',
+      establishmentCode: napsRecords[0]?.establishmentCode || '',
+      ojtState: napsRecords[0]?.ojtState || '',
+      ojtDistrict: napsRecords[0]?.ojtDistrict || '',
+      apprenticeCode: cand?.apprenticeCode || '',
+      contractCode: cand?.contractCode || '',
       jurisdiction: 'central',
-      contractStartDate: defaultCand?.onboardingDate || '2026-07-15',
-      contractEndDate: '2027-07-14',
+      contractStartDate: cand?.onboardingDate || '',
+      contractEndDate: '',
       contractType: 'optional',
-      payoutMonth: 'AUG-2026',
+      payoutMonth: '',
       beneficiaryStatus: 'created',
-      beneficiaryId: '*********7799',
+      beneficiaryId: '',
       dbtProcessedToPfmsDate: '',
       candidateDbtConsent: 'Yes',
       eKycStatus: 'Yes',
-      establishmentSharedStatus: 'paid',
-      amount: 1500.0,
-      paymentStatus: 'PAID',
+      establishmentSharedStatus: 'pending',
+      amount: 0,
+      paymentStatus: 'PENDING',
       paymentFailureReason: ''
     });
     setShowNapsModal(true);
@@ -1227,7 +1227,7 @@ export const SubmissionDetailDrawer: React.FC<SubmissionDetailDrawerProps> = ({
                       required
                       value={napsForm.establishmentCode}
                       onChange={(e) => setNapsForm({ ...napsForm, establishmentCode: e.target.value })}
-                      placeholder="E12253600040"
+                      placeholder="e.g. E12253600040"
                       className="w-full px-3 py-2 rounded-xl bg-zinc-50 border border-zinc-200 text-zinc-900 font-mono text-xs focus:outline-none focus:border-black font-semibold"
                     />
                   </div>
@@ -1239,7 +1239,7 @@ export const SubmissionDetailDrawer: React.FC<SubmissionDetailDrawerProps> = ({
                       required
                       value={napsForm.ojtState}
                       onChange={(e) => setNapsForm({ ...napsForm, ojtState: e.target.value })}
-                      placeholder="Telangana"
+                      placeholder="e.g. Telangana"
                       className="w-full px-3 py-2 rounded-xl bg-zinc-50 border border-zinc-200 text-zinc-900 text-xs focus:outline-none focus:border-black"
                     />
                   </div>
@@ -1251,7 +1251,7 @@ export const SubmissionDetailDrawer: React.FC<SubmissionDetailDrawerProps> = ({
                       required
                       value={napsForm.ojtDistrict}
                       onChange={(e) => setNapsForm({ ...napsForm, ojtDistrict: e.target.value })}
-                      placeholder="Hyderabad"
+                      placeholder="e.g. Hyderabad"
                       className="w-full px-3 py-2 rounded-xl bg-zinc-50 border border-zinc-200 text-zinc-900 text-xs focus:outline-none focus:border-black"
                     />
                   </div>
@@ -1265,7 +1265,7 @@ export const SubmissionDetailDrawer: React.FC<SubmissionDetailDrawerProps> = ({
                       required
                       value={napsForm.apprenticeCode}
                       onChange={(e) => setNapsForm({ ...napsForm, apprenticeCode: e.target.value })}
-                      placeholder="A012691340"
+                      placeholder="e.g. A012691340"
                       className="w-full px-3 py-2 rounded-xl bg-zinc-50 border border-zinc-200 text-zinc-900 font-mono text-xs focus:outline-none focus:border-black font-bold"
                     />
                   </div>
@@ -1277,7 +1277,7 @@ export const SubmissionDetailDrawer: React.FC<SubmissionDetailDrawerProps> = ({
                       required
                       value={napsForm.contractCode}
                       onChange={(e) => setNapsForm({ ...napsForm, contractCode: e.target.value })}
-                      placeholder="CN072687468"
+                      placeholder="e.g. CN072687468"
                       className="w-full px-3 py-2 rounded-xl bg-zinc-50 border border-zinc-200 text-zinc-900 font-mono text-xs focus:outline-none focus:border-black font-semibold"
                     />
                   </div>
@@ -1302,7 +1302,7 @@ export const SubmissionDetailDrawer: React.FC<SubmissionDetailDrawerProps> = ({
                       type="text"
                       value={napsForm.contractStartDate}
                       onChange={(e) => setNapsForm({ ...napsForm, contractStartDate: e.target.value })}
-                      placeholder="15/07/2026"
+                      placeholder="DD/MM/YYYY"
                       className="w-full px-3 py-2 rounded-xl bg-zinc-50 border border-zinc-200 text-zinc-900 font-mono text-xs focus:outline-none focus:border-black"
                     />
                   </div>
@@ -1313,7 +1313,7 @@ export const SubmissionDetailDrawer: React.FC<SubmissionDetailDrawerProps> = ({
                       type="text"
                       value={napsForm.contractEndDate}
                       onChange={(e) => setNapsForm({ ...napsForm, contractEndDate: e.target.value })}
-                      placeholder="14/07/2027"
+                      placeholder="DD/MM/YYYY"
                       className="w-full px-3 py-2 rounded-xl bg-zinc-50 border border-zinc-200 text-zinc-900 font-mono text-xs focus:outline-none focus:border-black"
                     />
                   </div>
@@ -1324,9 +1324,9 @@ export const SubmissionDetailDrawer: React.FC<SubmissionDetailDrawerProps> = ({
                     <label className="block text-[11px] font-bold text-zinc-700 mb-1">Payout Month & Year *</label>
                     <div className="grid grid-cols-2 gap-1.5">
                       <select
-                        value={(napsForm.payoutMonth || 'AUG-2026').split('-')[0] || 'AUG'}
+                        value={(napsForm.payoutMonth || '').split('-')[0] || 'JAN'}
                         onChange={(e) => {
-                          const yr = (napsForm.payoutMonth || 'AUG-2026').split('-')[1] || '2026';
+                          const yr = (napsForm.payoutMonth || '').split('-')[1] || new Date().getFullYear().toString();
                           setNapsForm({ ...napsForm, payoutMonth: `${e.target.value}-${yr}` });
                         }}
                         className="px-2 py-2 rounded-xl bg-zinc-50 border border-zinc-200 text-zinc-900 font-mono font-bold text-xs focus:outline-none focus:border-black cursor-pointer"
@@ -1336,9 +1336,9 @@ export const SubmissionDetailDrawer: React.FC<SubmissionDetailDrawerProps> = ({
                         ))}
                       </select>
                       <select
-                        value={(napsForm.payoutMonth || 'AUG-2026').split('-')[1] || '2026'}
+                        value={(napsForm.payoutMonth || '').split('-')[1] || new Date().getFullYear().toString()}
                         onChange={(e) => {
-                          const mo = (napsForm.payoutMonth || 'AUG-2026').split('-')[0] || 'AUG';
+                          const mo = (napsForm.payoutMonth || '').split('-')[0] || 'JAN';
                           setNapsForm({ ...napsForm, payoutMonth: `${mo}-${e.target.value}` });
                         }}
                         className="px-2 py-2 rounded-xl bg-zinc-50 border border-zinc-200 text-zinc-900 font-mono font-bold text-xs focus:outline-none focus:border-black cursor-pointer"
@@ -1356,7 +1356,7 @@ export const SubmissionDetailDrawer: React.FC<SubmissionDetailDrawerProps> = ({
                       type="text"
                       value={napsForm.beneficiaryId}
                       onChange={(e) => setNapsForm({ ...napsForm, beneficiaryId: e.target.value })}
-                      placeholder="*********7799"
+                      placeholder="e.g. *********7799"
                       className="w-full px-3 py-2 rounded-xl bg-zinc-50 border border-zinc-200 text-zinc-900 font-mono text-xs focus:outline-none focus:border-black"
                     />
                   </div>
@@ -1367,7 +1367,7 @@ export const SubmissionDetailDrawer: React.FC<SubmissionDetailDrawerProps> = ({
                       type="text"
                       value={napsForm.dbtProcessedToPfmsDate || ''}
                       onChange={(e) => setNapsForm({ ...napsForm, dbtProcessedToPfmsDate: e.target.value })}
-                      placeholder="04-08-2026 or leave empty"
+                      placeholder="DD-MM-YYYY (optional)"
                       className="w-full px-3 py-2 rounded-xl bg-zinc-50 border border-zinc-200 text-zinc-900 font-mono text-xs focus:outline-none focus:border-black"
                     />
                   </div>
@@ -1418,8 +1418,9 @@ export const SubmissionDetailDrawer: React.FC<SubmissionDetailDrawerProps> = ({
                       type="number"
                       required
                       step={100}
-                      value={napsForm.amount}
-                      onChange={(e) => setNapsForm({ ...napsForm, amount: Number(e.target.value) || 0 })}
+                      value={napsForm.amount === 0 ? '' : napsForm.amount}
+                      onChange={(e) => setNapsForm({ ...napsForm, amount: e.target.value === '' ? 0 : Number(e.target.value) })}
+                      placeholder="0.00"
                       className="w-full px-3 py-2 rounded-xl bg-zinc-50 border border-zinc-200 text-zinc-900 font-bold text-xs focus:outline-none focus:border-black"
                     />
                   </div>
@@ -1431,8 +1432,8 @@ export const SubmissionDetailDrawer: React.FC<SubmissionDetailDrawerProps> = ({
                       onChange={(e) => setNapsForm({ ...napsForm, paymentStatus: e.target.value })}
                       className="w-full px-3 py-2 rounded-xl bg-zinc-50 border border-zinc-200 text-zinc-900 font-bold text-xs focus:outline-none focus:border-black cursor-pointer"
                     >
-                      <option value="PAID">PAID</option>
                       <option value="PENDING">PENDING</option>
+                      <option value="PAID">PAID</option>
                       <option value="FAILED">FAILED</option>
                     </select>
                   </div>
