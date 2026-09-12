@@ -19,7 +19,7 @@ export const Navbar: React.FC = () => {
   // On landing/login page (`/`), render company navy blue header
   if (pathname === '/') {
     return (
-      <header className="sticky top-0 z-50 w-full border-b border-[#1e3a5f] bg-[#0a192f] text-white shadow-md font-sans">
+      <header className="sticky top-0 z-30 w-full border-b border-[#1e3a5f] bg-[#0a192f] text-white shadow-md font-sans">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 h-16 flex items-center justify-between">
           <div className="flex items-center gap-2.5">
             <div className="w-8 h-8 rounded-lg bg-[#112240] border border-amber-400/40 flex items-center justify-center text-amber-300 font-serif font-bold text-xs shadow-xs tracking-tighter">
@@ -48,7 +48,7 @@ export const Navbar: React.FC = () => {
   }
 
   return (
-    <header className="sticky top-0 z-50 w-full border-b border-[#1e3a5f] bg-[#0a192f] text-white shadow-md font-sans">
+    <header className="sticky top-0 z-30 w-full border-b border-[#1e3a5f] bg-[#0a192f] text-white shadow-md font-sans">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 h-16 flex items-center justify-between">
         
         {/* Logo */}

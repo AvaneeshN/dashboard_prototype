@@ -2092,12 +2092,12 @@ export const ClientDashboard: React.FC = () => {
       {/* MODAL 1: Add Apprentice Candidate with Multi-Format Documents (.pdf, .docx, .txt) & SPOC Email */}
       <AnimatePresence>
         {showAddModal && (
-          <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/40 backdrop-blur-xs font-sans">
+          <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 sm:p-6 bg-black/60 backdrop-blur-xs font-sans overflow-y-auto">
             <motion.div
               initial={{ opacity: 0, scale: 0.95 }}
               animate={{ opacity: 1, scale: 1 }}
               exit={{ opacity: 0, scale: 0.95 }}
-              className="w-full max-w-2xl bg-white rounded-3xl p-7 border border-zinc-200 shadow-2xl space-y-4 max-h-[92vh] overflow-y-auto"
+              className="w-full max-w-2xl bg-white rounded-3xl p-6 sm:p-8 border border-zinc-200 shadow-2xl space-y-4 my-auto max-h-[85vh] overflow-y-auto"
             >
               <div className="flex items-center justify-between border-b border-zinc-100 pb-3">
                 <div className="flex items-center gap-2">
@@ -2485,12 +2485,12 @@ export const ClientDashboard: React.FC = () => {
       {/* MODAL 2: Run Monthly Payroll Batch */}
       <AnimatePresence>
         {showPayrollModal && (
-          <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/40 backdrop-blur-xs font-sans">
+          <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 sm:p-6 bg-black/60 backdrop-blur-xs font-sans overflow-y-auto">
             <motion.div
               initial={{ opacity: 0, scale: 0.95 }}
               animate={{ opacity: 1, scale: 1 }}
               exit={{ opacity: 0, scale: 0.95 }}
-              className="w-full max-w-md bg-white rounded-3xl p-7 border border-zinc-200 shadow-2xl space-y-4"
+              className="w-full max-w-md bg-white rounded-3xl p-6 sm:p-7 border border-zinc-200 shadow-2xl space-y-4 my-auto max-h-[85vh] overflow-y-auto"
             >
               <div className="flex items-center justify-between border-b border-zinc-100 pb-3">
                 <h3 className="text-sm font-extrabold text-zinc-900 uppercase font-mono">
@@ -2536,12 +2536,12 @@ export const ClientDashboard: React.FC = () => {
       {/* MODAL 3: File DBT Subsidy Claim */}
       <AnimatePresence>
         {showDBTClaimModal && (
-          <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/40 backdrop-blur-xs font-sans">
+          <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 sm:p-6 bg-black/60 backdrop-blur-xs font-sans overflow-y-auto">
             <motion.div
               initial={{ opacity: 0, scale: 0.95 }}
               animate={{ opacity: 1, scale: 1 }}
               exit={{ opacity: 0, scale: 0.95 }}
-              className="w-full max-w-md bg-white rounded-3xl p-7 border border-zinc-200 shadow-2xl space-y-4"
+              className="w-full max-w-md bg-white rounded-3xl p-6 sm:p-7 border border-zinc-200 shadow-2xl space-y-4 my-auto max-h-[85vh] overflow-y-auto"
             >
               <div className="flex items-center justify-between border-b border-zinc-100 pb-3">
                 <h3 className="text-sm font-extrabold text-zinc-900 uppercase font-mono">
@@ -2586,12 +2586,12 @@ export const ClientDashboard: React.FC = () => {
       {/* MODAL 4: Legal Contract Agreement Preview */}
       <AnimatePresence>
         {selectedContractCandidate && (
-          <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/40 backdrop-blur-xs font-sans">
+          <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 sm:p-6 bg-black/60 backdrop-blur-xs font-sans overflow-y-auto">
             <motion.div
               initial={{ opacity: 0, scale: 0.95 }}
               animate={{ opacity: 1, scale: 1 }}
               exit={{ opacity: 0, scale: 0.95 }}
-              className="w-full max-w-2xl bg-white rounded-3xl p-8 border border-zinc-200 shadow-2xl space-y-5 max-h-[90vh] overflow-y-auto text-zinc-900"
+              className="w-full max-w-2xl bg-white rounded-3xl p-6 sm:p-8 border border-zinc-200 shadow-2xl space-y-5 my-auto max-h-[85vh] overflow-y-auto text-zinc-900"
             >
               <div className="flex items-center justify-between border-b border-zinc-200 pb-4">
                 <div>
@@ -2667,12 +2667,12 @@ export const ClientDashboard: React.FC = () => {
       {/* MODAL 6: Configure / Edit Designated Notification SPOC */}
       <AnimatePresence>
         {showSpocModal && (
-          <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-xs">
+          <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 sm:p-6 bg-black/60 backdrop-blur-xs font-sans overflow-y-auto">
             <motion.div
               initial={{ opacity: 0, scale: 0.95 }}
               animate={{ opacity: 1, scale: 1 }}
               exit={{ opacity: 0, scale: 0.95 }}
-              className="bg-white rounded-3xl border border-zinc-200 shadow-2xl p-6 sm:p-8 max-w-md w-full space-y-6"
+              className="bg-white rounded-3xl border border-zinc-200 shadow-2xl p-6 sm:p-8 max-w-md w-full space-y-6 my-auto max-h-[85vh] overflow-y-auto"
             >
               <div className="flex items-center justify-between">
                 <div>
@@ -2760,12 +2760,12 @@ export const ClientDashboard: React.FC = () => {
       {/* MODAL 7: Submit Monthly Stipend Disbursement (Locked Entry) */}
       <AnimatePresence>
         {showStipendModal && (
-          <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-xs font-sans">
+          <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 sm:p-6 bg-black/60 backdrop-blur-xs font-sans overflow-y-auto">
             <motion.div
               initial={{ scale: 0.95, opacity: 0 }}
               animate={{ scale: 1, opacity: 1 }}
               exit={{ scale: 0.95, opacity: 0 }}
-              className="w-full max-w-lg bg-white rounded-3xl border border-zinc-200 shadow-2xl overflow-hidden"
+              className="w-full max-w-lg bg-white rounded-3xl border border-zinc-200 shadow-2xl overflow-hidden my-auto max-h-[85vh] overflow-y-auto"
             >
               <div className="bg-[#0a192f] text-white p-6 flex items-center justify-between">
                 <div className="flex items-center gap-3">
@@ -2889,12 +2889,12 @@ export const ClientDashboard: React.FC = () => {
       {/* MODAL 8: Add Compliance Action Item / Remark (Both Client & Admin) */}
       <AnimatePresence>
         {showActionItemModal && (
-          <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-xs font-sans">
+          <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 sm:p-6 bg-black/60 backdrop-blur-xs font-sans overflow-y-auto">
             <motion.div
               initial={{ scale: 0.95, opacity: 0 }}
               animate={{ scale: 1, opacity: 1 }}
               exit={{ scale: 0.95, opacity: 0 }}
-              className="w-full max-w-lg bg-white rounded-3xl border border-zinc-200 shadow-2xl overflow-hidden"
+              className="my-auto max-h-[85vh] overflow-y-auto w-full max-w-lg bg-white rounded-3xl border border-zinc-200 shadow-2xl"
             >
               <div className="bg-[#0a192f] text-white p-6 flex items-center justify-between">
                 <div className="flex items-center gap-3">
