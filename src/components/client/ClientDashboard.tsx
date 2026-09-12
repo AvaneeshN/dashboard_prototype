@@ -170,6 +170,10 @@ export const ClientDashboard: React.FC = () => {
     phone: '',
     aadhaarNumber: '',
     tradeOrRole: '', // Curriculum
+    tradeType: 'optional' as 'optional' | 'designated',
+    gender: 'Male' as 'Male' | 'Female' | 'Others',
+    socialCategory: 'General' as 'General' | 'OBC' | 'SC' | 'ST' | 'Minority',
+    ojtState: 'Karnataka',
     qualification: '',
     stipendAmount: 18500,
     dbtEligibleAmount: 0,
@@ -703,11 +707,15 @@ export const ClientDashboard: React.FC = () => {
       panNumber: candidateForm.panNumber,
       aparId: candidateForm.aparId,
       tradeOrRole: candidateForm.tradeOrRole,
+      tradeType: candidateForm.tradeType || 'optional',
+      gender: candidateForm.gender || 'Male',
+      socialCategory: candidateForm.socialCategory || 'General',
+      ojtState: candidateForm.ojtState || 'Karnataka',
       qualification: candidateForm.qualification,
       onboardingDate: candidateForm.joiningDate,
       contractExpireDate: expiryDate,
       enrollmentScheme: candidateForm.enrollmentScheme || 'NAPS',
-      stipendAmount: Number(candidateForm.stipendAmount) || 18500,
+      stipendAmount: Number(candidateForm.stipendAmount) || 0,
       dbtEligibleAmount: Number(candidateForm.dbtEligibleAmount) || 0,
       contractStatus: 'Generated',
       attendanceRate: '100%',
@@ -761,8 +769,12 @@ export const ClientDashboard: React.FC = () => {
       phone: '',
       aadhaarNumber: '',
       tradeOrRole: '',
+      tradeType: 'optional',
+      gender: 'Male',
+      socialCategory: 'General',
+      ojtState: 'Karnataka',
       qualification: '',
-      stipendAmount: 18500,
+      stipendAmount: 0,
       dbtEligibleAmount: 0,
       joiningDate: new Date().toISOString().split('T')[0],
       contractExpireDate: new Date(new Date().setFullYear(new Date().getFullYear() + 1)).toISOString().split('T')[0],
@@ -812,8 +824,12 @@ export const ClientDashboard: React.FC = () => {
       phone: '',
       aadhaarNumber: '',
       tradeOrRole: defaultRole,
+      tradeType: 'optional',
+      gender: 'Male',
+      socialCategory: 'General',
+      ojtState: 'Karnataka',
       qualification: '',
-      stipendAmount: Number(activeSubmission?.responses?.stipendPerApprentice) || 18500,
+      stipendAmount: Number(activeSubmission?.responses?.stipendPerApprentice) || 0,
       dbtEligibleAmount: 0,
       joiningDate: defaultJoiningDate,
       contractExpireDate: defaultExpire,
@@ -2624,6 +2640,34 @@ export const ClientDashboard: React.FC = () => {
                     )}
 
                     <div>
+                      <label className="block font-bold text-zinc-700 mb-1">Gender *</label>
+                      <select
+                        value={candidateForm.gender || 'Male'}
+                        onChange={(e) => setCandidateForm({ ...candidateForm, gender: e.target.value as 'Male' | 'Female' | 'Others' })}
+                        className="w-full px-3 py-2 rounded-2xl bg-zinc-50 border border-zinc-200 text-zinc-900 text-xs focus:outline-none focus:border-black font-semibold cursor-pointer"
+                      >
+                        <option value="Male">Male</option>
+                        <option value="Female">Female</option>
+                        <option value="Others">Others</option>
+                      </select>
+                    </div>
+
+                    <div>
+                      <label className="block font-bold text-zinc-700 mb-1">Social Category *</label>
+                      <select
+                        value={candidateForm.socialCategory || 'General'}
+                        onChange={(e) => setCandidateForm({ ...candidateForm, socialCategory: e.target.value as any })}
+                        className="w-full px-3 py-2 rounded-2xl bg-zinc-50 border border-zinc-200 text-zinc-900 text-xs focus:outline-none focus:border-black font-semibold cursor-pointer"
+                      >
+                        <option value="General">General</option>
+                        <option value="OBC">OBC (Other Backward Class)</option>
+                        <option value="SC">SC (Scheduled Caste)</option>
+                        <option value="ST">ST (Scheduled Tribe)</option>
+                        <option value="Minority">Minority</option>
+                      </select>
+                    </div>
+
+                    <div>
                       <label className="block font-bold text-zinc-700 mb-1">Curriculum *</label>
                       <input
                         type="text"
@@ -2631,6 +2675,30 @@ export const ClientDashboard: React.FC = () => {
                         placeholder="e.g. Mechanical Engineering / Retail Sales Associate"
                         value={candidateForm.tradeOrRole}
                         onChange={(e) => setCandidateForm({ ...candidateForm, tradeOrRole: e.target.value })}
+                        className="w-full px-3 py-2 rounded-2xl bg-zinc-50 border border-zinc-200 text-zinc-900 text-xs focus:outline-none focus:border-black font-medium"
+                      />
+                    </div>
+
+                    <div>
+                      <label className="block font-bold text-zinc-700 mb-1">Trade Classification *</label>
+                      <select
+                        value={candidateForm.tradeType || 'optional'}
+                        onChange={(e) => setCandidateForm({ ...candidateForm, tradeType: e.target.value as 'optional' | 'designated' })}
+                        className="w-full px-3 py-2 rounded-2xl bg-zinc-50 border border-zinc-200 text-zinc-900 text-xs focus:outline-none focus:border-black font-semibold cursor-pointer"
+                      >
+                        <option value="optional">Optional Trade (IT, Services, SSC, Non-Engineering)</option>
+                        <option value="designated">Designated Trade (Manufacturing, Engineering, ITI / NCVT)</option>
+                      </select>
+                    </div>
+
+                    <div>
+                      <label className="block font-bold text-zinc-700 mb-1">OJT Training State *</label>
+                      <input
+                        type="text"
+                        required
+                        placeholder="e.g. Karnataka, Maharashtra, Delhi"
+                        value={candidateForm.ojtState || ''}
+                        onChange={(e) => setCandidateForm({ ...candidateForm, ojtState: e.target.value })}
                         className="w-full px-3 py-2 rounded-2xl bg-zinc-50 border border-zinc-200 text-zinc-900 text-xs focus:outline-none focus:border-black font-medium"
                       />
                     </div>
