@@ -79,9 +79,12 @@ export const AuthGateway: React.FC = () => {
           return;
         }
 
-        const res = await login('admin@company.com', 'admin', adminPasskey.trim());
+        const targetRole = adminPasskey.trim().toLowerCase().includes('junior') ? 'junior_admin' : 'senior_admin';
+        const targetEmail = targetRole === 'junior_admin' ? 'junior.admin@company.com' : 'admin@company.com';
+
+        const res = await login(targetEmail, targetRole, adminPasskey.trim());
         if (res.success) {
-          setSuccessMsg('Passkey verified. Unlocking Administrator Console...');
+          setSuccessMsg(`Passkey verified. Unlocking ${targetRole === 'junior_admin' ? 'Junior Operations' : 'Senior Administrator'} Console...`);
           setTimeout(() => {
             router.push('/admin');
           }, 400);
@@ -271,6 +274,35 @@ export const AuthGateway: React.FC = () => {
                       <span>{successMsg}</span>
                     </div>
                   )}
+
+                  {/* Senior vs Junior Admin Quick Preset Selector */}
+                  <div className="grid grid-cols-2 gap-2">
+                    <button
+                      type="button"
+                      onClick={() => setAdminPasskey('admin123')}
+                      className={`p-2.5 rounded-2xl border text-left cursor-pointer transition-all ${
+                        adminPasskey === 'admin123'
+                          ? 'border-black bg-white shadow-xs ring-2 ring-black/5'
+                          : 'border-zinc-200 bg-zinc-50 hover:bg-white text-zinc-600'
+                      }`}
+                    >
+                      <div className="text-[11px] font-bold text-zinc-900">Senior Admin</div>
+                      <div className="text-[10px] text-zinc-500 font-mono">admin123 (Full Access)</div>
+                    </button>
+
+                    <button
+                      type="button"
+                      onClick={() => setAdminPasskey('junior123')}
+                      className={`p-2.5 rounded-2xl border text-left cursor-pointer transition-all ${
+                        adminPasskey === 'junior123'
+                          ? 'border-amber-600 bg-amber-50/50 shadow-xs ring-2 ring-amber-600/10'
+                          : 'border-zinc-200 bg-zinc-50 hover:bg-white text-zinc-600'
+                      }`}
+                    >
+                      <div className="text-[11px] font-bold text-amber-900">Junior Admin</div>
+                      <div className="text-[10px] text-amber-700 font-mono">junior123 (Restricted)</div>
+                    </button>
+                  </div>
 
                   <div className="space-y-1">
                     <label className="block text-[11px] font-bold text-zinc-600 uppercase font-mono tracking-wider">

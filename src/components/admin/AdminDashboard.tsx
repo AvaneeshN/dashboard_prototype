@@ -30,7 +30,8 @@ import {
   LayoutDashboard,
   ArrowUpRight,
   Mail,
-  X
+  X,
+  Lock
 } from 'lucide-react';
 import { 
   ResponsiveContainer, 
@@ -41,9 +42,10 @@ import {
   Tooltip 
 } from 'recharts';
 import { motion, AnimatePresence } from 'framer-motion';
-import { RequiredDocumentConfig } from '@/types';
+import { RequiredDocumentConfig, getAdminPermissions, isSeniorAdmin, isJuniorAdmin } from '@/types';
+import { AdminVisualAnalytics } from './AdminVisualAnalytics';
 
-type AdminTab = 'telemetry' | 'intakes' | 'requirements' | 'security';
+type AdminTab = 'analytics' | 'telemetry' | 'intakes' | 'requirements' | 'security';
 
 export const AdminDashboard: React.FC = () => {
   const { 
@@ -52,13 +54,14 @@ export const AdminDashboard: React.FC = () => {
     loginLogs, 
     updateSubmissionStatus, 
     syncDataToSupabase, 
+    switchAdminRole,
     adminSpoc, 
     setAdminSpoc,
     requiredDocuments,
     updateRequiredDocuments,
     resetRequiredDocuments
   } = useStore();
-  const [activeTab, setActiveTab] = useState<AdminTab>('telemetry');
+  const [activeTab, setActiveTab] = useState<AdminTab>('analytics');
   const [searchQuery, setSearchQuery] = useState('');
   const [statusFilter, setStatusFilter] = useState<string>('all');
   const [selectedSubmission, setSelectedSubmission] = useState<FormSubmission | null>(null);
@@ -287,11 +290,17 @@ export const AdminDashboard: React.FC = () => {
     }
   };
 
+  const permissions = getAdminPermissions(user?.role);
+  const isSenior = isSeniorAdmin(user?.role);
+
   const adminTabs = [
-    { id: 'telemetry', label: 'Executive Telemetry & Funnel', icon: <LayoutDashboard className="w-3.5 h-3.5" /> },
+    { id: 'analytics', label: 'Visual Overview & Analytics', icon: <BarChart2 className="w-3.5 h-3.5 text-blue-600" /> },
+    { id: 'telemetry', label: 'Funnel & Telemetry', icon: <LayoutDashboard className="w-3.5 h-3.5" /> },
     { id: 'intakes', label: `Client Intakes (${submissions.length})`, icon: <FileSpreadsheet className="w-3.5 h-3.5" /> },
     { id: 'requirements', label: `Document Requirements (${requiredDocuments.length})`, icon: <FileCheck className="w-3.5 h-3.5" /> },
-    { id: 'security', label: `Security Audit Log (${loginLogs.length})`, icon: <ShieldCheck className="w-3.5 h-3.5" /> }
+    ...(permissions.canViewSecurityAuditLogs ? [
+      { id: 'security', label: `Security Audit Log (${loginLogs.length})`, icon: <ShieldCheck className="w-3.5 h-3.5" /> }
+    ] : [])
   ];
 
   return (
@@ -303,18 +312,51 @@ export const AdminDashboard: React.FC = () => {
           <div className="flex items-center gap-2 mb-2">
             <span className="text-lg leading-none">✦</span>
             <span className="font-mono text-xs font-semibold uppercase tracking-wider text-zinc-500">
-              Admin DBT Dashboard
+              Admin DBT Dashboard · {isSenior ? 'Senior Admin Access' : 'Junior Admin Restricted'}
             </span>
           </div>
           <h1 className="text-3xl sm:text-4xl font-extrabold tracking-tight text-zinc-900">
             DBT Administration Dashboard
           </h1>
           <p className="text-xs text-zinc-500 mt-1 font-medium">
-            DBT disbursement telemetry, client intake funnel, candidate quotas, and security audit logs.
+            Dynamic visual analytics, DBT disbursement telemetry, client intake funnel, and role-governed verification.
           </p>
         </div>
 
         <div className="flex flex-wrap items-center gap-2.5">
+          {/* Senior vs Junior Role Switcher */}
+          <div className="flex items-center gap-1 p-1 rounded-full bg-zinc-100 border border-zinc-200 shadow-2xs">
+            <button
+              type="button"
+              onClick={() => switchAdminRole('senior_admin')}
+              className={`px-3 py-1.5 rounded-full text-xs font-bold flex items-center gap-1.5 transition-all cursor-pointer ${
+                isSenior
+                  ? 'bg-black text-white shadow-xs'
+                  : 'text-zinc-600 hover:text-zinc-900'
+              }`}
+              title="Full access: approvals, unmasked financials, DBT release, audit logs"
+            >
+              <ShieldCheck className="w-3.5 h-3.5 text-emerald-400" />
+              <span>Senior Admin</span>
+            </button>
+            <button
+              type="button"
+              onClick={() => {
+                switchAdminRole('junior_admin');
+                if (activeTab === 'security') setActiveTab('analytics');
+              }}
+              className={`px-3 py-1.5 rounded-full text-xs font-bold flex items-center gap-1.5 transition-all cursor-pointer ${
+                !isSenior
+                  ? 'bg-amber-600 text-white shadow-xs'
+                  : 'text-zinc-600 hover:text-zinc-900'
+              }`}
+              title="Restricted: document review only, masked PII, no final approvals"
+            >
+              <ShieldAlert className="w-3.5 h-3.5 text-white" />
+              <span>Junior Admin</span>
+            </button>
+          </div>
+
           <button
             onClick={handleSupabaseSync}
             disabled={isSyncing}
@@ -324,13 +366,23 @@ export const AdminDashboard: React.FC = () => {
             <span>{isSyncing ? 'Syncing...' : 'Sync Database'}</span>
           </button>
 
-          <button
-            onClick={handleExportCSV}
-            className="px-4 py-2 rounded-full bg-black text-white hover:bg-zinc-800 text-xs font-bold flex items-center gap-1.5 transition-all cursor-pointer shadow-sm"
-          >
-            <Download className="w-3.5 h-3.5" />
-            <span>Export CSV ↗</span>
-          </button>
+          {permissions.canExportCSV ? (
+            <button
+              onClick={handleExportCSV}
+              className="px-4 py-2 rounded-full bg-black text-white hover:bg-zinc-800 text-xs font-bold flex items-center gap-1.5 transition-all cursor-pointer shadow-sm"
+            >
+              <Download className="w-3.5 h-3.5" />
+              <span>Export CSV ↗</span>
+            </button>
+          ) : (
+            <div 
+              className="px-3.5 py-2 rounded-full bg-zinc-100 text-zinc-400 border border-zinc-200 text-xs font-medium flex items-center gap-1.5 cursor-not-allowed"
+              title="Bulk CSV export restricted to Senior Admin"
+            >
+              <Lock className="w-3 h-3 text-zinc-400" />
+              <span>Export CSV (Senior Only)</span>
+            </div>
+          )}
         </div>
       </div>
 
@@ -374,6 +426,19 @@ export const AdminDashboard: React.FC = () => {
       <div className="min-h-[420px]">
         <AnimatePresence mode="wait">
           
+          {/* TAB 0: Visual Overview & Analytics */}
+          {activeTab === 'analytics' && (
+            <motion.div
+              key="analytics"
+              initial={{ opacity: 0, y: 8 }}
+              animate={{ opacity: 1, y: 0 }}
+              exit={{ opacity: 0, y: -8 }}
+              transition={{ duration: 0.2 }}
+            >
+              <AdminVisualAnalytics />
+            </motion.div>
+          )}
+
           {/* TAB 1: Executive Telemetry & Funnel */}
           {activeTab === 'telemetry' && (
             <motion.div

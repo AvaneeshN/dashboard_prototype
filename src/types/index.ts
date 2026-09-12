@@ -1,4 +1,48 @@
-export type UserRole = 'admin' | 'client';
+export type UserRole = 'senior_admin' | 'junior_admin' | 'admin' | 'client';
+
+export interface AdminPermissions {
+  canApproveOrRejectClient: boolean;
+  canDeleteSubmission: boolean;
+  canViewUnmaskedSensitiveData: boolean; // Bank account & full Aadhaar
+  canApproveDBTClaims: boolean;
+  canModifyDBTPaymentStatus: boolean;
+  canExportCSV: boolean;
+  canViewSecurityAuditLogs: boolean;
+  canReassignSPOC: boolean;
+}
+
+export const isSeniorAdmin = (role?: UserRole | string): boolean => {
+  return role === 'senior_admin' || role === 'admin';
+};
+
+export const isJuniorAdmin = (role?: UserRole | string): boolean => {
+  return role === 'junior_admin';
+};
+
+export const getAdminPermissions = (role?: UserRole | string): AdminPermissions => {
+  if (role === 'junior_admin') {
+    return {
+      canApproveOrRejectClient: false,
+      canDeleteSubmission: false,
+      canViewUnmaskedSensitiveData: false,
+      canApproveDBTClaims: false,
+      canModifyDBTPaymentStatus: false,
+      canExportCSV: false,
+      canViewSecurityAuditLogs: false,
+      canReassignSPOC: false,
+    };
+  }
+  return {
+    canApproveOrRejectClient: true,
+    canDeleteSubmission: true,
+    canViewUnmaskedSensitiveData: true,
+    canApproveDBTClaims: true,
+    canModifyDBTPaymentStatus: true,
+    canExportCSV: true,
+    canViewSecurityAuditLogs: true,
+    canReassignSPOC: true,
+  };
+};
 
 export type SubmissionStatus = 
   | 'draft' 
@@ -82,6 +126,10 @@ export interface ApprenticeRecord {
   daysPresent?: number;
   totalWorkingDays?: number;
   status: 'Active' | 'Under Training' | 'Completed' | 'Terminated';
+  socialCategory?: 'General' | 'OBC' | 'SC' | 'ST' | 'Minority';
+  tradeType?: 'optional' | 'designated';
+  assessmentStatus?: 'Assessed' | 'Pending' | 'Exempt';
+  certificationStatus?: 'Certified' | 'Pending' | 'In Progress';
   bankName?: string;
   bankAccountNumber?: string;
   ifscCode?: string;
@@ -142,6 +190,7 @@ export interface NAPSPortalRecord {
   ojtDistrict: string;
   dob?: string;
   gender?: string;
+  socialCategory?: 'General' | 'OBC' | 'SC' | 'ST' | 'Minority';
   mobileNumber?: string;
   emailId?: string;
   stipend?: number;

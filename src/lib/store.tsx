@@ -72,6 +72,7 @@ interface AuthState {
   getActiveClientSubmission: () => FormSubmission | undefined;
   syncDataToSupabase: () => Promise<{ success: boolean; message: string }>;
   resetToDemoData: () => void;
+  switchAdminRole: (newRole: 'senior_admin' | 'junior_admin') => void;
   
   // Production Candidate & Financial Operations
   addApprentice: (candidateData: Omit<ApprenticeRecord, 'id'>) => Promise<ApprenticeRecord>;
@@ -382,22 +383,27 @@ export const StoreProvider: React.FC<{ children: React.ReactNode }> = ({ childre
     const normalizedEmail = email.trim().toLowerCase();
 
     // 1. Direct Administrator Passkey Authentication
-    if (role === 'admin') {
-      const validPasskeys = [
-        'admin123',
-        'ADMIN-2026',
-        'admin',
-        'ADMIN123',
-        'ADMIN',
-        'passkey123'
-      ];
+    if (role === 'admin' || role === 'senior_admin' || role === 'junior_admin') {
       const submittedKey = (password || email || '').trim();
-      if (validPasskeys.includes(submittedKey) || (password && validPasskeys.includes(password.trim()))) {
+      const isJuniorAttempt = role === 'junior_admin' || 
+        normalizedEmail.includes('junior') ||
+        ['junior123', 'junior', 'junioradmin'].includes(submittedKey.toLowerCase());
+
+      const validSeniorPasskeys = ['admin123', 'ADMIN-2026', 'admin', 'ADMIN123', 'ADMIN', 'passkey123', 'senior123'];
+      const validJuniorPasskeys = ['junior123', 'junior', 'junioradmin', 'JUNIOR-2026', 'admin123', 'admin'];
+
+      const isValid = isJuniorAttempt
+        ? (validJuniorPasskeys.includes(submittedKey) || (password && validJuniorPasskeys.includes(password.trim())))
+        : (validSeniorPasskeys.includes(submittedKey) || (password && validSeniorPasskeys.includes(password.trim())));
+
+      if (isValid) {
+        const assignedRole: UserRole = isJuniorAttempt ? 'junior_admin' : 'senior_admin';
+        const adminEmail = isJuniorAttempt ? 'junior.admin@company.com' : 'admin@company.com';
         const adminUser: UserProfile = {
-          id: 'admin-1',
-          email: 'admin@company.com',
-          full_name: 'Administrator',
-          role: 'admin',
+          id: isJuniorAttempt ? 'junior-admin-1' : 'admin-1',
+          email: adminEmail,
+          full_name: isJuniorAttempt ? 'Junior Operations Admin' : 'Senior Administrator',
+          role: assignedRole,
           created_at: new Date().toISOString(),
           last_login_at: new Date().toISOString()
         };
@@ -418,11 +424,16 @@ export const StoreProvider: React.FC<{ children: React.ReactNode }> = ({ childre
           } catch (e) {}
         }
 
-        await addLoginLog('admin@company.com', 'admin', 'success');
+        await addLoginLog(adminEmail, assignedRole, 'success');
         return { success: true };
       } else {
-        await addLoginLog('admin@company.com', 'admin', 'failed', 'Invalid security passkey');
-        return { success: false, error: 'Invalid Administrator Security Passkey. Please check and try again.' };
+        await addLoginLog(email || 'admin@company.com', role, 'failed', 'Invalid security passkey');
+        return { 
+          success: false, 
+          error: isJuniorAttempt 
+            ? 'Invalid Junior Administrator Passkey (use: junior123).' 
+            : 'Invalid Administrator Passkey (use: admin123).' 
+        };
       }
     }
 
@@ -1608,6 +1619,18 @@ export const StoreProvider: React.FC<{ children: React.ReactNode }> = ({ childre
     }
   };
 
+  const switchAdminRole = (newRole: 'senior_admin' | 'junior_admin') => {
+    if (user && (user.role === 'admin' || user.role === 'senior_admin' || user.role === 'junior_admin')) {
+      const updatedUser: UserProfile = {
+        ...user,
+        role: newRole,
+        full_name: newRole === 'junior_admin' ? 'Junior Operations Admin' : 'Senior Administrator',
+        email: newRole === 'junior_admin' ? 'junior.admin@company.com' : 'admin@company.com'
+      };
+      setUser(updatedUser);
+    }
+  };
+
   const resetToDemoData = () => {
     setProfiles([]);
     setSubmissions([]);
@@ -1631,6 +1654,7 @@ export const StoreProvider: React.FC<{ children: React.ReactNode }> = ({ childre
         getActiveClientSubmission,
         syncDataToSupabase,
         resetToDemoData,
+        switchAdminRole,
         addApprentice,
         removeApprentice,
         updateApprentice,

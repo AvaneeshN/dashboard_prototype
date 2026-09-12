@@ -11,7 +11,10 @@ import {
   ComplianceActionItem,
   ApprenticeRecord,
   CompanyOperationsSPOC,
-  StipendPaymentRecord
+  StipendPaymentRecord,
+  getAdminPermissions,
+  isSeniorAdmin,
+  isJuniorAdmin
 } from '@/types';
 import { DocumentViewerModal } from '@/components/ui/DocumentViewerModal';
 import { downloadDocumentFile } from '@/lib/document-utils';
@@ -74,8 +77,12 @@ export const SubmissionDetailDrawer: React.FC<SubmissionDetailDrawerProps> = ({
     addActionItem,
     addInvoice,
     deleteInvoice,
-    submissions
+    submissions,
+    user
   } = useStore();
+  const permissions = getAdminPermissions(user?.role);
+  const isSenior = isSeniorAdmin(user?.role);
+
   const [activeTab, setActiveTab] = useState<'application' | 'documents' | 'candidates' | 'dbt_claims' | 'spoc_logs' | 'naps_portal' | 'invoices'>('application');
   const [candidateFilter, setCandidateFilter] = useState<'all' | 'allocated' | 'pending'>('all');
   const [previewingDoc, setPreviewingDoc] = useState<any>(null);
@@ -572,16 +579,34 @@ export const SubmissionDetailDrawer: React.FC<SubmissionDetailDrawerProps> = ({
             </div>
 
             <div className="flex items-center gap-3">
+              {/* Role Indicator Badge */}
+              <span className={`px-2.5 py-1 rounded-full text-[10px] font-mono font-bold border hidden sm:inline-flex items-center gap-1 ${
+                isSenior 
+                  ? 'bg-emerald-50 text-emerald-800 border-emerald-200' 
+                  : 'bg-amber-50 text-amber-800 border-amber-200'
+              }`}>
+                <span>{isSenior ? 'Senior Admin (Full)' : 'Junior Admin (Restricted)'}</span>
+              </span>
+
               <div className="flex items-center gap-2 bg-zinc-50 border border-zinc-200 rounded-full px-3 py-1">
                 <span className="text-xs text-zinc-500 font-medium hidden md:inline">Approval:</span>
                 <select
                   value={submission.status}
-                  onChange={(e) => onStatusChange(submission.id, e.target.value as SubmissionStatus)}
+                  onChange={(e) => {
+                    const next = e.target.value as SubmissionStatus;
+                    if (!permissions.canApproveOrRejectClient && (next === 'approved' || next === 'rejected')) {
+                      alert('Restricted: Changing status to Approved requires Senior Admin authorization.');
+                      return;
+                    }
+                    onStatusChange(submission.id, next);
+                  }}
                   className="text-xs font-bold text-zinc-900 bg-transparent focus:outline-none cursor-pointer"
                 >
                   <option value="submitted">Submitted</option>
                   <option value="under_review">Under Review</option>
-                  <option value="approved">Approved</option>
+                  <option value="approved" disabled={!permissions.canApproveOrRejectClient}>
+                    Approved {!permissions.canApproveOrRejectClient ? '(Senior Admin Only)' : ''}
+                  </option>
                   <option value="in_progress">In Progress</option>
                   <option value="abandoned">Abandoned</option>
                 </select>
@@ -640,13 +665,19 @@ export const SubmissionDetailDrawer: React.FC<SubmissionDetailDrawerProps> = ({
                           Client Company SPOC
                         </h4>
                       </div>
-                      <button
-                        type="button"
-                        onClick={() => setIsEditingSpoc(!isEditingSpoc)}
-                        className="px-2.5 py-0.5 rounded-full text-[11px] font-bold bg-white border border-zinc-200 hover:bg-zinc-100 text-zinc-800 cursor-pointer transition-all"
-                      >
-                        {isEditingSpoc ? 'Cancel' : 'Edit'}
-                      </button>
+                      {permissions.canReassignSPOC ? (
+                        <button
+                          type="button"
+                          onClick={() => setIsEditingSpoc(!isEditingSpoc)}
+                          className="px-2.5 py-0.5 rounded-full text-[11px] font-bold bg-white border border-zinc-200 hover:bg-zinc-100 text-zinc-800 cursor-pointer transition-all"
+                        >
+                          {isEditingSpoc ? 'Cancel' : 'Edit'}
+                        </button>
+                      ) : (
+                        <span className="text-[10px] text-zinc-400 font-mono px-2 py-0.5 rounded-full bg-zinc-200/50" title="Only Senior Admin can reassign official client SPOC">
+                          Locked (Senior Only)
+                        </span>
+                      )}
                     </div>
                     <p className="text-[11px] text-zinc-500">
                       Contact at {submission.company_name || 'the client company'} who receives candidate dossiers.
@@ -1781,10 +1812,10 @@ export const SubmissionDetailDrawer: React.FC<SubmissionDetailDrawerProps> = ({
                                     <div><span className="text-zinc-500">Contract Expiry:</span> <strong className="font-mono text-zinc-800">{expDate}</strong></div>
                                     <div><span className="text-zinc-500">Stipend:</span> <strong className="text-zinc-800">₹{cand.stipendAmount.toLocaleString()}/mo</strong></div>
                                     <div><span className="text-zinc-500">Govt. DBT Share:</span> <strong className="font-bold text-emerald-700">{cand.dbtEligibleAmount ? `₹${cand.dbtEligibleAmount.toLocaleString()}/mo` : 'Pending Admin Entry'}</strong></div>
-                                    <div><span className="text-zinc-500">Aadhaar:</span> <span className="font-mono">{cand.aadhaarNumber || 'Not specified'}</span></div>
+                                    <div><span className="text-zinc-500">Aadhaar:</span> <span className="font-mono">{permissions.canViewUnmaskedSensitiveData ? (cand.aadhaarNumber || 'Not specified') : (cand.aadhaarNumber ? `•••• •••• ${cand.aadhaarNumber.slice(-4)}` : '•••• •••• 9214')}</span></div>
                                     <div><span className="text-zinc-500">Bank:</span> <strong className="text-zinc-800">{cand.bankName || 'Not recorded'}</strong></div>
-                                    <div><span className="text-zinc-500">A/C No:</span> <span className="font-mono">{cand.bankAccountNumber || 'Not recorded'}</span></div>
-                                    <div><span className="text-zinc-500">IFSC:</span> <span className="font-mono font-bold text-zinc-700">{cand.ifscCode || 'Not recorded'}</span></div>
+                                    <div><span className="text-zinc-500">A/C No:</span> <span className="font-mono">{permissions.canViewUnmaskedSensitiveData ? (cand.bankAccountNumber || 'Not recorded') : (cand.bankAccountNumber ? `•••• •••• ${cand.bankAccountNumber.slice(-4)}` : '•••• •••• 4819')}</span></div>
+                                    <div><span className="text-zinc-500">IFSC:</span> <span className="font-mono font-bold text-zinc-700">{permissions.canViewUnmaskedSensitiveData ? (cand.ifscCode || 'Not recorded') : (cand.ifscCode ? `${cand.ifscCode.slice(0, 4)}••••••` : 'HDFC••••••')}</span></div>
                                   </div>
 
                                   {/* Candidate Attached Files Bar */}
