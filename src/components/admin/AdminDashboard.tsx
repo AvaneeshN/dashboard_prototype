@@ -54,7 +54,6 @@ export const AdminDashboard: React.FC = () => {
     loginLogs, 
     updateSubmissionStatus, 
     syncDataToSupabase, 
-    switchAdminRole,
     adminSpoc, 
     setAdminSpoc,
     requiredDocuments,
@@ -324,37 +323,27 @@ export const AdminDashboard: React.FC = () => {
         </div>
 
         <div className="flex flex-wrap items-center gap-2.5">
-          {/* Senior vs Junior Role Switcher */}
-          <div className="flex items-center gap-1 p-1 rounded-full bg-zinc-100 border border-zinc-200 shadow-2xs">
-            <button
-              type="button"
-              onClick={() => switchAdminRole('senior_admin')}
-              className={`px-3 py-1.5 rounded-full text-xs font-bold flex items-center gap-1.5 transition-all cursor-pointer ${
-                isSenior
-                  ? 'bg-black text-white shadow-xs'
-                  : 'text-zinc-600 hover:text-zinc-900'
-              }`}
-              title="Full access: approvals, unmasked financials, DBT release, audit logs"
-            >
-              <ShieldCheck className="w-3.5 h-3.5 text-emerald-400" />
-              <span>Senior Admin</span>
-            </button>
-            <button
-              type="button"
-              onClick={() => {
-                switchAdminRole('junior_admin');
-                if (activeTab === 'security') setActiveTab('analytics');
-              }}
-              className={`px-3 py-1.5 rounded-full text-xs font-bold flex items-center gap-1.5 transition-all cursor-pointer ${
-                !isSenior
-                  ? 'bg-amber-600 text-white shadow-xs'
-                  : 'text-zinc-600 hover:text-zinc-900'
-              }`}
-              title="Restricted: document review only, masked PII, no final approvals"
-            >
-              <ShieldAlert className="w-3.5 h-3.5 text-white" />
-              <span>Junior Admin</span>
-            </button>
+          {/* Authenticated Clearance Badge (Immutable - strictly governed by login credentials) */}
+          <div className="flex items-center gap-2 px-3.5 py-1.5 rounded-full bg-white border border-zinc-200 shadow-2xs">
+            {isSenior ? (
+              <>
+                <span className="w-2 h-2 rounded-full bg-emerald-500" />
+                <ShieldCheck className="w-4 h-4 text-emerald-600" />
+                <span className="text-xs font-bold text-zinc-900">Senior Administrator</span>
+                <span className="text-[10px] font-mono uppercase px-1.5 py-0.5 rounded-md bg-emerald-50 text-emerald-700 border border-emerald-200 font-semibold">
+                  Full Authority
+                </span>
+              </>
+            ) : (
+              <>
+                <span className="w-2 h-2 rounded-full bg-amber-500" />
+                <ShieldAlert className="w-4 h-4 text-amber-600" />
+                <span className="text-xs font-bold text-zinc-900">Junior Operations Admin</span>
+                <span className="text-[10px] font-mono uppercase px-1.5 py-0.5 rounded-md bg-amber-50 text-amber-700 border border-amber-200 font-semibold">
+                  Restricted Review
+                </span>
+              </>
+            )}
           </div>
 
           <button

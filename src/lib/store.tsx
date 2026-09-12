@@ -72,7 +72,6 @@ interface AuthState {
   getActiveClientSubmission: () => FormSubmission | undefined;
   syncDataToSupabase: () => Promise<{ success: boolean; message: string }>;
   resetToDemoData: () => void;
-  switchAdminRole: (newRole: 'senior_admin' | 'junior_admin') => void;
   
   // Production Candidate & Financial Operations
   addApprentice: (candidateData: Omit<ApprenticeRecord, 'id'>) => Promise<ApprenticeRecord>;
@@ -1655,23 +1654,6 @@ export const StoreProvider: React.FC<{ children: React.ReactNode }> = ({ childre
     }
   };
 
-  const switchAdminRole = (newRole: 'senior_admin' | 'junior_admin') => {
-    if (user && (user.role === 'admin' || user.role === 'senior_admin' || user.role === 'junior_admin')) {
-      const updatedUser: UserProfile = {
-        ...user,
-        role: newRole,
-        full_name: newRole === 'junior_admin' ? 'Junior Operations Admin' : 'Senior Administrator',
-        email: newRole === 'junior_admin' ? 'junior.admin@company.com' : 'admin@company.com'
-      };
-      setUser(updatedUser);
-      if (typeof window !== 'undefined') {
-        try {
-          sessionStorage.setItem('portal_admin_session', JSON.stringify(updatedUser));
-        } catch (e) {}
-      }
-    }
-  };
-
   const resetToDemoData = () => {
     if (typeof window !== 'undefined') {
       try {
@@ -1700,7 +1682,6 @@ export const StoreProvider: React.FC<{ children: React.ReactNode }> = ({ childre
         getActiveClientSubmission,
         syncDataToSupabase,
         resetToDemoData,
-        switchAdminRole,
         addApprentice,
         removeApprentice,
         updateApprentice,
