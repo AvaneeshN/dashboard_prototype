@@ -1479,10 +1479,7 @@ export const ClientIntakeWizard: React.FC = () => {
                     <span>Why do we require your SPOC Email Address?</span>
                   </div>
                   <p className="text-[11px] text-amber-900/90 leading-relaxed pl-6 font-medium">
-                    Whenever a new apprentice candidate is onboarded or multi-format documents (.pdf, .docx) are verified, an official compliance dossier is <strong>automatically dispatched to this email address</strong>. 
-                  </p>
-                  <p className="text-[11px] text-amber-900/80 leading-relaxed pl-6">
-                    This includes candidate KYC, Aadhaar card, education certificates, bank proofs, and apprenticeship legal contract agreements. Setting this now ensures your internal HR and compliance team receives real-time verification records.
+                    Whenever a new candidate is onboarded, an official candidate dossier (including candidate profile details and uploaded compliance documents) is <strong>automatically dispatched to this email address</strong> for your records.
                   </p>
                   <div className="pl-6 pt-1 text-[10px] font-mono text-amber-800 font-bold flex items-center gap-1.5">
                     <Check className="w-3.5 h-3.5 text-emerald-600" />
@@ -1498,7 +1495,7 @@ export const ClientIntakeWizard: React.FC = () => {
                         Designated SPOC Details
                       </h4>
                       <p className="text-[11px] text-zinc-500 font-medium">
-                        This person will receive candidate onboarding emails and audit logs
+                        This person will receive candidate dossier dispatches upon onboarding
                       </p>
                     </div>
                     <Mail className="w-4 h-4 text-zinc-400" />

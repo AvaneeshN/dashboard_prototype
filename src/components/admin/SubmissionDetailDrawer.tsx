@@ -863,7 +863,7 @@ export const SubmissionDetailDrawer: React.FC<SubmissionDetailDrawerProps> = ({
                         3. Designated Notification SPOC
                       </h4>
                       <span className="text-[10px] font-mono px-2 py-0.5 rounded-full bg-blue-100 text-blue-800 font-bold border border-blue-200">
-                        Configured for Dispatches
+                        Configured for Candidate Dossiers
                       </span>
                     </div>
                     <div className="p-4 rounded-2xl bg-zinc-50 border border-zinc-200 space-y-2 text-xs">
