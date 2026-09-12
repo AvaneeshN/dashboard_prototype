@@ -17,6 +17,7 @@ import { DocumentViewerModal } from '@/components/ui/DocumentViewerModal';
 import { downloadDocumentFile } from '@/lib/document-utils';
 import { 
   X, 
+  ArrowLeft,
   Mail, 
   Phone, 
   Calendar, 
@@ -450,95 +451,101 @@ export const SubmissionDetailDrawer: React.FC<SubmissionDetailDrawerProps> = ({
   return (
     <>
       <AnimatePresence>
-        <div 
-          onClick={onClose}
-          className="fixed inset-0 z-[100] flex justify-end bg-black/40 backdrop-blur-xs font-sans"
+        <motion.div
+          initial={{ opacity: 0, scale: 0.99 }}
+          animate={{ opacity: 1, scale: 1 }}
+          exit={{ opacity: 0, scale: 0.99 }}
+          transition={{ duration: 0.18, ease: [0.16, 1, 0.3, 1] }}
+          className="fixed inset-0 z-[100] w-screen h-screen bg-[#f8fafc] flex flex-col overflow-hidden text-zinc-900 font-sans"
         >
-          <motion.div
-            onClick={(e) => e.stopPropagation()}
-            initial={{ opacity: 0, x: 100 }}
-            animate={{ opacity: 1, x: 0 }}
-            exit={{ opacity: 0, x: 100 }}
-            transition={{ duration: 0.22, ease: [0.16, 1, 0.3, 1] }}
-            className="w-full max-w-4xl h-full bg-white border-l border-zinc-200 shadow-2xl flex flex-col text-zinc-900"
-          >
-            {/* Sticky Header with Always-Visible Close Button */}
-            <div className="sticky top-0 z-30 bg-white/95 backdrop-blur-md px-6 py-4 border-b border-zinc-200 flex items-center justify-between">
+          {/* Fullscreen Sticky Header with Back Button, Title, Status & Close */}
+          <div className="sticky top-0 z-30 bg-white border-b border-zinc-200 px-6 sm:px-10 py-3.5 flex items-center justify-between gap-4 shadow-xs">
+            <div className="flex items-center gap-3 sm:gap-4">
+              {/* Back to Dashboard Button */}
+              <button
+                onClick={onClose}
+                className="px-3.5 py-1.5 rounded-full bg-zinc-100 hover:bg-zinc-200 text-zinc-800 text-xs font-bold flex items-center gap-1.5 cursor-pointer transition-colors shadow-2xs shrink-0"
+              >
+                <ArrowLeft className="w-4 h-4" />
+                <span>Back to Dashboard</span>
+              </button>
+
+              <div className="h-6 w-px bg-zinc-200 hidden sm:block" />
+
               <div className="flex items-center gap-3">
-                <div className="w-10 h-10 rounded-full bg-[#0a192f] text-amber-300 font-serif flex items-center justify-center font-bold text-xs shrink-0">
-                  {submission.company_name?.charAt(0) || submission.client_name?.charAt(0) || 'W'}
+                <div className="w-10 h-10 rounded-2xl bg-[#0a192f] text-amber-300 font-serif flex items-center justify-center font-bold text-sm shrink-0 shadow-xs">
+                  {submission.company_name?.charAt(0) || submission.client_name?.charAt(0) || 'C'}
                 </div>
                 <div>
-                  <h3 className="text-sm font-extrabold text-zinc-900 leading-tight">
-                    {submission.company_name || submission.client_name || 'Candidate Intake Application'}
-                  </h3>
-                  <p className="text-[10px] font-mono text-zinc-400">
+                  <div className="flex items-center gap-2 flex-wrap">
+                    <h2 className="text-sm sm:text-base font-extrabold text-zinc-900 leading-tight">
+                      {submission.company_name || submission.client_name || 'Company Information'}
+                    </h2>
+                    {getStatusBadge(submission.status)}
+                  </div>
+                  <p className="text-[11px] font-mono text-zinc-400">
                     Client: {submission.client_name} · ID: {submission.id}
                   </p>
                 </div>
+              </div>
+            </div>
+
+            <div className="flex items-center gap-3">
+              <div className="flex items-center gap-2 bg-zinc-50 border border-zinc-200 rounded-full px-3 py-1">
+                <span className="text-xs text-zinc-500 font-medium hidden md:inline">Approval:</span>
+                <select
+                  value={submission.status}
+                  onChange={(e) => onStatusChange(submission.id, e.target.value as SubmissionStatus)}
+                  className="text-xs font-bold text-zinc-900 bg-transparent focus:outline-none cursor-pointer"
+                >
+                  <option value="submitted">Submitted</option>
+                  <option value="under_review">Under Review</option>
+                  <option value="approved">Approved</option>
+                  <option value="in_progress">In Progress</option>
+                  <option value="abandoned">Abandoned</option>
+                </select>
               </div>
 
               {/* Top Close Button */}
               <button
                 onClick={onClose}
-                className="px-4 py-1.5 rounded-full bg-black text-white hover:bg-zinc-800 text-xs font-bold flex items-center gap-1.5 cursor-pointer shadow-sm transition-all"
+                title="Close Fullscreen (ESC)"
+                className="p-1.5 rounded-full hover:bg-zinc-100 text-zinc-400 hover:text-black cursor-pointer transition-colors"
               >
-                <X className="w-3.5 h-3.5" />
-                <span>Close</span>
+                <X className="w-5 h-5" />
               </button>
             </div>
+          </div>
 
-            {/* Section Tabs inside Drawer */}
-            <div className="px-6 py-2.5 bg-zinc-50 border-b border-zinc-200 flex items-center gap-1.5 overflow-x-auto">
-              {[
-                { id: 'application', label: 'Intake Application' },
-                { id: 'naps_portal', label: `DBT Dashboard (${napsRecords.length})` },
-                { id: 'invoices', label: `Invoices (${invoiceList.length})` },
-                { id: 'documents', label: 'Company Documents' },
-                { id: 'candidates', label: `Apprentices (${candidateList.length})` },
-                { id: 'dbt_claims', label: `DBT Claims (${dbtClaims.length})` },
-                { id: 'spoc_logs', label: `SPOC Alerts (${spocLogs.length})` }
-              ].map(tab => (
-                <button
-                  key={tab.id}
-                  type="button"
-                  onClick={() => setActiveTab(tab.id as any)}
-                  className={`px-3 py-1 rounded-full text-xs font-bold whitespace-nowrap transition-all cursor-pointer ${
-                    activeTab === tab.id
-                      ? 'bg-black text-white shadow-xs'
-                      : 'text-zinc-600 hover:text-black hover:bg-zinc-200/60'
-                  }`}
-                >
-                  {tab.label}
-                </button>
-              ))}
-            </div>
+          {/* Fullscreen Section Tabs Bar */}
+          <div className="px-6 sm:px-10 py-2.5 bg-white border-b border-zinc-200 flex items-center gap-2 overflow-x-auto shrink-0 shadow-2xs">
+            {[
+              { id: 'application', label: 'Company Info' },
+              { id: 'naps_portal', label: `DBT Dashboard (${napsRecords.length})` },
+              { id: 'invoices', label: `Invoices (${invoiceList.length})` },
+              { id: 'documents', label: 'Company Documents' },
+              { id: 'candidates', label: `Apprentices (${candidateList.length})` },
+              { id: 'dbt_claims', label: `DBT Claims (${dbtClaims.length})` },
+              { id: 'spoc_logs', label: `SPOC Alerts (${spocLogs.length})` }
+            ].map(tab => (
+              <button
+                key={tab.id}
+                type="button"
+                onClick={() => setActiveTab(tab.id as any)}
+                className={`px-4 py-1.5 rounded-full text-xs font-bold whitespace-nowrap transition-all cursor-pointer ${
+                  activeTab === tab.id
+                    ? 'bg-[#0a192f] text-white shadow-xs'
+                    : 'text-zinc-600 hover:text-black hover:bg-zinc-100'
+                }`}
+              >
+                {tab.label}
+              </button>
+            ))}
+          </div>
 
-            {/* Scrollable Body Content */}
-            <div className="flex-1 overflow-y-auto px-6 py-5 space-y-4">
-              
-              {/* Status & Approval Bar */}
-              <div className="p-4 rounded-2xl bg-zinc-50 border border-zinc-200 flex items-center justify-between">
-                <div className="flex items-center gap-2">
-                  <span className="text-xs text-zinc-500 font-bold font-mono">STATUS:</span>
-                  {getStatusBadge(submission.status)}
-                </div>
-
-                <div className="flex items-center gap-2">
-                  <span className="text-xs text-zinc-500 font-medium">Set Approval:</span>
-                  <select
-                    value={submission.status}
-                    onChange={(e) => onStatusChange(submission.id, e.target.value as SubmissionStatus)}
-                    className="text-xs px-3 py-1.5 rounded-full bg-white border border-zinc-300 text-zinc-900 font-bold focus:outline-none focus:border-black cursor-pointer"
-                  >
-                    <option value="submitted">Submitted</option>
-                    <option value="under_review">Under Review</option>
-                    <option value="approved">Approved</option>
-                    <option value="in_progress">In Progress</option>
-                    <option value="abandoned">Abandoned</option>
-                  </select>
-                </div>
-              </div>
+          {/* Fullscreen Scrollable Body Content */}
+          <div className="flex-1 overflow-y-auto px-6 sm:px-10 lg:px-12 py-6">
+            <div className="max-w-7xl mx-auto space-y-5">
 
               {/* SPOC Management & Routing Grid */}
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
@@ -1672,21 +1679,22 @@ export const SubmissionDetailDrawer: React.FC<SubmissionDetailDrawerProps> = ({
                 </div>
               )}
 
+              </div>
             </div>
 
-            {/* Sticky Bottom Actions */}
-            <div className="p-4 border-t border-zinc-200 bg-white flex items-center justify-between">
-              <span className="text-xs text-zinc-400 font-mono">* Press ESC to close</span>
+            {/* Fullscreen Bottom Status Bar */}
+            <div className="px-6 sm:px-10 py-3 border-t border-zinc-200 bg-white flex items-center justify-between shrink-0">
+              <span className="text-xs text-zinc-400 font-mono">* Press ESC or click &quot;Back to Dashboard&quot; to exit fullscreen view</span>
               <button
                 onClick={onClose}
-                className="px-4 py-2 rounded-full bg-zinc-100 hover:bg-zinc-200 text-zinc-800 text-xs font-bold cursor-pointer transition-all"
+                className="px-4 py-1.5 rounded-full bg-zinc-100 hover:bg-zinc-200 text-zinc-800 text-xs font-bold cursor-pointer transition-all flex items-center gap-1.5"
               >
-                Close Inspector
+                <ArrowLeft className="w-3.5 h-3.5" />
+                <span>Back to Dashboard</span>
               </button>
             </div>
 
           </motion.div>
-        </div>
       </AnimatePresence>
 
       {/* NAPS Record Add/Edit Modal */}
