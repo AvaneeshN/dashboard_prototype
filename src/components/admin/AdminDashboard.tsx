@@ -31,7 +31,8 @@ import {
   ArrowUpRight,
   Mail,
   X,
-  Lock
+  Lock,
+  Coins
 } from 'lucide-react';
 import { 
   ResponsiveContainer, 
@@ -44,8 +45,9 @@ import {
 import { motion, AnimatePresence } from 'framer-motion';
 import { RequiredDocumentConfig, getAdminPermissions, isSeniorAdmin } from '@/types';
 import { AdminVisualAnalytics } from './AdminVisualAnalytics';
+import { AdminOverallDbtDashboard } from './AdminOverallDbtDashboard';
 
-type AdminTab = 'analytics' | 'telemetry' | 'intakes' | 'requirements' | 'security';
+type AdminTab = 'analytics' | 'dbt_registry' | 'telemetry' | 'intakes' | 'requirements' | 'security';
 
 export const AdminDashboard: React.FC = () => {
   const { 
@@ -302,8 +304,17 @@ export const AdminDashboard: React.FC = () => {
   const permissions = getAdminPermissions(user?.role);
   const isSenior = isSeniorAdmin(user?.role);
 
+  const totalDbtRecordCount = useMemo(() => {
+    return clientSubmissions.reduce((acc, sub) => {
+      const napsCount = (sub.naps_records || []).length;
+      const candCount = (sub.candidates || []).length;
+      return acc + (napsCount > 0 ? napsCount : candCount);
+    }, 0);
+  }, [clientSubmissions]);
+
   const adminTabs = [
     { id: 'analytics', label: 'Visual Overview & Analytics', icon: <BarChart2 className="w-3.5 h-3.5 text-blue-600" /> },
+    { id: 'dbt_registry', label: `Overall DBT Dashboard (${totalDbtRecordCount})`, icon: <Coins className="w-3.5 h-3.5 text-emerald-600" /> },
     { id: 'telemetry', label: 'Funnel & Telemetry', icon: <LayoutDashboard className="w-3.5 h-3.5" /> },
     { id: 'intakes', label: `Client Intakes (${clientSubmissions.length})`, icon: <FileSpreadsheet className="w-3.5 h-3.5" /> },
     { id: 'requirements', label: `Document Requirements (${requiredDocuments.length})`, icon: <FileCheck className="w-3.5 h-3.5" /> },
@@ -438,7 +449,23 @@ export const AdminDashboard: React.FC = () => {
             </motion.div>
           )}
 
-          {/* TAB 1: Executive Telemetry & Funnel */}
+          {/* TAB 1: Overall DBT Dashboard (Cross-Establishment Ledger) */}
+          {activeTab === 'dbt_registry' && (
+            <motion.div
+              key="dbt_registry"
+              initial={{ opacity: 0, y: 8 }}
+              animate={{ opacity: 1, y: 0 }}
+              exit={{ opacity: 0, y: -8 }}
+              transition={{ duration: 0.2 }}
+            >
+              <AdminOverallDbtDashboard
+                submissions={clientSubmissions}
+                onInspectSubmission={(sub) => setSelectedSubmission(sub)}
+              />
+            </motion.div>
+          )}
+
+          {/* TAB 2: Executive Telemetry & Funnel */}
           {activeTab === 'telemetry' && (
             <motion.div
               key="telemetry"
