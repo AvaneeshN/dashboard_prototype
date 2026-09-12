@@ -11,11 +11,15 @@ export default function AdminPage() {
   const { user, isLoading } = useStore();
   const router = useRouter();
 
+  const isAdmin = Boolean(
+    user && (user.role === 'admin' || user.role === 'senior_admin' || user.role === 'junior_admin')
+  );
+
   useEffect(() => {
-    if (!isLoading && (!user || user.role !== 'admin')) {
+    if (!isLoading && !isAdmin) {
       router.replace('/');
     }
-  }, [user, isLoading, router]);
+  }, [user, isLoading, router, isAdmin]);
 
   if (isLoading) {
     return (
@@ -25,7 +29,7 @@ export default function AdminPage() {
     );
   }
 
-  if (!user || user.role !== 'admin') {
+  if (!isAdmin) {
     return (
       <div className="min-h-[80vh] flex items-center justify-center p-4">
         <div className="max-w-md w-full p-8 rounded-3xl bg-white border border-zinc-200 shadow-xl text-center space-y-4">

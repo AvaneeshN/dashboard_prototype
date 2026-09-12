@@ -112,7 +112,20 @@ interface AuthState {
 const StoreContext = createContext<AuthState | null>(null);
 
 export const StoreProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
-  const [user, setUser] = useState<UserProfile | null>(null);
+  const [user, setUser] = useState<UserProfile | null>(() => {
+    if (typeof window !== 'undefined') {
+      try {
+        const cachedAdmin = sessionStorage.getItem('portal_admin_session');
+        if (cachedAdmin) {
+          const parsed = JSON.parse(cachedAdmin);
+          if (parsed && (parsed.role === 'admin' || parsed.role === 'senior_admin' || parsed.role === 'junior_admin')) {
+            return parsed;
+          }
+        }
+      } catch (e) {}
+    }
+    return null;
+  });
   const [isLoading, setIsLoading] = useState<boolean>(true);
   const [profiles, setProfiles] = useState<UserProfile[]>([]);
   const [submissions, setSubmissions] = useState<FormSubmission[]>([]);
@@ -337,6 +350,19 @@ export const StoreProvider: React.FC<{ children: React.ReactNode }> = ({ childre
 
               setUser(profile);
             }
+          } else {
+            // Restore persistent admin session if available
+            if (typeof window !== 'undefined') {
+              try {
+                const cachedAdmin = sessionStorage.getItem('portal_admin_session');
+                if (cachedAdmin) {
+                  const parsed = JSON.parse(cachedAdmin);
+                  if (parsed && (parsed.role === 'admin' || parsed.role === 'senior_admin' || parsed.role === 'junior_admin')) {
+                    setUser(parsed);
+                  }
+                }
+              } catch (e) {}
+            }
           }
         } catch (supaErr) {
           console.error('Database initialization notice:', supaErr);
@@ -408,6 +434,11 @@ export const StoreProvider: React.FC<{ children: React.ReactNode }> = ({ childre
           last_login_at: new Date().toISOString()
         };
         setUser(adminUser);
+        if (typeof window !== 'undefined') {
+          try {
+            sessionStorage.setItem('portal_admin_session', JSON.stringify(adminUser));
+          } catch (e) {}
+        }
 
         // Fetch live submissions and logs directly from DB for Admin
         if (isSupabaseConfigured()) {
@@ -683,6 +714,11 @@ export const StoreProvider: React.FC<{ children: React.ReactNode }> = ({ childre
   };
 
   const logout = () => {
+    if (typeof window !== 'undefined') {
+      try {
+        sessionStorage.removeItem('portal_admin_session');
+      } catch (e) {}
+    }
     if (isSupabaseConfigured()) {
       try {
         const supabase = createClient();
@@ -1628,10 +1664,20 @@ export const StoreProvider: React.FC<{ children: React.ReactNode }> = ({ childre
         email: newRole === 'junior_admin' ? 'junior.admin@company.com' : 'admin@company.com'
       };
       setUser(updatedUser);
+      if (typeof window !== 'undefined') {
+        try {
+          sessionStorage.setItem('portal_admin_session', JSON.stringify(updatedUser));
+        } catch (e) {}
+      }
     }
   };
 
   const resetToDemoData = () => {
+    if (typeof window !== 'undefined') {
+      try {
+        sessionStorage.removeItem('portal_admin_session');
+      } catch (e) {}
+    }
     setProfiles([]);
     setSubmissions([]);
     setLoginLogs([]);

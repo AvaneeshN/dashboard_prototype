@@ -47,12 +47,14 @@ export const Navbar: React.FC = () => {
     return null;
   }
 
+  const isAdmin = user.role === 'admin' || user.role === 'senior_admin' || user.role === 'junior_admin';
+
   return (
     <header className="sticky top-0 z-30 w-full border-b border-[#1e3a5f] bg-[#0a192f] text-white shadow-md font-sans">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 h-16 flex items-center justify-between">
         
         {/* Logo */}
-        <Link href={user.role === 'admin' ? '/admin' : '/client'} className="flex items-center gap-2.5 group">
+        <Link href={isAdmin ? '/admin' : '/client'} className="flex items-center gap-2.5 group">
           <div className="w-8 h-8 rounded-lg bg-[#112240] border border-amber-400/40 flex items-center justify-center text-amber-300 font-serif font-bold text-xs shadow-xs tracking-tighter transition-transform group-hover:scale-105">
             C
           </div>
@@ -62,7 +64,7 @@ export const Navbar: React.FC = () => {
                 Console
               </span>
               <span className="text-[10px] font-mono uppercase px-2 py-0.5 rounded-full bg-[#112240] text-amber-300 border border-amber-400/30">
-                {user.role === 'admin' ? 'DBT Admin Portal' : 'Client Portal'}
+                {isAdmin ? 'DBT Admin Portal' : 'Client Portal'}
               </span>
             </div>
           </div>
