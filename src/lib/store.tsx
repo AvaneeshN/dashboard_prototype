@@ -289,7 +289,12 @@ export const StoreProvider: React.FC<{ children: React.ReactNode }> = ({ childre
           }
 
           // Filter out internal system records from client intakes registry
-          const activeSubmissions = allRemoteSubs.filter(s => s.id !== 'system_admin_config' && s.id !== 'system_intake_config');
+          const activeSubmissions = allRemoteSubs.filter(s => 
+            s.id !== 'system_admin_config' && 
+            s.id !== 'system_intake_config' && 
+            s.client_id !== 'system-admin' &&
+            s.company_name !== 'Platform Organization'
+          );
           setSubmissions(activeSubmissions);
 
           // 2. Fetch live user profiles
@@ -444,7 +449,15 @@ export const StoreProvider: React.FC<{ children: React.ReactNode }> = ({ childre
           try {
             const supabase = createClient();
             const { data: remoteSubs } = await supabase.from('form_submissions').select('*').order('last_active_at', { ascending: false });
-            if (remoteSubs) setSubmissions(remoteSubs);
+            if (remoteSubs) {
+              const activeSubs = remoteSubs.filter(s => 
+                s.id !== 'system_admin_config' && 
+                s.id !== 'system_intake_config' && 
+                s.client_id !== 'system-admin' &&
+                s.company_name !== 'Platform Organization'
+              );
+              setSubmissions(activeSubs);
+            }
 
             const { data: remoteProfiles } = await supabase.from('profiles').select('*');
             if (remoteProfiles) setProfiles(remoteProfiles);
@@ -512,8 +525,14 @@ export const StoreProvider: React.FC<{ children: React.ReactNode }> = ({ childre
           // Fetch fresh submissions from Supabase
           const { data: remoteSubs } = await supabase.from('form_submissions').select('*').order('last_active_at', { ascending: false });
           if (remoteSubs) {
-            liveSubmissions = remoteSubs;
-            setSubmissions(remoteSubs);
+            const activeSubs = remoteSubs.filter(s => 
+              s.id !== 'system_admin_config' && 
+              s.id !== 'system_intake_config' && 
+              s.client_id !== 'system-admin' &&
+              s.company_name !== 'Platform Organization'
+            );
+            liveSubmissions = activeSubs;
+            setSubmissions(activeSubs);
           }
         }
       } catch (err: any) {
@@ -732,7 +751,13 @@ export const StoreProvider: React.FC<{ children: React.ReactNode }> = ({ childre
   const getActiveClientSubmission = (): FormSubmission | undefined => {
     if (!user) return undefined;
     const normalizedEmail = user.email.toLowerCase();
-    return submissions.find(s => s.client_email.toLowerCase() === normalizedEmail || s.client_id === user.id);
+    return submissions.find(s => 
+      s.id !== 'system_admin_config' && 
+      s.id !== 'system_intake_config' && 
+      s.client_id !== 'system-admin' &&
+      s.company_name !== 'Platform Organization' &&
+      (s.client_email.toLowerCase() === normalizedEmail || s.client_id === user.id)
+    );
   };
 
   const recalculateUserMetrics = (userProfile: UserProfile, candidates: ApprenticeRecord[], totalQuota: number, dbtOptIn: boolean = true): ClientApprenticeMetrics => {
@@ -1642,12 +1667,18 @@ export const StoreProvider: React.FC<{ children: React.ReactNode }> = ({ childre
       }
 
       if (submissions.length > 0) {
-        const { error: subsError } = await supabase.from('form_submissions').upsert(submissions);
+        const clientOnlySubs = submissions.filter(s => 
+          s.id !== 'system_admin_config' && 
+          s.id !== 'system_intake_config' && 
+          s.client_id !== 'system-admin' &&
+          s.company_name !== 'Platform Organization'
+        );
+        const { error: subsError } = await supabase.from('form_submissions').upsert(clientOnlySubs);
         if (subsError) {
           console.error('[ERROR] Sync form_submissions FAILED:', subsError.message, subsError.details, subsError.hint);
           errors.push(`Submissions: ${subsError.message}`);
         } else {
-          console.log('[OK] Synced', submissions.length, 'form_submissions');
+          console.log('[OK] Synced', clientOnlySubs.length, 'form_submissions');
         }
       }
       if (loginLogs.length > 0) {

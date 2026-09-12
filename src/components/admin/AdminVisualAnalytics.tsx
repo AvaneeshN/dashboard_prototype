@@ -33,6 +33,16 @@ export const AdminVisualAnalytics: React.FC = () => {
   const { submissions } = useStore();
   const [dataViewMode, setDataViewMode] = useState<'live_delta' | 'national_benchmark'>('live_delta');
 
+  // Filter out any internal system records from client intakes
+  const clientSubmissions = useMemo(() => {
+    return submissions.filter(s => 
+      s.id !== 'system_admin_config' && 
+      s.id !== 'system_intake_config' && 
+      s.client_id !== 'system-admin' &&
+      s.company_name !== 'Platform Organization'
+    );
+  }, [submissions]);
+
   // Compute live real metrics from database
   const liveStats = useMemo(() => {
     let totalCandidates = 0;
@@ -64,7 +74,7 @@ export const AdminVisualAnalytics: React.FC = () => {
 
     // Count distinct client establishments
     const uniqueEstCodes = new Set<string>();
-    submissions.forEach(sub => {
+    clientSubmissions.forEach(sub => {
       const estCode = sub.establishment_details?.pan || sub.establishment_details?.gstin || sub.company_name;
       if (estCode) uniqueEstCodes.add(estCode);
 
@@ -143,7 +153,7 @@ export const AdminVisualAnalytics: React.FC = () => {
       });
     });
 
-    const establishmentsCount = Math.max(uniqueEstCodes.size, submissions.length);
+    const establishmentsCount = Math.max(uniqueEstCodes.size, clientSubmissions.length);
 
     return {
       totalCandidates,
@@ -162,7 +172,7 @@ export const AdminVisualAnalytics: React.FC = () => {
       socialCounts,
       stateMap
     };
-  }, [submissions]);
+  }, [clientSubmissions]);
 
   // Scaled dynamic data blending live submissions with realistic national benchmarks
   const benchmarkBase = {
@@ -417,7 +427,7 @@ export const AdminVisualAnalytics: React.FC = () => {
                 : 'text-zinc-600 hover:text-zinc-900'
             }`}
           >
-            Live Database ({submissions.length} Intakes)
+            Live Database ({clientSubmissions.length} Intakes)
           </button>
           <button
             type="button"

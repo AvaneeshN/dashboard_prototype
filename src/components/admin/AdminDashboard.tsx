@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import { useStore } from '@/lib/store';
 import { FormSubmission, SubmissionStatus } from '@/types';
 import { GlassCard } from '@/components/ui/GlassCard';
@@ -191,34 +191,44 @@ export const AdminDashboard: React.FC = () => {
     }, 6000);
   };
 
+  // Filter out any internal system records from client intakes
+  const clientSubmissions = useMemo(() => {
+    return submissions.filter(s => 
+      s.id !== 'system_admin_config' && 
+      s.id !== 'system_intake_config' && 
+      s.client_id !== 'system-admin' &&
+      s.company_name !== 'Platform Organization'
+    );
+  }, [submissions]);
+
   // Compute Live KPIs
-  const totalSubmissions = submissions.length;
-  const completedCount = submissions.filter(s => s.status === 'submitted' || s.status === 'under_review' || s.status === 'approved').length;
-  const inProgressCount = submissions.filter(s => s.status === 'in_progress' || s.status === 'draft').length;
-  const abandonedCount = submissions.filter(s => s.status === 'abandoned').length;
+  const totalSubmissions = clientSubmissions.length;
+  const completedCount = clientSubmissions.filter(s => s.status === 'submitted' || s.status === 'under_review' || s.status === 'approved').length;
+  const inProgressCount = clientSubmissions.filter(s => s.status === 'in_progress' || s.status === 'draft').length;
+  const abandonedCount = clientSubmissions.filter(s => s.status === 'abandoned').length;
   
   const totalLogins = loginLogs.length;
   const failedLogins = loginLogs.filter(l => l.status === 'failed').length;
   const successLogins = loginLogs.filter(l => l.status === 'success').length;
 
   // Dynamic Total DBT Disbursed from actual submissions and claims
-  const totalDbtDisbursed = submissions.reduce((acc, sub) => {
+  const totalDbtDisbursed = clientSubmissions.reduce((acc, sub) => {
     const claimsTotal = (sub.dbt_claims || []).reduce((cAcc, claim) => cAcc + (claim.amountSettled || claim.amountClaimed || 0), 0);
     const candidateDbt = (sub.candidates || []).reduce((candAcc, c) => candAcc + (c.dbtEligibleAmount || 0), 0);
     return acc + (claimsTotal > 0 ? claimsTotal : candidateDbt);
   }, 0);
 
   // Count total and pending candidates across submissions
-  const totalApprenticesAcrossClients = submissions.reduce((acc, s) => acc + (s.candidates?.length || 0), 0);
-  const pendingAllocatedCandidatesCount = submissions.reduce(
+  const totalApprenticesAcrossClients = clientSubmissions.reduce((acc, s) => acc + (s.candidates?.length || 0), 0);
+  const pendingAllocatedCandidatesCount = clientSubmissions.reduce(
     (acc, s) => acc + (s.candidates || []).filter(c => !c.contractCode || c.contractCode === 'CN Pending').length,
     0
   );
 
   // Dynamic Funnel data for Recharts based on real client intake progression (2 sections)
-  const step1Started = submissions.length;
-  const step1Completed = submissions.filter(s => (s.current_step || 1) >= 1 || s.status !== 'draft').length;
-  const step2Completed = submissions.filter(s => (s.current_step || 1) >= 2 || s.status === 'submitted' || s.status === 'under_review' || s.status === 'approved').length;
+  const step1Started = clientSubmissions.length;
+  const step1Completed = clientSubmissions.filter(s => (s.current_step || 1) >= 1 || s.status !== 'draft').length;
+  const step2Completed = clientSubmissions.filter(s => (s.current_step || 1) >= 2 || s.status === 'submitted' || s.status === 'under_review' || s.status === 'approved').length;
 
   const funnelChartData = [
     { name: 'Section 1', fullName: 'Requirements & Quota Scope', started: step1Started, completed: step1Completed, dropOff: Math.max(step1Started - step1Completed, 0) },
@@ -226,7 +236,7 @@ export const AdminDashboard: React.FC = () => {
   ];
 
   // Filter Submissions
-  const filteredSubmissions = submissions.filter(sub => {
+  const filteredSubmissions = clientSubmissions.filter(sub => {
     const matchesSearch = 
       sub.client_name?.toLowerCase().includes(searchQuery.toLowerCase()) ||
       sub.client_email?.toLowerCase().includes(searchQuery.toLowerCase());
@@ -251,7 +261,7 @@ export const AdminDashboard: React.FC = () => {
   // Export CSV
   const handleExportCSV = () => {
     const headers = ['Submission ID', 'Client Name', 'Email', 'Status', 'Current Step', 'Completion %', 'Time Spent (s)', 'Submitted At'];
-    const rows = submissions.map(s => [
+    const rows = clientSubmissions.map(s => [
       s.id,
       `"${s.client_name}"`,
       `"${s.client_email}"`,
@@ -295,7 +305,7 @@ export const AdminDashboard: React.FC = () => {
   const adminTabs = [
     { id: 'analytics', label: 'Visual Overview & Analytics', icon: <BarChart2 className="w-3.5 h-3.5 text-blue-600" /> },
     { id: 'telemetry', label: 'Funnel & Telemetry', icon: <LayoutDashboard className="w-3.5 h-3.5" /> },
-    { id: 'intakes', label: `Client Intakes (${submissions.length})`, icon: <FileSpreadsheet className="w-3.5 h-3.5" /> },
+    { id: 'intakes', label: `Client Intakes (${clientSubmissions.length})`, icon: <FileSpreadsheet className="w-3.5 h-3.5" /> },
     { id: 'requirements', label: `Document Requirements (${requiredDocuments.length})`, icon: <FileCheck className="w-3.5 h-3.5" /> },
     ...(permissions.canViewSecurityAuditLogs ? [
       { id: 'security', label: `Security Audit Log (${loginLogs.length})`, icon: <ShieldCheck className="w-3.5 h-3.5" /> }
