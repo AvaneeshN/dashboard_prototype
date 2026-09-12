@@ -18,6 +18,7 @@ import { downloadDocumentFile } from '@/lib/document-utils';
 import { 
   X, 
   ArrowLeft,
+  ArrowRight,
   Mail, 
   Phone, 
   Calendar, 
@@ -757,69 +758,160 @@ export const SubmissionDetailDrawer: React.FC<SubmissionDetailDrawerProps> = ({
                     </div>
                   </div>
 
-                  {/* Section 1: Requirements & Quota Scope */}
+                  {/* Section 1: Establishment Registration Details */}
                   <div className="space-y-2">
-                    <h4 className="text-xs font-bold text-zinc-900 uppercase font-mono">
-                      1. Requirements & Headcount Quota Scope
-                    </h4>
-                    <div className="p-4 rounded-2xl bg-zinc-50 border border-zinc-200 space-y-2 text-xs">
-                      {(responses.companyName || submission.company_name) && (
-                        <div className="flex justify-between">
-                          <span className="text-zinc-500 font-medium">Company / Establishment:</span> 
-                          <span className="font-extrabold text-zinc-900">{responses.companyName || submission.company_name}</span>
-                        </div>
-                      )}
-                      <div className="flex justify-between"><span className="text-zinc-500 font-medium">Authorized Contact:</span> <span className="font-bold text-zinc-900">{submission.client_name}</span></div>
-                      <div className="flex justify-between"><span className="text-zinc-500 font-medium">Contact Email:</span> <span className="font-mono text-zinc-800">{submission.client_email}</span></div>
-                      <div className="flex justify-between"><span className="text-zinc-500 font-medium">Headcount Quota:</span> <span className="font-extrabold text-zinc-900">{responses.requiredApprenticeCount || 0} Candidates</span></div>
-                      {(responses.operationalStates || (submission.establishment_details ? `${submission.establishment_details.operatingStatesCount} State(s)` : null)) && (
-                        <div className="flex justify-between">
-                          <span className="text-zinc-500 font-medium">Operational States:</span> 
-                          <span className="font-bold text-zinc-900">{responses.operationalStates || 'Karnataka (Operating)'}</span>
-                        </div>
-                      )}
+                    <div className="flex items-center justify-between">
+                      <h4 className="text-xs font-bold text-zinc-900 uppercase font-mono">
+                        1. Establishment Registration Details ({responses.enrollmentScheme || 'NAPS'} Scheme)
+                      </h4>
+                      <span className="text-[10px] font-mono px-2 py-0.5 rounded-full bg-emerald-100 text-emerald-800 font-bold border border-emerald-200">
+                        {responses.enrollmentScheme || 'NAPS'} Portal
+                      </span>
                     </div>
-                  </div>
-
-                  {/* Section 2: Statutory Compliance Profile */}
-                  <div className="space-y-2">
-                    <h4 className="text-xs font-bold text-zinc-900 uppercase font-mono">
-                      2. Mandatory Compliance Identifiers & Documents
-                    </h4>
                     <div className="p-4 rounded-2xl bg-zinc-50 border border-zinc-200 space-y-2 text-xs">
-                      <div className="flex justify-between"><span className="text-zinc-500 font-medium">Company GSTIN:</span> <span className="font-mono font-bold text-zinc-900">{responses.gstinNumber || '29AAVFN4359C1ZS'}</span></div>
-                      {companyDocs.epfoRegistrationCode && (
-                        <div className="flex justify-between"><span className="text-zinc-500 font-medium">EPFO Registration Code:</span> <span className="font-mono text-zinc-800">{companyDocs.epfoRegistrationCode}</span></div>
+                      <div className="flex justify-between">
+                        <span className="text-zinc-500 font-medium">Name of Establishment:</span> 
+                        <strong className="text-zinc-900">{submission.establishment_details?.establishmentName || responses.companyName || submission.company_name || 'N/A'}</strong>
+                      </div>
+                      <div className="flex justify-between">
+                        <span className="text-zinc-500 font-medium">Establishment Type:</span> 
+                        <span className="text-zinc-800 font-semibold">{submission.establishment_details?.establishmentType || responses.establishmentType || 'FOOD SERVICE / SERVICES'}</span>
+                      </div>
+                      {(submission.establishment_details?.establishmentCategory || responses.establishmentCategory) && (
+                        <div className="flex justify-between">
+                          <span className="text-zinc-500 font-medium">Category / Sector:</span> 
+                          <span className="text-zinc-800 font-medium">{submission.establishment_details?.establishmentCategory || responses.establishmentCategory}</span>
+                        </div>
                       )}
                       <div className="flex justify-between">
-                        <span className="text-zinc-500 font-medium">Compliance Files:</span>
-                        <span className="font-bold text-emerald-700">Verified & Submitted</span>
+                        <span className="text-zinc-500 font-medium">Company PAN:</span> 
+                        <span className="font-mono font-bold text-zinc-900">{submission.establishment_details?.pan || responses.panNumber || 'N/A'}</span>
+                      </div>
+                      <div className="flex justify-between">
+                        <span className="text-zinc-500 font-medium">GSTIN Number:</span> 
+                        <span className="font-mono font-bold text-zinc-900">{submission.establishment_details?.gstin || responses.gstinNumber || 'N/A'}</span>
+                      </div>
+                      <div className="flex justify-between">
+                        <span className="text-zinc-500 font-medium">Contact Person:</span> 
+                        <span className="text-zinc-800 font-medium">{submission.establishment_details?.contactPerson || responses.contactName || submission.client_name || 'N/A'}</span>
+                      </div>
+                      <div className="flex justify-between">
+                        <span className="text-zinc-500 font-medium">Contact Mobile:</span> 
+                        <span className="text-zinc-800 font-mono">{submission.establishment_details?.contactPhone || responses.contactPhone || 'N/A'}</span>
+                      </div>
+                      <div className="flex justify-between">
+                        <span className="text-zinc-500 font-medium">Official Contact Email:</span> 
+                        <span className="text-zinc-800 font-mono">{submission.establishment_details?.contactEmail || responses.contactEmail || submission.client_email || 'N/A'}</span>
+                      </div>
+                      {(submission.establishment_details?.landline || responses.landlineNumber) && (
+                        <div className="flex justify-between">
+                          <span className="text-zinc-500 font-medium">Landline:</span> 
+                          <span className="text-zinc-800 font-mono">{submission.establishment_details?.landline || responses.landlineNumber}</span>
+                        </div>
+                      )}
+                      <div className="flex justify-between">
+                        <span className="text-zinc-500 font-medium">Apprentice Quota:</span> 
+                        <span className="font-extrabold text-emerald-800">{responses.requiredApprenticeCount || 0} Candidates</span>
+                      </div>
+                      <div className="flex justify-between">
+                        <span className="text-zinc-500 font-medium">Operational States:</span> 
+                        <span className="font-bold text-zinc-900">{responses.operationalStates || submission.establishment_details?.state || 'N/A'}</span>
+                      </div>
+                      <div className="pt-2 border-t border-zinc-200 text-zinc-600">
+                        <span className="text-zinc-500 font-medium block mb-0.5">Registered Address:</span>
+                        <p className="text-[11px] text-zinc-700 bg-white p-2.5 rounded-xl border border-zinc-200">
+                          {submission.establishment_details?.address || responses.registeredAddress || 'N/A'}
+                          {(submission.establishment_details?.city || responses.city) && (
+                            <span className="block mt-0.5 text-zinc-500 font-mono text-[10px]">
+                              {submission.establishment_details?.city || responses.city}, {submission.establishment_details?.district || responses.district || ''}, {submission.establishment_details?.state || responses.state || ''} - {submission.establishment_details?.pincode || responses.pincode || ''}
+                            </span>
+                          )}
+                        </p>
                       </div>
                     </div>
                   </div>
 
-                  {/* NAPS Establishment Profile */}
+                  {/* Section 2: Head of Establishment Details */}
+                  <div className="space-y-2">
+                    <h4 className="text-xs font-bold text-zinc-900 uppercase font-mono">
+                      2. Head of Establishment
+                    </h4>
+                    <div className="p-4 rounded-2xl bg-zinc-50 border border-zinc-200 space-y-2 text-xs">
+                      <div className="flex justify-between">
+                        <span className="text-zinc-500 font-medium">Full Name:</span> 
+                        <span className="font-bold text-zinc-900">{submission.establishment_details?.headOfEstablishment || responses.headOfEstablishmentName || 'N/A'}</span>
+                      </div>
+                      <div className="flex justify-between">
+                        <span className="text-zinc-500 font-medium">Designation:</span> 
+                        <span className="text-zinc-800 font-semibold">{submission.establishment_details?.designation || responses.headOfEstablishmentDesignation || 'Director'}</span>
+                      </div>
+                      <div className="flex justify-between">
+                        <span className="text-zinc-500 font-medium">Official Email ID:</span> 
+                        <span className="font-mono text-zinc-800">{submission.establishment_details?.headOfEstablishmentEmail || responses.headOfEstablishmentEmail || 'N/A'}</span>
+                      </div>
+                      <div className="flex justify-between">
+                        <span className="text-zinc-500 font-medium">Signing Authority:</span> 
+                        <span className="font-bold text-emerald-700">Authorized Signatory Declared</span>
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Section 3: Designated Notification SPOC */}
                   <div className="space-y-2">
                     <div className="flex items-center justify-between">
                       <h4 className="text-xs font-bold text-zinc-900 uppercase font-mono">
-                        NAPS Establishment Registration Details
+                        3. Designated Notification SPOC
                       </h4>
-                      <span className="text-[10px] font-mono px-2 py-0.5 rounded-full bg-emerald-100 text-emerald-800 font-bold border border-emerald-200">
-                        NAPS Portal Registered
+                      <span className="text-[10px] font-mono px-2 py-0.5 rounded-full bg-blue-100 text-blue-800 font-bold border border-blue-200">
+                        Configured for Dispatches
                       </span>
                     </div>
                     <div className="p-4 rounded-2xl bg-zinc-50 border border-zinc-200 space-y-2 text-xs">
-                      <div className="flex justify-between"><span className="text-zinc-500 font-medium">Establishment Name:</span> <strong className="text-zinc-900">{submission.establishment_details?.establishmentName || responses.companyName || submission.company_name || 'NIDEESHWARAM FOODS'}</strong></div>
-                      <div className="flex justify-between"><span className="text-zinc-500 font-medium">Establishment Type:</span> <span className="text-zinc-800 font-semibold">{submission.establishment_details?.establishmentType || 'FOOD SERVICE'}</span></div>
-                      <div className="flex justify-between"><span className="text-zinc-500 font-medium">PAN Number:</span> <span className="font-mono font-bold text-zinc-900">{submission.establishment_details?.pan || 'AAVFN4359C'}</span></div>
-                      <div className="flex justify-between"><span className="text-zinc-500 font-medium">GSTIN:</span> <span className="font-mono font-bold text-zinc-900">{submission.establishment_details?.gstin || responses.gstinNumber || '29AAVFN4359C1ZS'}</span></div>
-                      <div className="flex justify-between"><span className="text-zinc-500 font-medium">Head of Establishment:</span> <span className="text-zinc-800 font-semibold">{submission.establishment_details?.headOfEstablishment || 'Mansi Gupta C S (Director)'}</span></div>
-                      <div className="flex justify-between"><span className="text-zinc-500 font-medium">Contact Person:</span> <span className="text-zinc-800">{submission.establishment_details?.contactPerson || 'Mansi Gupta C S'} · 9632469856 · mansigupta1509@gmail.com</span></div>
-                      <div className="flex justify-between"><span className="text-zinc-500 font-medium">Operating States & Work Days:</span> <span className="text-zinc-800 font-mono">1 State · 6 Working Days</span></div>
-                      <div className="flex justify-between"><span className="text-zinc-500 font-medium">Bank Details:</span> <span className="text-zinc-800 font-mono font-bold">IDFC FIRST BANK · A/C 10147439967 · IFSC IDFB0080179</span></div>
-                      <div className="pt-2 border-t border-zinc-200 text-zinc-600">
-                        <span className="text-zinc-500 font-medium block mb-0.5">Registered Address:</span>
-                        <p className="text-[11px] text-zinc-700 bg-white p-2.5 rounded-xl border border-zinc-200">{submission.establishment_details?.address || 'SP 8, NGEF Ancillay industrial Estate, Mahadevapura, Bangalore - 560048, Karnataka'}</p>
+                      <div className="flex justify-between">
+                        <span className="text-zinc-500 font-medium">SPOC Name:</span> 
+                        <span className="font-bold text-zinc-900">{submission.assigned_company_spoc?.name || responses.spocFullName || 'N/A'}</span>
+                      </div>
+                      <div className="flex justify-between">
+                        <span className="text-zinc-500 font-medium">SPOC Official Email:</span> 
+                        <span className="font-mono font-bold text-blue-700">{submission.assigned_company_spoc?.email || responses.spocEmailAddress || 'N/A'}</span>
+                      </div>
+                      <div className="flex justify-between">
+                        <span className="text-zinc-500 font-medium">SPOC Phone:</span> 
+                        <span className="font-mono text-zinc-800">{submission.assigned_company_spoc?.phone || responses.spocPhone || 'N/A'}</span>
+                      </div>
+                      <div className="flex justify-between">
+                        <span className="text-zinc-500 font-medium">Role / Title:</span> 
+                        <span className="text-zinc-800">{submission.assigned_company_spoc?.roleTitle || responses.spocRoleTitle || 'HR / Compliance SPOC'}</span>
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Statutory Tax & Compliance Identifiers */}
+                  <div className="space-y-2">
+                    <h4 className="text-xs font-bold text-zinc-900 uppercase font-mono">
+                      4. Statutory Compliance Documents
+                    </h4>
+                    <div className="p-4 rounded-2xl bg-zinc-50 border border-zinc-200 space-y-2 text-xs">
+                      <div className="flex justify-between">
+                        <span className="text-zinc-500 font-medium">Company GSTIN:</span> 
+                        <span className="font-mono font-bold text-zinc-900">{responses.gstinNumber || submission.establishment_details?.gstin || 'N/A'}</span>
+                      </div>
+                      {companyDocs.epfoRegistrationCode && (
+                        <div className="flex justify-between">
+                          <span className="text-zinc-500 font-medium">EPFO Registration Code:</span> 
+                          <span className="font-mono text-zinc-800">{companyDocs.epfoRegistrationCode}</span>
+                        </div>
+                      )}
+                      <div className="flex justify-between">
+                        <span className="text-zinc-500 font-medium">Uploaded Documents:</span>
+                        <button
+                          type="button"
+                          onClick={() => setActiveTab('documents')}
+                          className="font-bold text-black hover:underline cursor-pointer flex items-center gap-1"
+                        >
+                          <span>Cross-verify in Documents Tab</span>
+                          <ArrowRight className="w-3 h-3" />
+                        </button>
                       </div>
                     </div>
                   </div>

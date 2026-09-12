@@ -262,20 +262,27 @@ export interface ClientApprenticeMetrics {
 export interface NAPSEstablishmentDetails {
   establishmentName: string;
   establishmentType: string;
+  establishmentCategory?: string;
   pan: string;
   address: string;
+  city?: string;
+  district?: string;
+  state?: string;
+  pincode?: string;
   contactPerson: string;
   contactPhone: string;
   contactEmail: string;
+  landline?: string;
   gstin: string;
   headOfEstablishment: string;
+  headOfEstablishmentEmail?: string;
   designation: string;
-  workingDays: string;
-  operatingStatesCount: number;
-  bankName: string;
-  beneficiaryName: string;
-  accountNumber: string;
-  ifscCode: string;
+  workingDays?: string;
+  operatingStatesCount?: number;
+  bankName?: string;
+  beneficiaryName?: string;
+  accountNumber?: string;
+  ifscCode?: string;
   documents?: {
     panDoc?: UploadedDocument;
     gstDoc?: UploadedDocument;
@@ -368,6 +375,28 @@ export interface IntakeFormData {
   servicesNeeded?: string[];
   primaryObjective?: string;
   keyPainPoints?: string;
+
+  // Establishment Registration Details (Official NAPS/NATS Register)
+  establishmentType?: string;
+  establishmentCategory?: string;
+  panNumber?: string;
+  registeredAddress?: string;
+  city?: string;
+  district?: string;
+  state?: string;
+  pincode?: string;
+  landlineNumber?: string;
+
+  // Head of Establishment Details
+  headOfEstablishmentName?: string;
+  headOfEstablishmentEmail?: string;
+  headOfEstablishmentDesignation?: string;
+
+  // Designated SPOC Notification Details (Section 3)
+  spocFullName?: string;
+  spocEmailAddress?: string;
+  spocPhone?: string;
+  spocRoleTitle?: string;
 
   // Step 2: Payroll, Timeline & Budget
   budgetRange?: string;

@@ -17,7 +17,8 @@ import {
   NAPSPortalRecord,
   ComplianceInvoiceRecord,
   ComplianceActionItem,
-  StipendPaymentRecord
+  StipendPaymentRecord,
+  NAPSEstablishmentDetails
 } from '@/types';
 import { INITIAL_PROFILES, INITIAL_SUBMISSIONS, INITIAL_LOGIN_LOGS } from './mock-data';
 import { createClient, isSupabaseConfigured } from '@/lib/supabase/client';
@@ -772,10 +773,46 @@ export const StoreProvider: React.FC<{ children: React.ReactNode }> = ({ childre
     };
 
     const newStatus: SubmissionStatus = isFinalSubmit ? 'submitted' : 'in_progress';
-    const completionPercentage = isFinalSubmit ? 100 : Math.round((step / 2) * 100);
+    const completionPercentage = isFinalSubmit ? 100 : Math.round((step / 3) * 100);
 
     const quotaRequired = mergedResponses.requiredApprenticeCount || 15;
     const candidateList: ApprenticeRecord[] = existing?.candidates || [];
+
+    // Construct structured Establishment Registration Details
+    const establishmentDetails: NAPSEstablishmentDetails = {
+      establishmentName: mergedResponses.companyName || user?.company_name || 'Establishment',
+      establishmentType: mergedResponses.establishmentType || 'FOOD SERVICE / SERVICES',
+      establishmentCategory: mergedResponses.establishmentCategory || mergedResponses.industry || 'General',
+      pan: mergedResponses.panNumber || '',
+      address: mergedResponses.registeredAddress || '',
+      city: mergedResponses.city || '',
+      district: mergedResponses.district || '',
+      state: mergedResponses.state || mergedResponses.operationalStates || '',
+      pincode: mergedResponses.pincode || '',
+      contactPerson: mergedResponses.contactName || '',
+      contactPhone: mergedResponses.contactPhone || '',
+      contactEmail: mergedResponses.contactEmail || '',
+      landline: mergedResponses.landlineNumber || '',
+      gstin: mergedResponses.gstinNumber || '',
+      headOfEstablishment: mergedResponses.headOfEstablishmentName || mergedResponses.contactName || '',
+      headOfEstablishmentEmail: mergedResponses.headOfEstablishmentEmail || mergedResponses.contactEmail || '',
+      designation: mergedResponses.headOfEstablishmentDesignation || 'Director',
+      documents: {
+        panDoc: mergedResponses.companyDocs?.panDoc,
+        gstDoc: mergedResponses.companyDocs?.gstDoc,
+        chequeDoc: mergedResponses.companyDocs?.chequeDoc,
+        signatoryDoc: mergedResponses.companyDocs?.signatoryDoc,
+      }
+    };
+
+    // Auto-configure SPOC if provided in Section 3
+    const spocData = (mergedResponses.spocEmailAddress || mergedResponses.spocFullName) ? {
+      name: mergedResponses.spocFullName || mergedResponses.contactName || 'SPOC Lead',
+      email: (mergedResponses.spocEmailAddress || mergedResponses.contactEmail || '').trim().toLowerCase(),
+      phone: mergedResponses.spocPhone || mergedResponses.contactPhone || '',
+      roleTitle: mergedResponses.spocRoleTitle || 'Designated SPOC',
+      assignedAt: existing?.assigned_company_spoc?.assignedAt || new Date().toISOString()
+    } : existing?.assigned_company_spoc;
 
     const updatedSubmission: FormSubmission = {
       id: submissionId,
@@ -785,14 +822,16 @@ export const StoreProvider: React.FC<{ children: React.ReactNode }> = ({ childre
       company_name: mergedResponses.companyName || user?.company_name || '',
       status: newStatus,
       current_step: step,
-      total_steps: 2,
+      total_steps: 3,
       completion_percentage: completionPercentage,
       time_spent_seconds: currentTotalTime,
       started_at: existing?.started_at || new Date().toISOString(),
       last_active_at: new Date().toISOString(),
       submitted_at: isFinalSubmit ? new Date().toISOString() : existing?.submitted_at,
       responses: mergedResponses,
-      candidates: candidateList
+      candidates: candidateList,
+      establishment_details: establishmentDetails,
+      assigned_company_spoc: spocData
     };
 
     const filtered = submissions.filter(s => s.id !== submissionId);
@@ -801,6 +840,8 @@ export const StoreProvider: React.FC<{ children: React.ReactNode }> = ({ childre
 
     if (user) {
       const dynamicMetrics = recalculateUserMetrics(user, candidateList, quotaRequired, mergedResponses.dbtSchemeOptIn !== false);
+      if (spocData) dynamicMetrics.assignedCompanySpoc = spocData;
+      dynamicMetrics.establishmentDetails = establishmentDetails;
       const updatedUser = { ...user, company_name: mergedResponses.companyName || user.company_name, apprenticeMetrics: dynamicMetrics };
       setUser(updatedUser);
     }
