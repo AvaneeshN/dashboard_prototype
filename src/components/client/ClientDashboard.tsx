@@ -119,6 +119,10 @@ export const ClientDashboard: React.FC = () => {
 
   const [napsPayoutMonthFilter, setNapsPayoutMonthFilter] = useState<string>('all');
   const [napsClientSearch, setNapsClientSearch] = useState('');
+  const [napsClientEstCode, setNapsClientEstCode] = useState('');
+  const [napsClientCnCode, setNapsClientCnCode] = useState('');
+  const [napsClientApCode, setNapsClientApCode] = useState('');
+  const [napsClientDbtStatus, setNapsClientDbtStatus] = useState<string>('all');
   const [claimSuccessAlert, setClaimSuccessAlert] = useState<string | null>(null);
 
   // Modal States
@@ -505,17 +509,36 @@ export const ClientDashboard: React.FC = () => {
   const filteredNapsRecords = useMemo(() => {
     return effectiveNapsRecords.filter((rec) => {
       const recMonthUpper = (rec.payoutMonth || '').toUpperCase();
-      const matchesMonth = selectedReportMonth === 'all' || recMonthUpper.includes(selectedReportMonth);
+      const matchesMonth = selectedReportMonth === 'all' || recMonthUpper.includes(selectedReportMonth.toUpperCase());
       const matchesYear = selectedReportYear === 'all' || recMonthUpper.includes(selectedReportYear);
-      const matchesSearch = !napsClientSearch.trim() ||
-        rec.apprenticeCode.toLowerCase().includes(napsClientSearch.toLowerCase()) ||
-        rec.contractCode.toLowerCase().includes(napsClientSearch.toLowerCase()) ||
-        rec.establishmentCode.toLowerCase().includes(napsClientSearch.toLowerCase()) ||
-        rec.beneficiaryId.toLowerCase().includes(napsClientSearch.toLowerCase()) ||
-        rec.ojtDistrict.toLowerCase().includes(napsClientSearch.toLowerCase());
-      return matchesMonth && matchesYear && matchesSearch;
+
+      const matchesEst = !napsClientEstCode.trim() ||
+        (rec.establishmentCode && rec.establishmentCode.toLowerCase().includes(napsClientEstCode.trim().toLowerCase()));
+
+      const matchesCn = !napsClientCnCode.trim() ||
+        (rec.contractCode && rec.contractCode.toLowerCase().includes(napsClientCnCode.trim().toLowerCase()));
+
+      const matchesAp = !napsClientApCode.trim() ||
+        (rec.apprenticeCode && rec.apprenticeCode.toLowerCase().includes(napsClientApCode.trim().toLowerCase()));
+
+      const resolvedStatus = (rec.dbtStatus || (rec.paymentStatus === 'PAID' ? 'PAID' : rec.paymentStatus === 'FAILED' ? 'FAIL' : 'UNPAID')).toUpperCase();
+      const matchesDbt = napsClientDbtStatus === 'all' || resolvedStatus === napsClientDbtStatus.toUpperCase();
+
+      const q = napsClientSearch.trim().toLowerCase();
+      const matchesSearch = !q ||
+        (rec.candidateName && rec.candidateName.toLowerCase().includes(q)) ||
+        (rec.candidateAadhaarName && rec.candidateAadhaarName.toLowerCase().includes(q)) ||
+        rec.apprenticeCode.toLowerCase().includes(q) ||
+        rec.contractCode.toLowerCase().includes(q) ||
+        rec.establishmentCode.toLowerCase().includes(q) ||
+        rec.beneficiaryId.toLowerCase().includes(q) ||
+        (rec.location && rec.location.toLowerCase().includes(q)) ||
+        (rec.emailId && rec.emailId.toLowerCase().includes(q)) ||
+        (rec.mobileNumber && rec.mobileNumber.toLowerCase().includes(q));
+
+      return matchesMonth && matchesYear && matchesEst && matchesCn && matchesAp && matchesDbt && matchesSearch;
     });
-  }, [effectiveNapsRecords, selectedReportMonth, selectedReportYear, napsClientSearch]);
+  }, [effectiveNapsRecords, selectedReportMonth, selectedReportYear, napsClientEstCode, napsClientCnCode, napsClientApCode, napsClientDbtStatus, napsClientSearch]);
 
   const napsMonthOptions = useMemo(() => {
     const months = Array.from(new Set(effectiveNapsRecords.map(r => r.payoutMonth).filter(Boolean)));
@@ -527,48 +550,52 @@ export const ClientDashboard: React.FC = () => {
     if (!list.length) return;
 
     const headers = [
+      'Serial No',
+      'Document Receive Date',
       'Establishment Code',
-      'OJT State',
-      'OJT District',
-      'Apprentice Code',
-      'Contract Code',
-      'Jurisdiction',
+      'Location',
+      'Candidate Aadhar Name',
+      'DOB',
+      'Gender',
+      'Mobile Number',
+      'Email ID',
+      'Stipend',
+      'Qualification',
+      'Curriculum',
+      'AP Code',
+      'Beneficiary ID',
+      'CN Number',
+      'Remarks',
       'Contract Start Date',
       'Contract End Date',
-      'Contract Type',
-      'Payout Month',
-      'Beneficiary Status',
-      'Beneficiary ID',
-      'DBT Processed to PFMS Date',
-      'Candidate DBT Consent',
-      'eKYC Status',
-      'Establishment Shared Status',
-      'Amount (INR)',
-      'Payment Status',
-      'Payment Failure Reason'
+      'DBT Status'
     ];
 
-    const rows = list.map(r => [
-      r.establishmentCode,
-      r.ojtState,
-      r.ojtDistrict,
-      r.apprenticeCode,
-      r.contractCode,
-      r.jurisdiction,
-      r.contractStartDate,
-      r.contractEndDate,
-      r.contractType,
-      r.payoutMonth,
-      r.beneficiaryStatus,
-      r.beneficiaryId,
-      r.dbtProcessedToPfmsDate || '-',
-      r.candidateDbtConsent,
-      r.eKycStatus,
-      r.establishmentSharedStatus,
-      r.amount,
-      r.paymentStatus,
-      r.paymentFailureReason || '-'
-    ]);
+    const rows = list.map((r, idx) => {
+      const cand = candidateList.find(c => c.id === r.candidateId || c.contractCode === r.contractCode || (c.name && r.candidateName && c.name.toLowerCase() === r.candidateName.toLowerCase()));
+      const resolvedStatus = (r.dbtStatus || (r.paymentStatus === 'PAID' ? 'PAID' : r.paymentStatus === 'FAILED' ? 'FAIL' : 'UNPAID')).toUpperCase();
+      return [
+        idx + 1,
+        r.documentReceiveDate || cand?.documentReceiveDate || '-',
+        r.establishmentCode || '-',
+        r.location || (r.ojtDistrict ? `${r.ojtDistrict}, ${r.ojtState}` : (cand?.ojtDistrict ? `${cand.ojtDistrict}, ${cand.ojtState || ''}` : '-')),
+        r.candidateAadhaarName || r.candidateName || cand?.name || '-',
+        r.dob || cand?.dob || '-',
+        r.gender || cand?.gender || '-',
+        r.mobileNumber || cand?.phone || '-',
+        r.emailId || cand?.email || '-',
+        r.stipend || cand?.stipendAmount || r.amount || 0,
+        r.qualification || cand?.qualification || '-',
+        r.curriculum || cand?.tradeOrRole || '-',
+        r.apprenticeCode || cand?.apprenticeCode || '-',
+        r.beneficiaryId || '-',
+        r.contractCode || cand?.contractCode || '-',
+        r.remarks || '-',
+        r.contractStartDate || cand?.onboardingDate || '-',
+        r.contractEndDate || cand?.contractExpireDate || '-',
+        resolvedStatus
+      ];
+    });
 
     const csvContent = [
       headers.join(','),
@@ -1736,59 +1763,114 @@ export const ClientDashboard: React.FC = () => {
                     </div>
 
                     {/* Filter & Search Bar */}
-                    <div className="pt-3 border-t border-zinc-200 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
-                      <div className="flex flex-wrap items-center gap-2">
-                        <Filter className="w-4 h-4 text-zinc-400" />
-                        <span className="text-xs font-bold text-zinc-600">Month:</span>
-                        <select
-                          value={selectedReportMonth}
-                          onChange={(e) => setSelectedReportMonth(e.target.value)}
-                          className="px-3 py-1.5 rounded-full bg-zinc-100 border border-zinc-300 text-xs font-bold text-zinc-800 focus:outline-none focus:border-black cursor-pointer font-mono"
-                        >
-                          {ALL_REPORT_MONTHS.map((m) => (
-                            <option key={m.value} value={m.value}>
-                              {m.label}
-                            </option>
-                          ))}
-                        </select>
+                    <div className="pt-3 border-t border-zinc-200 space-y-3">
+                      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+                        <div className="flex flex-wrap items-center gap-2">
+                          <Filter className="w-4 h-4 text-zinc-400" />
+                          <span className="text-xs font-bold text-zinc-600">Month:</span>
+                          <select
+                            value={selectedReportMonth}
+                            onChange={(e) => setSelectedReportMonth(e.target.value)}
+                            className="px-3 py-1.5 rounded-full bg-zinc-100 border border-zinc-300 text-xs font-bold text-zinc-800 focus:outline-none focus:border-black cursor-pointer font-mono"
+                          >
+                            {ALL_REPORT_MONTHS.map((m) => (
+                              <option key={m.value} value={m.value}>
+                                {m.label}
+                              </option>
+                            ))}
+                          </select>
 
-                        <span className="text-xs font-bold text-zinc-600 ml-1">Year:</span>
-                        <select
-                          value={selectedReportYear}
-                          onChange={(e) => setSelectedReportYear(e.target.value)}
-                          className="px-3 py-1.5 rounded-full bg-zinc-100 border border-zinc-300 text-xs font-bold text-zinc-800 focus:outline-none focus:border-black cursor-pointer font-mono"
-                        >
-                          {ALL_REPORT_YEARS.map((y) => (
-                            <option key={y.value} value={y.value}>
-                              {y.label}
-                            </option>
-                          ))}
-                        </select>
+                          <span className="text-xs font-bold text-zinc-600 ml-1">Year:</span>
+                          <select
+                            value={selectedReportYear}
+                            onChange={(e) => setSelectedReportYear(e.target.value)}
+                            className="px-3 py-1.5 rounded-full bg-zinc-100 border border-zinc-300 text-xs font-bold text-zinc-800 focus:outline-none focus:border-black cursor-pointer font-mono"
+                          >
+                            {ALL_REPORT_YEARS.map((y) => (
+                              <option key={y.value} value={y.value}>
+                                {y.label}
+                              </option>
+                            ))}
+                          </select>
 
-                        {(selectedReportMonth !== 'all' || selectedReportYear !== 'all') && (
+                          <span className="text-xs font-bold text-zinc-600 ml-1">DBT Status:</span>
+                          <select
+                            value={napsClientDbtStatus}
+                            onChange={(e) => setNapsClientDbtStatus(e.target.value)}
+                            className="px-3 py-1.5 rounded-full bg-zinc-100 border border-zinc-300 text-xs font-bold text-zinc-800 focus:outline-none focus:border-black cursor-pointer"
+                          >
+                            <option value="all">All Statuses</option>
+                            <option value="PAID">PAID</option>
+                            <option value="UNPAID">UNPAID</option>
+                            <option value="FAIL">FAIL</option>
+                          </select>
+                        </div>
+
+                        {/* General Search Input */}
+                        <div className="relative w-full sm:w-72">
+                          <Search className="w-4 h-4 text-zinc-400 absolute left-3 top-2.5" />
+                          <input
+                            type="text"
+                            placeholder="Search Aadhaar, Email, AP/CN..."
+                            value={napsClientSearch}
+                            onChange={(e) => setNapsClientSearch(e.target.value)}
+                            className="w-full pl-9 pr-3 py-1.5 rounded-full bg-zinc-100 border border-zinc-200 text-xs text-zinc-800 focus:outline-none focus:border-black"
+                          />
+                        </div>
+                      </div>
+
+                      {/* Code Specific Filters */}
+                      <div className="pt-2 border-t border-zinc-100 flex flex-wrap items-center gap-3 text-xs">
+                        <div className="flex items-center gap-1.5 flex-1 min-w-[170px]">
+                          <span className="font-mono text-zinc-500 text-[11px] font-bold whitespace-nowrap">Est Code:</span>
+                          <input
+                            type="text"
+                            placeholder="Establishment Code..."
+                            value={napsClientEstCode}
+                            onChange={(e) => setNapsClientEstCode(e.target.value)}
+                            className="w-full px-2.5 py-1 rounded-lg bg-zinc-50 border border-zinc-300 text-xs text-zinc-800 font-mono focus:outline-none focus:border-black"
+                          />
+                        </div>
+
+                        <div className="flex items-center gap-1.5 flex-1 min-w-[170px]">
+                          <span className="font-mono text-zinc-500 text-[11px] font-bold whitespace-nowrap">CN Code:</span>
+                          <input
+                            type="text"
+                            placeholder="CN Code..."
+                            value={napsClientCnCode}
+                            onChange={(e) => setNapsClientCnCode(e.target.value)}
+                            className="w-full px-2.5 py-1 rounded-lg bg-zinc-50 border border-zinc-300 text-xs text-zinc-800 font-mono focus:outline-none focus:border-black"
+                          />
+                        </div>
+
+                        <div className="flex items-center gap-1.5 flex-1 min-w-[170px]">
+                          <span className="font-mono text-zinc-500 text-[11px] font-bold whitespace-nowrap">AP Code:</span>
+                          <input
+                            type="text"
+                            placeholder="AP Code..."
+                            value={napsClientApCode}
+                            onChange={(e) => setNapsClientApCode(e.target.value)}
+                            className="w-full px-2.5 py-1 rounded-lg bg-zinc-50 border border-zinc-300 text-xs text-zinc-800 font-mono focus:outline-none focus:border-black"
+                          />
+                        </div>
+
+                        {(selectedReportMonth !== 'all' || selectedReportYear !== 'all' || napsClientDbtStatus !== 'all' || napsClientEstCode || napsClientCnCode || napsClientApCode || napsClientSearch) && (
                           <button
                             type="button"
                             onClick={() => {
                               setSelectedReportMonth('all');
                               setSelectedReportYear('all');
+                              setNapsClientDbtStatus('all');
+                              setNapsClientEstCode('');
+                              setNapsClientCnCode('');
+                              setNapsClientApCode('');
+                              setNapsClientSearch('');
                             }}
-                            className="px-2.5 py-1 rounded-full bg-zinc-200 hover:bg-zinc-300 text-zinc-700 text-xs font-bold cursor-pointer transition-all"
+                            className="px-3 py-1 rounded-full bg-zinc-200 hover:bg-zinc-300 text-zinc-700 text-xs font-bold cursor-pointer transition-all"
                           >
-                            Show All
+                            Clear Filters
                           </button>
                         )}
-                      </div>
-
-                      {/* Search Input */}
-                      <div className="relative w-full sm:w-72">
-                        <Search className="w-4 h-4 text-zinc-400 absolute left-3 top-2.5" />
-                        <input
-                          type="text"
-                          placeholder="Search Apprentice / Contract..."
-                          value={napsClientSearch}
-                          onChange={(e) => setNapsClientSearch(e.target.value)}
-                          className="w-full pl-9 pr-3 py-1.5 rounded-full bg-zinc-100 border border-zinc-200 text-xs text-zinc-800 focus:outline-none focus:border-black"
-                        />
                       </div>
                     </div>
 
@@ -1799,122 +1881,120 @@ export const ClientDashboard: React.FC = () => {
                         <div className="text-lg font-bold font-mono text-zinc-900 mt-0.5">{filteredNapsRecords.length}</div>
                       </div>
                       <div className="p-3 rounded-2xl bg-zinc-50 border border-zinc-200">
-                        <span className="text-[10px] font-bold uppercase tracking-tight text-zinc-500">Total DBT Amount</span>
+                        <span className="text-[10px] font-bold uppercase tracking-tight text-zinc-500">Total Stipend / DBT</span>
                         <div className="text-lg font-bold font-mono text-emerald-700 mt-0.5">
-                          ₹{filteredNapsRecords.reduce((acc, r) => acc + (r.amount || 0), 0).toLocaleString('en-IN')}
+                          ₹{filteredNapsRecords.reduce((acc, r) => acc + (r.stipend || r.amount || 0), 0).toLocaleString('en-IN')}
                         </div>
                       </div>
                       <div className="p-3 rounded-2xl bg-emerald-50 border border-emerald-200">
                         <span className="text-[10px] font-bold uppercase tracking-tight text-emerald-800">Paid Status</span>
                         <div className="text-lg font-bold font-mono text-emerald-700 mt-0.5">
-                          {filteredNapsRecords.filter(r => r.paymentStatus === 'PAID').length}
+                          {filteredNapsRecords.filter(r => (r.dbtStatus || r.paymentStatus) === 'PAID').length}
                         </div>
                       </div>
                       <div className="p-3 rounded-2xl bg-amber-50 border border-amber-200">
-                        <span className="text-[10px] font-bold uppercase tracking-tight text-amber-800">Pending</span>
+                        <span className="text-[10px] font-bold uppercase tracking-tight text-amber-800">Pending / Unpaid</span>
                         <div className="text-lg font-bold font-mono text-amber-700 mt-0.5">
-                          {filteredNapsRecords.filter(r => r.paymentStatus !== 'PAID').length}
+                          {filteredNapsRecords.filter(r => (r.dbtStatus || r.paymentStatus) !== 'PAID').length}
                         </div>
                       </div>
                     </div>
                   </div>
 
-                  {/* Full Multi-Column NAPS Government Portal Table (TPA Columns Omitted) */}
+                  {/* Full 19-Column DBT Dashboard Table */}
                   <div className="rounded-3xl bg-white border border-zinc-200 overflow-hidden shadow-sm">
                     <div className="overflow-x-auto max-h-[600px]">
                       <table className="w-full text-left text-xs text-zinc-700 whitespace-nowrap">
-                        <thead className="bg-[#0a192f] text-white font-bold text-[11px] uppercase tracking-wider sticky top-0 z-10">
+                        <thead className="bg-[#0a192f] text-white font-bold text-[10px] uppercase tracking-wider sticky top-0 z-10 font-mono">
                           <tr>
-                            <th className="px-3.5 py-3">Candidate / Apprentice</th>
-                            <th className="px-3.5 py-3">Establishment Code</th>
-                            <th className="px-3.5 py-3">OJT State</th>
-                            <th className="px-3.5 py-3">OJT District</th>
-                            <th className="px-3.5 py-3">Contract Code</th>
-                            <th className="px-3.5 py-3">Jurisdiction</th>
-                            <th className="px-3.5 py-3">Contract Dates</th>
-                            <th className="px-3.5 py-3">Contract Type</th>
-                            <th className="px-3.5 py-3">Payout Month</th>
-                            <th className="px-3.5 py-3">Beneficiary Status</th>
-                            <th className="px-3.5 py-3">Beneficiary ID</th>
-                            <th className="px-3.5 py-3">DBT to PFMS Date</th>
-                            <th className="px-3.5 py-3">Candidate DBT Consent</th>
-                            <th className="px-3.5 py-3">eKYC Status</th>
-                            <th className="px-3.5 py-3">Establishment Shared</th>
-                            <th className="px-3.5 py-3">Amount (₹)</th>
-                            <th className="px-3.5 py-3">Payment Status</th>
-                            <th className="px-3.5 py-3">Payment Failure Reason</th>
+                            <th className="px-3 py-2.5">Serial No</th>
+                            <th className="px-3 py-2.5">Document Receive Date</th>
+                            <th className="px-3 py-2.5">Establishment Code</th>
+                            <th className="px-3 py-2.5">Location</th>
+                            <th className="px-3 py-2.5">Candidate Aadhar Name</th>
+                            <th className="px-3 py-2.5">DOB</th>
+                            <th className="px-3 py-2.5">Gender</th>
+                            <th className="px-3 py-2.5">Mobile Number</th>
+                            <th className="px-3 py-2.5">Email ID</th>
+                            <th className="px-3 py-2.5">Stipend</th>
+                            <th className="px-3 py-2.5">Qualification</th>
+                            <th className="px-3 py-2.5">Curriculum</th>
+                            <th className="px-3 py-2.5">AP Code</th>
+                            <th className="px-3 py-2.5">Beneficiary ID</th>
+                            <th className="px-3 py-2.5">CN Number</th>
+                            <th className="px-3 py-2.5">Remarks</th>
+                            <th className="px-3 py-2.5">Contract Start Date</th>
+                            <th className="px-3 py-2.5">Contract End Date</th>
+                            <th className="px-3 py-2.5">DBT Status</th>
                           </tr>
                         </thead>
                         <tbody className="divide-y divide-zinc-200 font-mono text-[11px]">
                           {filteredNapsRecords.length === 0 ? (
                             <tr>
-                              <td colSpan={18} className="px-6 py-12 text-center text-zinc-500 font-sans">
-                                No NAPS government portal records filed yet. Operations administrators update this ledger as monthly claims are processed.
+                              <td colSpan={19} className="px-6 py-12 text-center text-zinc-500 font-sans">
+                                No DBT dashboard records found matching the active filters.
                               </td>
                             </tr>
                           ) : (
-                            filteredNapsRecords.map((r) => {
+                            filteredNapsRecords.map((r, idx) => {
                               const cand = candidateList.find(c => c.id === r.candidateId || c.contractCode === r.contractCode || (c.name && r.candidateName && c.name.toLowerCase() === r.candidateName.toLowerCase()));
-                              const candidateDisplayName = r.candidateName || cand?.name || 'Apprentice';
+                              const docRecDate = r.documentReceiveDate || cand?.documentReceiveDate || '-';
+                              const estCode = r.establishmentCode || '-';
+                              const loc = r.location || (r.ojtDistrict ? `${r.ojtDistrict}, ${r.ojtState}` : (cand?.ojtDistrict ? `${cand.ojtDistrict}, ${cand.ojtState || ''}` : '-'));
+                              const aadharName = r.candidateAadhaarName || r.candidateName || cand?.name || '-';
+                              const birthDate = r.dob || cand?.dob || '-';
+                              const candGender = r.gender || cand?.gender || '-';
+                              const phoneNum = r.mobileNumber || cand?.phone || '-';
+                              const mailAddr = r.emailId || cand?.email || '-';
+                              const stipendVal = r.stipend || cand?.stipendAmount || r.amount || 0;
+                              const qual = r.qualification || cand?.qualification || '-';
+                              const curr = r.curriculum || cand?.tradeOrRole || '-';
+                              const apCode = r.apprenticeCode || cand?.apprenticeCode || '-';
+                              const benId = r.beneficiaryId || '-';
+                              const cnNum = r.contractCode || cand?.contractCode || '-';
+                              const rem = r.remarks || '-';
+                              const startDate = r.contractStartDate || cand?.onboardingDate || '-';
+                              const endDate = r.contractEndDate || cand?.contractExpireDate || '-';
+                              const resolvedStatus: 'PAID' | 'UNPAID' | 'FAIL' = 
+                                r.dbtStatus === 'PAID' || r.paymentStatus === 'PAID' ? 'PAID' :
+                                r.dbtStatus === 'FAIL' || r.paymentStatus === 'FAILED' ? 'FAIL' : 'UNPAID';
 
                               return (
                                 <tr key={r.id} className="hover:bg-zinc-50/90 transition-colors">
-                                  <td className="px-3.5 py-3 font-sans">
-                                    <div className="font-bold text-zinc-900">{candidateDisplayName}</div>
-                                    <div className="font-mono text-[10px] text-sky-700 font-bold">{r.apprenticeCode}</div>
+                                  <td className="px-3 py-2.5 font-bold text-zinc-400">{idx + 1}</td>
+                                  <td className="px-3 py-2.5 text-zinc-600">{docRecDate}</td>
+                                  <td className="px-3 py-2.5 font-bold text-zinc-900">{estCode}</td>
+                                  <td className="px-3 py-2.5 font-sans text-zinc-700">{loc}</td>
+                                  <td className="px-3 py-2.5 font-sans font-bold text-zinc-900">{aadharName}</td>
+                                  <td className="px-3 py-2.5 text-zinc-600">{birthDate}</td>
+                                  <td className="px-3 py-2.5 font-sans capitalize text-zinc-700">{candGender}</td>
+                                  <td className="px-3 py-2.5 text-zinc-700">{phoneNum}</td>
+                                  <td className="px-3 py-2.5 text-zinc-600">{mailAddr}</td>
+                                  <td className="px-3 py-2.5 font-bold text-zinc-900">₹{stipendVal.toLocaleString('en-IN')}</td>
+                                  <td className="px-3 py-2.5 font-sans text-zinc-700">{qual}</td>
+                                  <td className="px-3 py-2.5 font-sans text-zinc-700 max-w-xs truncate">{curr}</td>
+                                  <td className="px-3 py-2.5 text-sky-800 font-bold">{apCode}</td>
+                                  <td className="px-3 py-2.5 text-zinc-500">{benId}</td>
+                                  <td className="px-3 py-2.5 font-bold text-zinc-800">{cnNum}</td>
+                                  <td className="px-3 py-2.5 font-sans text-zinc-600 max-w-xs truncate">{rem}</td>
+                                  <td className="px-3 py-2.5 text-zinc-600">{startDate}</td>
+                                  <td className="px-3 py-2.5 text-zinc-600">{endDate}</td>
+                                  <td className="px-3 py-2.5">
+                                    <span className={`px-2.5 py-0.5 rounded-full text-[10px] font-bold ${
+                                      resolvedStatus === 'PAID'
+                                        ? 'bg-emerald-100 text-emerald-800 border border-emerald-300'
+                                        : resolvedStatus === 'FAIL'
+                                        ? 'bg-rose-100 text-rose-800 border border-rose-300'
+                                        : 'bg-amber-100 text-amber-800 border border-amber-300'
+                                    }`}>
+                                      {resolvedStatus}
+                                    </span>
                                   </td>
-                                  <td className="px-3.5 py-3 font-bold text-zinc-900">{r.establishmentCode}</td>
-                                  <td className="px-3.5 py-3 font-sans text-zinc-600">{r.ojtState}</td>
-                                  <td className="px-3.5 py-3 font-sans text-zinc-600">{r.ojtDistrict}</td>
-                                  <td className="px-3.5 py-3 font-mono font-bold text-zinc-800">{r.contractCode}</td>
-                                <td className="px-3.5 py-3 font-sans capitalize text-zinc-600">{r.jurisdiction}</td>
-                                <td className="px-3.5 py-3 text-zinc-500">
-                                  {r.contractStartDate} → {r.contractEndDate}
-                                </td>
-                                <td className="px-3.5 py-3 font-sans capitalize text-zinc-600">{r.contractType}</td>
-                                <td className="px-3.5 py-3 font-bold text-zinc-900">{r.payoutMonth}</td>
-                                <td className="px-3.5 py-3 font-sans capitalize text-zinc-600">{r.beneficiaryStatus}</td>
-                                <td className="px-3.5 py-3 text-zinc-500">{r.beneficiaryId}</td>
-                                <td className="px-3.5 py-3 text-zinc-500">{r.dbtProcessedToPfmsDate || '-'}</td>
-                                <td className="px-3.5 py-3 font-sans">
-                                  <span className={`px-2 py-0.5 rounded-full text-[10px] font-bold ${
-                                    r.candidateDbtConsent === 'Yes'
-                                      ? 'bg-emerald-50 text-emerald-700 border border-emerald-200'
-                                      : 'bg-zinc-100 text-zinc-600'
-                                  }`}>
-                                    {r.candidateDbtConsent}
-                                  </span>
-                                </td>
-                                <td className="px-3.5 py-3 font-sans">
-                                  <span className={`px-2 py-0.5 rounded-full text-[10px] font-bold ${
-                                    r.eKycStatus === 'Yes'
-                                      ? 'bg-emerald-50 text-emerald-700 border border-emerald-200'
-                                      : 'bg-amber-50 text-amber-700 border border-amber-200'
-                                  }`}>
-                                    {r.eKycStatus}
-                                  </span>
-                                </td>
-                                <td className="px-3.5 py-3 font-sans capitalize text-zinc-600">{r.establishmentSharedStatus}</td>
-                                <td className="px-3.5 py-3 font-bold text-zinc-900">
-                                  ₹{r.amount.toFixed(1)}
-                                </td>
-                                <td className="px-3.5 py-3 font-sans">
-                                  <span className={`px-2 py-0.5 rounded-full text-[10px] font-bold ${
-                                    r.paymentStatus === 'PAID'
-                                      ? 'bg-emerald-100 text-emerald-800 border border-emerald-300'
-                                      : r.paymentStatus === 'PENDING'
-                                      ? 'bg-amber-100 text-amber-800 border border-amber-300'
-                                      : 'bg-red-100 text-red-800 border border-red-300'
-                                  }`}>
-                                    {r.paymentStatus}
-                                  </span>
-                                </td>
-                                <td className="px-3.5 py-3 text-zinc-400">{r.paymentFailureReason || '-'}</td>
-                              </tr>
-                            );
-                          })
-                        )}
-                      </tbody>
+                                </tr>
+                              );
+                            })
+                          )}
+                        </tbody>
                       </table>
                     </div>
                   </div>

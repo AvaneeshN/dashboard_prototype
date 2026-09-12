@@ -63,6 +63,11 @@ export interface ApprenticeRecord {
   aadhaarNumber?: string;
   panNumber?: string;
   aparId?: string;
+  dob?: string;
+  gender?: string;
+  documentReceiveDate?: string;
+  ojtDistrict?: string;
+  ojtState?: string;
   tradeOrRole: string;
   qualification: string;
   onboardingDate: string;
@@ -129,9 +134,19 @@ export interface NAPSPortalRecord {
   id: string;
   candidateId?: string;
   candidateName?: string;
+  candidateAadhaarName?: string;
+  documentReceiveDate?: string;
   establishmentCode: string;
+  location?: string;
   ojtState: string;
   ojtDistrict: string;
+  dob?: string;
+  gender?: string;
+  mobileNumber?: string;
+  emailId?: string;
+  stipend?: number;
+  qualification?: string;
+  curriculum?: string;
   apprenticeCode: string;
   contractCode: string;
   jurisdiction: 'central' | 'state' | string;
@@ -146,7 +161,8 @@ export interface NAPSPortalRecord {
   eKycStatus: 'Yes' | 'No' | string;
   establishmentSharedStatus: 'paid' | 'pending' | string;
   amount: number; // e.g. 1500.0
-  paymentStatus: 'PAID' | 'PENDING' | 'FAILED' | string;
+  paymentStatus: 'PAID' | 'UNPAID' | 'FAIL' | 'PENDING' | 'FAILED' | string;
+  dbtStatus?: 'PAID' | 'UNPAID' | 'FAIL' | string;
   paymentFailureReason?: string;
   remarks?: string;
   createdAt?: string;

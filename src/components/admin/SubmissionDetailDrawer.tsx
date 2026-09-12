@@ -44,7 +44,9 @@ import {
   Trash2,
   Edit2,
   Copy,
-  Lock
+  Lock,
+  Search,
+  Filter
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 
@@ -116,22 +118,39 @@ export const SubmissionDetailDrawer: React.FC<SubmissionDetailDrawerProps> = ({
   const [showNapsModal, setShowNapsModal] = useState(false);
   const [editingNapsRecord, setEditingNapsRecord] = useState<NAPSPortalRecord | null>(null);
   const [napsFormMonthFilter, setNapsFormMonthFilter] = useState<string>('all');
+  const [napsFormYearFilter, setNapsFormYearFilter] = useState<string>('all');
+  const [napsFilterEstCode, setNapsFilterEstCode] = useState<string>('');
+  const [napsFilterCnCode, setNapsFilterCnCode] = useState<string>('');
+  const [napsFilterApCode, setNapsFilterApCode] = useState<string>('');
+  const [napsFilterDbtStatus, setNapsFilterDbtStatus] = useState<string>('all');
   const [napsSearchQuery, setNapsSearchQuery] = useState('');
   const [napsForm, setNapsForm] = useState<Omit<NAPSPortalRecord, 'id'>>({
     candidateId: '',
     candidateName: '',
+    candidateAadhaarName: '',
+    documentReceiveDate: '',
     establishmentCode: '',
+    location: '',
     ojtState: '',
     ojtDistrict: '',
+    dob: '',
+    gender: '',
+    mobileNumber: '',
+    emailId: '',
+    stipend: 0,
+    qualification: '',
+    curriculum: '',
     apprenticeCode: '',
+    beneficiaryId: '',
     contractCode: '',
-    jurisdiction: 'central',
+    remarks: '',
     contractStartDate: '',
     contractEndDate: '',
+    dbtStatus: 'UNPAID',
+    jurisdiction: 'central',
     contractType: 'optional',
     payoutMonth: '',
     beneficiaryStatus: 'created',
-    beneficiaryId: '',
     dbtProcessedToPfmsDate: '',
     candidateDbtConsent: 'Yes',
     eKycStatus: 'Yes',
@@ -291,14 +310,50 @@ export const SubmissionDetailDrawer: React.FC<SubmissionDetailDrawerProps> = ({
   };
 
   const filteredNapsRecords = napsRecords.filter(r => {
-    const matchesMonth = napsFormMonthFilter === 'all' || r.payoutMonth === napsFormMonthFilter;
-    const matchesQuery = 
-      (r.candidateName && r.candidateName.toLowerCase().includes(napsSearchQuery.toLowerCase())) ||
-      r.apprenticeCode.toLowerCase().includes(napsSearchQuery.toLowerCase()) ||
-      r.contractCode.toLowerCase().includes(napsSearchQuery.toLowerCase()) ||
-      r.beneficiaryId.toLowerCase().includes(napsSearchQuery.toLowerCase()) ||
-      r.establishmentCode.toLowerCase().includes(napsSearchQuery.toLowerCase());
-    return matchesMonth && matchesQuery;
+    // Month filter (supports payoutMonth format like 'JAN-2026' or just 'JAN')
+    let matchesMonth = true;
+    if (napsFormMonthFilter !== 'all') {
+      const pMonth = (r.payoutMonth || '').toUpperCase();
+      matchesMonth = pMonth.includes(napsFormMonthFilter.toUpperCase());
+    }
+
+    // Year filter
+    let matchesYear = true;
+    if (napsFormYearFilter !== 'all') {
+      const pYear = (r.payoutMonth || '').toUpperCase();
+      matchesYear = pYear.includes(napsFormYearFilter);
+    }
+
+    // Est Code filter
+    const matchesEst = !napsFilterEstCode.trim() || 
+      (r.establishmentCode && r.establishmentCode.toLowerCase().includes(napsFilterEstCode.trim().toLowerCase()));
+
+    // CN Code filter
+    const matchesCn = !napsFilterCnCode.trim() || 
+      (r.contractCode && r.contractCode.toLowerCase().includes(napsFilterCnCode.trim().toLowerCase()));
+
+    // AP Code filter
+    const matchesAp = !napsFilterApCode.trim() || 
+      (r.apprenticeCode && r.apprenticeCode.toLowerCase().includes(napsFilterApCode.trim().toLowerCase()));
+
+    // DBT Status filter
+    const currentStatus = (r.dbtStatus || (r.paymentStatus === 'PAID' ? 'PAID' : r.paymentStatus === 'FAILED' ? 'FAIL' : 'UNPAID')).toUpperCase();
+    const matchesStatus = napsFilterDbtStatus === 'all' || currentStatus === napsFilterDbtStatus.toUpperCase();
+
+    // General query search
+    const query = napsSearchQuery.trim().toLowerCase();
+    const matchesQuery = !query || 
+      (r.candidateName && r.candidateName.toLowerCase().includes(query)) ||
+      (r.candidateAadhaarName && r.candidateAadhaarName.toLowerCase().includes(query)) ||
+      (r.apprenticeCode && r.apprenticeCode.toLowerCase().includes(query)) ||
+      (r.contractCode && r.contractCode.toLowerCase().includes(query)) ||
+      (r.establishmentCode && r.establishmentCode.toLowerCase().includes(query)) ||
+      (r.beneficiaryId && r.beneficiaryId.toLowerCase().includes(query)) ||
+      (r.emailId && r.emailId.toLowerCase().includes(query)) ||
+      (r.mobileNumber && r.mobileNumber.toLowerCase().includes(query)) ||
+      (r.location && r.location.toLowerCase().includes(query));
+
+    return matchesMonth && matchesYear && matchesEst && matchesCn && matchesAp && matchesStatus && matchesQuery;
   });
 
   const availableNapsMonths = Array.from(new Set(napsRecords.map(r => r.payoutMonth))).filter(Boolean);
@@ -309,23 +364,35 @@ export const SubmissionDetailDrawer: React.FC<SubmissionDetailDrawerProps> = ({
     setNapsForm({
       candidateId: cand?.id || '',
       candidateName: cand?.name || '',
-      establishmentCode: napsRecords[0]?.establishmentCode || '',
-      ojtState: napsRecords[0]?.ojtState || '',
-      ojtDistrict: napsRecords[0]?.ojtDistrict || '',
+      candidateAadhaarName: cand?.name || '',
+      documentReceiveDate: cand?.documentReceiveDate || new Date().toISOString().split('T')[0],
+      establishmentCode: napsRecords[0]?.establishmentCode || submission.establishment_details?.pan || '',
+      location: (napsRecords[0]?.location) || (cand ? `${cand.ojtDistrict || 'Bangalore'}, ${cand.ojtState || 'Karnataka'}` : 'Bangalore, Karnataka'),
+      ojtState: napsRecords[0]?.ojtState || 'Karnataka',
+      ojtDistrict: napsRecords[0]?.ojtDistrict || 'Bangalore',
+      dob: cand?.dob || '2001-05-15',
+      gender: cand?.gender || 'Male',
+      mobileNumber: cand?.phone || '',
+      emailId: cand?.email || '',
+      stipend: cand?.stipendAmount || 18500,
+      qualification: cand?.qualification || 'Graduate / Diploma',
+      curriculum: cand?.tradeOrRole || 'Apprenticeship Trainee',
       apprenticeCode: cand?.apprenticeCode || '',
-      contractCode: cand?.contractCode || '',
-      jurisdiction: 'central',
-      contractStartDate: cand?.onboardingDate || '',
-      contractEndDate: cand?.contractExpireDate || (cand?.onboardingDate ? new Date(new Date(cand.onboardingDate).setFullYear(new Date(cand.onboardingDate).getFullYear() + 1)).toISOString().split('T')[0] : ''),
-      contractType: 'optional',
-      payoutMonth: '',
-      beneficiaryStatus: 'created',
       beneficiaryId: '',
+      contractCode: cand?.contractCode || '',
+      remarks: '',
+      jurisdiction: 'central',
+      contractStartDate: cand?.onboardingDate || new Date().toISOString().split('T')[0],
+      contractEndDate: cand?.contractExpireDate || (cand?.onboardingDate ? new Date(new Date(cand.onboardingDate).setFullYear(new Date(cand.onboardingDate).getFullYear() + 1)).toISOString().split('T')[0] : ''),
+      dbtStatus: 'UNPAID',
+      contractType: 'optional',
+      payoutMonth: `AUG-${new Date().getFullYear()}`,
+      beneficiaryStatus: 'created',
       dbtProcessedToPfmsDate: '',
       candidateDbtConsent: 'Yes',
       eKycStatus: 'Yes',
       establishmentSharedStatus: 'pending',
-      amount: cand?.dbtEligibleAmount || 0,
+      amount: cand?.dbtEligibleAmount || 1500,
       paymentStatus: 'PENDING',
       paymentFailureReason: ''
     });
@@ -334,21 +401,34 @@ export const SubmissionDetailDrawer: React.FC<SubmissionDetailDrawerProps> = ({
 
   const handleOpenEditNaps = (rec: NAPSPortalRecord) => {
     setEditingNapsRecord(rec);
+    const cand = candidateList.find(c => c.id === rec.candidateId || c.contractCode === rec.contractCode || (c.name && rec.candidateName && c.name.toLowerCase() === rec.candidateName.toLowerCase()));
     setNapsForm({
-      candidateId: rec.candidateId || '',
-      candidateName: rec.candidateName || '',
+      candidateId: rec.candidateId || cand?.id || '',
+      candidateName: rec.candidateName || cand?.name || '',
+      candidateAadhaarName: rec.candidateAadhaarName || rec.candidateName || cand?.name || '',
+      documentReceiveDate: rec.documentReceiveDate || cand?.documentReceiveDate || '',
       establishmentCode: rec.establishmentCode,
+      location: rec.location || (rec.ojtDistrict ? `${rec.ojtDistrict}, ${rec.ojtState}` : ''),
       ojtState: rec.ojtState,
       ojtDistrict: rec.ojtDistrict,
+      dob: rec.dob || cand?.dob || '',
+      gender: rec.gender || cand?.gender || '',
+      mobileNumber: rec.mobileNumber || cand?.phone || '',
+      emailId: rec.emailId || cand?.email || '',
+      stipend: rec.stipend || cand?.stipendAmount || rec.amount || 0,
+      qualification: rec.qualification || cand?.qualification || '',
+      curriculum: rec.curriculum || cand?.tradeOrRole || '',
       apprenticeCode: rec.apprenticeCode,
+      beneficiaryId: rec.beneficiaryId,
       contractCode: rec.contractCode,
-      jurisdiction: rec.jurisdiction,
+      remarks: rec.remarks || '',
       contractStartDate: rec.contractStartDate,
       contractEndDate: rec.contractEndDate,
+      dbtStatus: (rec.dbtStatus as any) || (rec.paymentStatus === 'PAID' ? 'PAID' : rec.paymentStatus === 'FAILED' ? 'FAIL' : 'UNPAID'),
+      jurisdiction: rec.jurisdiction,
       contractType: rec.contractType,
       payoutMonth: rec.payoutMonth,
       beneficiaryStatus: rec.beneficiaryStatus,
-      beneficiaryId: rec.beneficiaryId,
       dbtProcessedToPfmsDate: rec.dbtProcessedToPfmsDate || '',
       candidateDbtConsent: rec.candidateDbtConsent,
       eKycStatus: rec.eKycStatus,
@@ -941,114 +1021,238 @@ export const SubmissionDetailDrawer: React.FC<SubmissionDetailDrawerProps> = ({
                   </div>
 
                   {/* Filter & Search Bar */}
-                  <div className="flex flex-wrap items-center justify-between gap-2 text-xs">
-                    <div className="flex items-center gap-2">
-                      <span className="font-mono text-zinc-500 text-[11px] font-bold">Month:</span>
-                      <select
-                        value={napsFormMonthFilter}
-                        onChange={(e) => setNapsFormMonthFilter(e.target.value)}
-                        className="px-2.5 py-1 rounded-full bg-zinc-100 border border-zinc-300 text-zinc-900 font-bold text-xs cursor-pointer focus:outline-none"
-                      >
-                        <option value="all">All Months ({napsRecords.length})</option>
-                        {availableNapsMonths.map(m => (
-                          <option key={m} value={m}>{m}</option>
-                        ))}
-                      </select>
+                  <div className="p-4 rounded-2xl bg-zinc-50 border border-zinc-200 space-y-3 text-xs">
+                    <div className="flex flex-wrap items-center justify-between gap-3">
+                      <div className="flex flex-wrap items-center gap-2">
+                        <div className="flex items-center gap-1.5">
+                          <Filter className="w-3.5 h-3.5 text-zinc-500" />
+                          <span className="font-mono text-zinc-600 text-[11px] font-bold">Month:</span>
+                          <select
+                            value={napsFormMonthFilter}
+                            onChange={(e) => setNapsFormMonthFilter(e.target.value)}
+                            className="px-2.5 py-1 rounded-full bg-white border border-zinc-300 text-zinc-900 font-bold text-xs cursor-pointer focus:outline-none"
+                          >
+                            <option value="all">All Months</option>
+                            {['JAN', 'FEB', 'MAR', 'APR', 'MAY', 'JUN', 'JUL', 'AUG', 'SEP', 'OCT', 'NOV', 'DEC'].map(m => (
+                              <option key={m} value={m}>{m}</option>
+                            ))}
+                          </select>
+                        </div>
+
+                        <div className="flex items-center gap-1.5 ml-1">
+                          <span className="font-mono text-zinc-600 text-[11px] font-bold">Year:</span>
+                          <select
+                            value={napsFormYearFilter}
+                            onChange={(e) => setNapsFormYearFilter(e.target.value)}
+                            className="px-2.5 py-1 rounded-full bg-white border border-zinc-300 text-zinc-900 font-bold text-xs cursor-pointer focus:outline-none"
+                          >
+                            <option value="all">All Years</option>
+                            {['2024', '2025', '2026', '2027', '2028', '2029', '2030'].map(y => (
+                              <option key={y} value={y}>{y}</option>
+                            ))}
+                          </select>
+                        </div>
+
+                        <div className="flex items-center gap-1.5 ml-1">
+                          <span className="font-mono text-zinc-600 text-[11px] font-bold">DBT Status:</span>
+                          <select
+                            value={napsFilterDbtStatus}
+                            onChange={(e) => setNapsFilterDbtStatus(e.target.value)}
+                            className="px-2.5 py-1 rounded-full bg-white border border-zinc-300 text-zinc-900 font-bold text-xs cursor-pointer focus:outline-none"
+                          >
+                            <option value="all">All Statuses</option>
+                            <option value="PAID">PAID</option>
+                            <option value="UNPAID">UNPAID</option>
+                            <option value="FAIL">FAIL</option>
+                          </select>
+                        </div>
+                      </div>
+
+                      <div className="relative w-full sm:w-64">
+                        <Search className="w-3.5 h-3.5 text-zinc-400 absolute left-3 top-2.5" />
+                        <input
+                          type="text"
+                          placeholder="Search Aadhar name, email..."
+                          value={napsSearchQuery}
+                          onChange={(e) => setNapsSearchQuery(e.target.value)}
+                          className="w-full pl-8 pr-3 py-1.5 rounded-full bg-white border border-zinc-300 text-xs text-zinc-800 placeholder:text-zinc-400 focus:outline-none focus:border-black"
+                        />
+                      </div>
                     </div>
 
-                    <input
-                      type="text"
-                      placeholder="Search apprentice, contract or ID..."
-                      value={napsSearchQuery}
-                      onChange={(e) => setNapsSearchQuery(e.target.value)}
-                      className="px-3 py-1 rounded-full bg-zinc-50 border border-zinc-300 text-xs text-zinc-800 placeholder:text-zinc-400 focus:outline-none focus:border-black w-60"
-                    />
+                    {/* Dedicated Code Filters */}
+                    <div className="pt-2 border-t border-zinc-200 flex flex-wrap items-center gap-3">
+                      <div className="flex items-center gap-1.5 flex-1 min-w-[180px]">
+                        <span className="font-mono text-zinc-500 text-[11px] font-bold whitespace-nowrap">Est Code:</span>
+                        <input
+                          type="text"
+                          placeholder="Filter Establishment Code..."
+                          value={napsFilterEstCode}
+                          onChange={(e) => setNapsFilterEstCode(e.target.value)}
+                          className="w-full px-2.5 py-1 rounded-lg bg-white border border-zinc-300 text-xs text-zinc-800 font-mono focus:outline-none focus:border-black"
+                        />
+                      </div>
+
+                      <div className="flex items-center gap-1.5 flex-1 min-w-[180px]">
+                        <span className="font-mono text-zinc-500 text-[11px] font-bold whitespace-nowrap">CN Code:</span>
+                        <input
+                          type="text"
+                          placeholder="Filter CN Code..."
+                          value={napsFilterCnCode}
+                          onChange={(e) => setNapsFilterCnCode(e.target.value)}
+                          className="w-full px-2.5 py-1 rounded-lg bg-white border border-zinc-300 text-xs text-zinc-800 font-mono focus:outline-none focus:border-black"
+                        />
+                      </div>
+
+                      <div className="flex items-center gap-1.5 flex-1 min-w-[180px]">
+                        <span className="font-mono text-zinc-500 text-[11px] font-bold whitespace-nowrap">AP Code:</span>
+                        <input
+                          type="text"
+                          placeholder="Filter AP Code..."
+                          value={napsFilterApCode}
+                          onChange={(e) => setNapsFilterApCode(e.target.value)}
+                          className="w-full px-2.5 py-1 rounded-lg bg-white border border-zinc-300 text-xs text-zinc-800 font-mono focus:outline-none focus:border-black"
+                        />
+                      </div>
+
+                      {(napsFilterEstCode || napsFilterCnCode || napsFilterApCode || napsFormMonthFilter !== 'all' || napsFormYearFilter !== 'all' || napsFilterDbtStatus !== 'all' || napsSearchQuery) && (
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setNapsFilterEstCode('');
+                            setNapsFilterCnCode('');
+                            setNapsFilterApCode('');
+                            setNapsFormMonthFilter('all');
+                            setNapsFormYearFilter('all');
+                            setNapsFilterDbtStatus('all');
+                            setNapsSearchQuery('');
+                          }}
+                          className="px-3 py-1 rounded-full bg-zinc-200 hover:bg-zinc-300 text-zinc-700 text-[11px] font-bold cursor-pointer transition-colors"
+                        >
+                          Clear Filters
+                        </button>
+                      )}
+                    </div>
                   </div>
 
-                  {/* NAPS Portal Table (TPA Omitted) */}
+                  {/* NAPS Portal Table (19 Required Columns) */}
                   <div className="overflow-x-auto rounded-2xl border border-zinc-200 bg-white shadow-xs">
                     <table className="w-full text-left text-[11px]">
                       <thead className="bg-[#112240] text-white uppercase tracking-wider text-[9px] font-mono whitespace-nowrap">
                         <tr>
-                          <th className="py-2.5 px-3">Candidate / Apprentice</th>
-                          <th className="py-2.5 px-3">Establishment</th>
-                          <th className="py-2.5 px-3">OJT State / Dist</th>
-                          <th className="py-2.5 px-3">Contract Code</th>
-                          <th className="py-2.5 px-3">Jurisdiction</th>
-                          <th className="py-2.5 px-3">Contract Period</th>
-                          <th className="py-2.5 px-3">Month</th>
+                          <th className="py-2.5 px-3">Serial No</th>
+                          <th className="py-2.5 px-3">Document Receive Date</th>
+                          <th className="py-2.5 px-3">Establishment Code</th>
+                          <th className="py-2.5 px-3">Location</th>
+                          <th className="py-2.5 px-3">Candidate Aadhar Name</th>
+                          <th className="py-2.5 px-3">DOB</th>
+                          <th className="py-2.5 px-3">Gender</th>
+                          <th className="py-2.5 px-3">Mobile Number</th>
+                          <th className="py-2.5 px-3">Email ID</th>
+                          <th className="py-2.5 px-3">Stipend</th>
+                          <th className="py-2.5 px-3">Qualification</th>
+                          <th className="py-2.5 px-3">Curriculum</th>
+                          <th className="py-2.5 px-3">AP Code</th>
                           <th className="py-2.5 px-3">Beneficiary ID</th>
-                          <th className="py-2.5 px-3">PFMS Date</th>
-                          <th className="py-2.5 px-3">eKYC / Consent</th>
-                          <th className="py-2.5 px-3">Est. Share</th>
-                          <th className="py-2.5 px-3">DBT (₹)</th>
-                          <th className="py-2.5 px-3">Status</th>
+                          <th className="py-2.5 px-3">CN Number</th>
+                          <th className="py-2.5 px-3">Remarks</th>
+                          <th className="py-2.5 px-3">Contract Start Date</th>
+                          <th className="py-2.5 px-3">Contract End Date</th>
+                          <th className="py-2.5 px-3">DBT Status</th>
                           <th className="py-2.5 px-3 text-right">Actions</th>
                         </tr>
                       </thead>
                       <tbody className="divide-y divide-zinc-100 font-medium whitespace-nowrap">
                         {filteredNapsRecords.length > 0 ? (
-                          filteredNapsRecords.map((rec) => (
-                            <tr key={rec.id} className="hover:bg-zinc-50/80 transition-colors">
-                              <td className="py-2 px-3">
-                                <div className="font-bold text-zinc-900">{rec.candidateName || candidateList.find(c => c.id === rec.candidateId || c.contractCode === rec.contractCode)?.name || 'Apprentice'}</div>
-                                <div className="font-mono text-[10px] text-zinc-500 font-bold">{rec.apprenticeCode}</div>
-                              </td>
-                              <td className="py-2 px-3 font-mono font-bold text-zinc-800">{rec.establishmentCode}</td>
-                              <td className="py-2 px-3 text-zinc-600">{rec.ojtState}, {rec.ojtDistrict}</td>
-                              <td className="py-2 px-3 font-mono text-zinc-700 font-bold">{rec.contractCode}</td>
-                              <td className="py-2 px-3 uppercase text-[10px] text-zinc-500">{rec.jurisdiction}</td>
-                              <td className="py-2 px-3 text-zinc-600 font-mono text-[10px]">{rec.contractStartDate} → {rec.contractEndDate}</td>
-                              <td className="py-2 px-3 font-bold font-mono text-[#0a192f] bg-zinc-50">{rec.payoutMonth}</td>
-                              <td className="py-2 px-3 font-mono text-zinc-500">{rec.beneficiaryId}</td>
-                              <td className="py-2 px-3 font-mono text-zinc-600">{rec.dbtProcessedToPfmsDate || '-'}</td>
-                              <td className="py-2 px-3 text-[10px]">
-                                <span className="text-emerald-700 font-bold">eKYC: {rec.eKycStatus}</span>
-                                <span className="text-zinc-400 ml-1">· DBT: {rec.candidateDbtConsent}</span>
-                              </td>
-                              <td className="py-2 px-3 capitalize text-zinc-600">{rec.establishmentSharedStatus}</td>
-                              <td className="py-2 px-3 font-bold text-zinc-900">₹{rec.amount}</td>
-                              <td className="py-2 px-3">
-                                <span className={`px-2 py-0.5 rounded-full text-[9px] font-bold ${
-                                  rec.paymentStatus === 'PAID' ? 'bg-emerald-100 text-emerald-800' : 'bg-amber-100 text-amber-800'
-                                }`}>
-                                  {rec.paymentStatus}
-                                </span>
-                              </td>
-                              <td className="py-2 px-3 text-right">
-                                <div className="flex items-center justify-end gap-1">
-                                  <button
-                                    type="button"
-                                    onClick={() => handleDuplicateNapsToNextMonth(rec)}
-                                    title="Replicate to next month"
-                                    className="p-1 text-zinc-500 hover:text-black rounded hover:bg-zinc-100 cursor-pointer"
-                                  >
-                                    <Copy className="w-3.5 h-3.5" />
-                                  </button>
-                                  <button
-                                    type="button"
-                                    onClick={() => handleOpenEditNaps(rec)}
-                                    title="Edit record"
-                                    className="p-1 text-zinc-500 hover:text-black rounded hover:bg-zinc-100 cursor-pointer"
-                                  >
-                                    <Edit2 className="w-3.5 h-3.5" />
-                                  </button>
-                                  <button
-                                    type="button"
-                                    onClick={() => deleteNAPSRecord(submission.id, rec.id)}
-                                    title="Delete record"
-                                    className="p-1 text-rose-500 hover:text-rose-700 rounded hover:bg-rose-50 cursor-pointer"
-                                  >
-                                    <Trash2 className="w-3.5 h-3.5" />
-                                  </button>
-                                </div>
-                              </td>
-                            </tr>
-                          ))
+                          filteredNapsRecords.map((rec, idx) => {
+                            const cand = candidateList.find(c => c.id === rec.candidateId || c.contractCode === rec.contractCode || (c.name && rec.candidateName && c.name.toLowerCase() === rec.candidateName.toLowerCase()));
+                            const docRecDate = rec.documentReceiveDate || cand?.documentReceiveDate || '-';
+                            const estCode = rec.establishmentCode || '-';
+                            const loc = rec.location || (rec.ojtDistrict ? `${rec.ojtDistrict}, ${rec.ojtState}` : (cand?.ojtDistrict ? `${cand.ojtDistrict}, ${cand.ojtState || ''}` : '-'));
+                            const aadharName = rec.candidateAadhaarName || rec.candidateName || cand?.name || '-';
+                            const birthDate = rec.dob || cand?.dob || '-';
+                            const candGender = rec.gender || cand?.gender || '-';
+                            const phoneNum = rec.mobileNumber || cand?.phone || '-';
+                            const mailAddr = rec.emailId || cand?.email || '-';
+                            const stipendVal = rec.stipend || cand?.stipendAmount || rec.amount || 0;
+                            const qual = rec.qualification || cand?.qualification || '-';
+                            const curr = rec.curriculum || cand?.tradeOrRole || '-';
+                            const apCode = rec.apprenticeCode || cand?.apprenticeCode || '-';
+                            const benId = rec.beneficiaryId || '-';
+                            const cnNum = rec.contractCode || cand?.contractCode || '-';
+                            const rem = rec.remarks || '-';
+                            const startDate = rec.contractStartDate || cand?.onboardingDate || '-';
+                            const endDate = rec.contractEndDate || cand?.contractExpireDate || '-';
+                            const resolvedStatus: 'PAID' | 'UNPAID' | 'FAIL' = 
+                              rec.dbtStatus === 'PAID' || rec.paymentStatus === 'PAID' ? 'PAID' :
+                              rec.dbtStatus === 'FAIL' || rec.paymentStatus === 'FAILED' ? 'FAIL' : 'UNPAID';
+
+                            return (
+                              <tr key={rec.id} className="hover:bg-zinc-50/80 transition-colors">
+                                <td className="py-2 px-3 font-mono font-bold text-zinc-400">{idx + 1}</td>
+                                <td className="py-2 px-3 font-mono text-zinc-600">{docRecDate}</td>
+                                <td className="py-2 px-3 font-mono font-bold text-zinc-800">{estCode}</td>
+                                <td className="py-2 px-3 text-zinc-700">{loc}</td>
+                                <td className="py-2 px-3 font-bold text-zinc-900">{aadharName}</td>
+                                <td className="py-2 px-3 font-mono text-zinc-600">{birthDate}</td>
+                                <td className="py-2 px-3 capitalize text-zinc-700">{candGender}</td>
+                                <td className="py-2 px-3 font-mono text-zinc-700">{phoneNum}</td>
+                                <td className="py-2 px-3 font-mono text-zinc-600">{mailAddr}</td>
+                                <td className="py-2 px-3 font-bold text-zinc-900 font-mono">₹{stipendVal.toLocaleString('en-IN')}</td>
+                                <td className="py-2 px-3 text-zinc-700">{qual}</td>
+                                <td className="py-2 px-3 text-zinc-700 max-w-xs truncate">{curr}</td>
+                                <td className="py-2 px-3 font-mono text-sky-800 font-bold">{apCode}</td>
+                                <td className="py-2 px-3 font-mono text-zinc-500">{benId}</td>
+                                <td className="py-2 px-3 font-mono font-bold text-zinc-800">{cnNum}</td>
+                                <td className="py-2 px-3 text-zinc-600 max-w-xs truncate">{rem}</td>
+                                <td className="py-2 px-3 font-mono text-zinc-600">{startDate}</td>
+                                <td className="py-2 px-3 font-mono text-zinc-600">{endDate}</td>
+                                <td className="py-2 px-3">
+                                  <span className={`px-2.5 py-0.5 rounded-full text-[10px] font-bold ${
+                                    resolvedStatus === 'PAID'
+                                      ? 'bg-emerald-100 text-emerald-800 border border-emerald-200'
+                                      : resolvedStatus === 'FAIL'
+                                      ? 'bg-rose-100 text-rose-800 border border-rose-200'
+                                      : 'bg-amber-100 text-amber-800 border border-amber-200'
+                                  }`}>
+                                    {resolvedStatus}
+                                  </span>
+                                </td>
+                                <td className="py-2 px-3 text-right">
+                                  <div className="flex items-center justify-end gap-1">
+                                    <button
+                                      type="button"
+                                      onClick={() => handleDuplicateNapsToNextMonth(rec)}
+                                      title="Replicate to next month"
+                                      className="p-1 text-zinc-500 hover:text-black rounded hover:bg-zinc-100 cursor-pointer"
+                                    >
+                                      <Copy className="w-3.5 h-3.5" />
+                                    </button>
+                                    <button
+                                      type="button"
+                                      onClick={() => handleOpenEditNaps(rec)}
+                                      title="Edit record"
+                                      className="p-1 text-zinc-500 hover:text-black rounded hover:bg-zinc-100 cursor-pointer"
+                                    >
+                                      <Edit2 className="w-3.5 h-3.5" />
+                                    </button>
+                                    <button
+                                      type="button"
+                                      onClick={() => deleteNAPSRecord(submission.id, rec.id)}
+                                      title="Delete record"
+                                      className="p-1 text-rose-500 hover:text-rose-700 rounded hover:bg-rose-50 cursor-pointer"
+                                    >
+                                      <Trash2 className="w-3.5 h-3.5" />
+                                    </button>
+                                  </div>
+                                </td>
+                              </tr>
+                            );
+                          })
                         ) : (
                           <tr>
-                            <td colSpan={14} className="py-8 text-center text-zinc-400">
-                              No DBT dashboard records logged for this client yet. Click "+ Add Monthly Record" to enter government registry rows.
+                            <td colSpan={20} className="py-8 text-center text-zinc-400">
+                              No DBT dashboard records found matching the selected filters. Click &quot;+ Add Monthly Record&quot; to add rows or clear active filters.
                             </td>
                           </tr>
                         )}
@@ -1737,7 +1941,7 @@ export const SubmissionDetailDrawer: React.FC<SubmissionDetailDrawerProps> = ({
                         <Users className="w-3.5 h-3.5 text-sky-700" />
                         <span>Link to Employee / Candidate</span>
                       </label>
-                      <span className="text-[10px] text-sky-700 font-mono">Syncs CN directly to candidate profile</span>
+                      <span className="text-[10px] text-sky-700 font-mono">Auto-populates Aadhaar Name, DOB, Gender, Phone, Email, Stipend, Qualification & Curriculum</span>
                     </div>
                     <select
                       value={napsForm.candidateId || ''}
@@ -1749,9 +1953,20 @@ export const SubmissionDetailDrawer: React.FC<SubmissionDetailDrawerProps> = ({
                             ...napsForm,
                             candidateId: matched.id,
                             candidateName: matched.name,
+                            candidateAadhaarName: matched.name,
+                            dob: matched.dob || napsForm.dob,
+                            gender: matched.gender || napsForm.gender,
+                            mobileNumber: matched.phone || napsForm.mobileNumber,
+                            emailId: matched.email || napsForm.emailId,
+                            stipend: matched.stipendAmount || napsForm.stipend,
+                            qualification: matched.qualification || napsForm.qualification,
+                            curriculum: matched.tradeOrRole || napsForm.curriculum,
                             apprenticeCode: matched.apprenticeCode || napsForm.apprenticeCode,
                             contractCode: matched.contractCode || napsForm.contractCode,
-                            contractStartDate: matched.onboardingDate || napsForm.contractStartDate
+                            contractStartDate: matched.onboardingDate || napsForm.contractStartDate,
+                            contractEndDate: matched.contractExpireDate || (matched.onboardingDate ? new Date(new Date(matched.onboardingDate).setFullYear(new Date(matched.onboardingDate).getFullYear() + 1)).toISOString().split('T')[0] : napsForm.contractEndDate),
+                            documentReceiveDate: matched.documentReceiveDate || napsForm.documentReceiveDate,
+                            location: (matched.ojtDistrict ? `${matched.ojtDistrict}, ${matched.ojtState || ''}` : napsForm.location)
                           });
                         } else {
                           setNapsForm({
@@ -1766,14 +1981,25 @@ export const SubmissionDetailDrawer: React.FC<SubmissionDetailDrawerProps> = ({
                       <option value="">-- Select Candidate (Optional, Recommended) --</option>
                       {candidateList.map(c => (
                         <option key={c.id} value={c.id}>
-                          {c.name} ({c.tradeOrRole}) {c.contractCode ? `· Existing CN: ${c.contractCode}` : '· [No CN yet]'}
+                          {c.name} ({c.tradeOrRole}) {c.contractCode ? `· CN: ${c.contractCode}` : '· [No CN yet]'}
                         </option>
                       ))}
                     </select>
                   </div>
                 )}
 
+                {/* Row 1: Document Receive Date, Establishment Code, Location */}
                 <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                  <div>
+                    <label className="block text-[11px] font-bold text-zinc-700 mb-1">Document Receive Date</label>
+                    <input
+                      type="date"
+                      value={napsForm.documentReceiveDate || ''}
+                      onChange={(e) => setNapsForm({ ...napsForm, documentReceiveDate: e.target.value })}
+                      className="w-full px-3 py-2 rounded-xl bg-zinc-50 border border-zinc-200 text-zinc-900 font-mono text-xs focus:outline-none focus:border-black"
+                    />
+                  </div>
+
                   <div>
                     <label className="block text-[11px] font-bold text-zinc-700 mb-1">Establishment Code *</label>
                     <input
@@ -1787,33 +2013,120 @@ export const SubmissionDetailDrawer: React.FC<SubmissionDetailDrawerProps> = ({
                   </div>
 
                   <div>
-                    <label className="block text-[11px] font-bold text-zinc-700 mb-1">OJT State *</label>
+                    <label className="block text-[11px] font-bold text-zinc-700 mb-1">Location *</label>
                     <input
                       type="text"
                       required
-                      value={napsForm.ojtState}
-                      onChange={(e) => setNapsForm({ ...napsForm, ojtState: e.target.value })}
-                      placeholder="e.g. Telangana"
-                      className="w-full px-3 py-2 rounded-xl bg-zinc-50 border border-zinc-200 text-zinc-900 text-xs focus:outline-none focus:border-black"
-                    />
-                  </div>
-
-                  <div>
-                    <label className="block text-[11px] font-bold text-zinc-700 mb-1">OJT District *</label>
-                    <input
-                      type="text"
-                      required
-                      value={napsForm.ojtDistrict}
-                      onChange={(e) => setNapsForm({ ...napsForm, ojtDistrict: e.target.value })}
-                      placeholder="e.g. Hyderabad"
+                      value={napsForm.location || ''}
+                      onChange={(e) => setNapsForm({ ...napsForm, location: e.target.value })}
+                      placeholder="e.g. Bangalore, Karnataka"
                       className="w-full px-3 py-2 rounded-xl bg-zinc-50 border border-zinc-200 text-zinc-900 text-xs focus:outline-none focus:border-black"
                     />
                   </div>
                 </div>
 
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                {/* Row 2: Candidate Aadhar Name, DOB, Gender */}
+                <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
                   <div>
-                    <label className="block text-[11px] font-bold text-zinc-700 mb-1">Apprentice Code *</label>
+                    <label className="block text-[11px] font-bold text-zinc-700 mb-1">Candidate Aadhar Name *</label>
+                    <input
+                      type="text"
+                      required
+                      value={napsForm.candidateAadhaarName || napsForm.candidateName || ''}
+                      onChange={(e) => setNapsForm({ ...napsForm, candidateAadhaarName: e.target.value, candidateName: e.target.value })}
+                      placeholder="e.g. Priya Sharma"
+                      className="w-full px-3 py-2 rounded-xl bg-zinc-50 border border-zinc-200 text-zinc-900 font-bold text-xs focus:outline-none focus:border-black"
+                    />
+                  </div>
+
+                  <div>
+                    <label className="block text-[11px] font-bold text-zinc-700 mb-1">DOB</label>
+                    <input
+                      type="date"
+                      value={napsForm.dob || ''}
+                      onChange={(e) => setNapsForm({ ...napsForm, dob: e.target.value })}
+                      className="w-full px-3 py-2 rounded-xl bg-zinc-50 border border-zinc-200 text-zinc-900 font-mono text-xs focus:outline-none focus:border-black"
+                    />
+                  </div>
+
+                  <div>
+                    <label className="block text-[11px] font-bold text-zinc-700 mb-1">Gender</label>
+                    <select
+                      value={napsForm.gender || 'Male'}
+                      onChange={(e) => setNapsForm({ ...napsForm, gender: e.target.value })}
+                      className="w-full px-3 py-2 rounded-xl bg-zinc-50 border border-zinc-200 text-zinc-900 text-xs focus:outline-none focus:border-black cursor-pointer"
+                    >
+                      <option value="Male">Male</option>
+                      <option value="Female">Female</option>
+                      <option value="Other">Other</option>
+                    </select>
+                  </div>
+                </div>
+
+                {/* Row 3: Mobile Number, Email ID, Stipend */}
+                <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                  <div>
+                    <label className="block text-[11px] font-bold text-zinc-700 mb-1">Mobile Number</label>
+                    <input
+                      type="tel"
+                      value={napsForm.mobileNumber || ''}
+                      onChange={(e) => setNapsForm({ ...napsForm, mobileNumber: e.target.value })}
+                      placeholder="+91 98765 43210"
+                      className="w-full px-3 py-2 rounded-xl bg-zinc-50 border border-zinc-200 text-zinc-900 font-mono text-xs focus:outline-none focus:border-black"
+                    />
+                  </div>
+
+                  <div>
+                    <label className="block text-[11px] font-bold text-zinc-700 mb-1">Email ID</label>
+                    <input
+                      type="email"
+                      value={napsForm.emailId || ''}
+                      onChange={(e) => setNapsForm({ ...napsForm, emailId: e.target.value })}
+                      placeholder="candidate@example.com"
+                      className="w-full px-3 py-2 rounded-xl bg-zinc-50 border border-zinc-200 text-zinc-900 text-xs focus:outline-none focus:border-black"
+                    />
+                  </div>
+
+                  <div>
+                    <label className="block text-[11px] font-bold text-zinc-700 mb-1">Stipend (₹) *</label>
+                    <input
+                      type="number"
+                      required
+                      min={0}
+                      value={napsForm.stipend || ''}
+                      onChange={(e) => setNapsForm({ ...napsForm, stipend: Number(e.target.value) })}
+                      placeholder="18500"
+                      className="w-full px-3 py-2 rounded-xl bg-zinc-50 border border-zinc-200 text-zinc-900 font-mono font-bold text-xs focus:outline-none focus:border-black"
+                    />
+                  </div>
+                </div>
+
+                {/* Row 4: Qualification, Curriculum, AP Code */}
+                <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                  <div>
+                    <label className="block text-[11px] font-bold text-zinc-700 mb-1">Qualification</label>
+                    <input
+                      type="text"
+                      value={napsForm.qualification || ''}
+                      onChange={(e) => setNapsForm({ ...napsForm, qualification: e.target.value })}
+                      placeholder="e.g. B.Tech / Diploma / Graduate"
+                      className="w-full px-3 py-2 rounded-xl bg-zinc-50 border border-zinc-200 text-zinc-900 text-xs focus:outline-none focus:border-black"
+                    />
+                  </div>
+
+                  <div>
+                    <label className="block text-[11px] font-bold text-zinc-700 mb-1">Curriculum</label>
+                    <input
+                      type="text"
+                      value={napsForm.curriculum || ''}
+                      onChange={(e) => setNapsForm({ ...napsForm, curriculum: e.target.value })}
+                      placeholder="e.g. Mechanical / Retail Associate"
+                      className="w-full px-3 py-2 rounded-xl bg-zinc-50 border border-zinc-200 text-zinc-900 text-xs focus:outline-none focus:border-black"
+                    />
+                  </div>
+
+                  <div>
+                    <label className="block text-[11px] font-bold text-zinc-700 mb-1">AP Code *</label>
                     <input
                       type="text"
                       required
@@ -1823,9 +2136,23 @@ export const SubmissionDetailDrawer: React.FC<SubmissionDetailDrawerProps> = ({
                       className="w-full px-3 py-2 rounded-xl bg-zinc-50 border border-zinc-200 text-zinc-900 font-mono text-xs focus:outline-none focus:border-black font-bold"
                     />
                   </div>
+                </div>
+
+                {/* Row 5: Beneficiary ID, CN Number, Remarks */}
+                <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                  <div>
+                    <label className="block text-[11px] font-bold text-zinc-700 mb-1">Beneficiary ID</label>
+                    <input
+                      type="text"
+                      value={napsForm.beneficiaryId || ''}
+                      onChange={(e) => setNapsForm({ ...napsForm, beneficiaryId: e.target.value })}
+                      placeholder="e.g. *********7799"
+                      className="w-full px-3 py-2 rounded-xl bg-zinc-50 border border-zinc-200 text-zinc-900 font-mono text-xs focus:outline-none focus:border-black"
+                    />
+                  </div>
 
                   <div>
-                    <label className="block text-[11px] font-bold text-zinc-700 mb-1">Contract Code *</label>
+                    <label className="block text-[11px] font-bold text-zinc-700 mb-1">CN Number *</label>
                     <input
                       type="text"
                       required
@@ -1835,28 +2162,27 @@ export const SubmissionDetailDrawer: React.FC<SubmissionDetailDrawerProps> = ({
                       className="w-full px-3 py-2 rounded-xl bg-zinc-50 border border-zinc-200 text-zinc-900 font-mono text-xs focus:outline-none focus:border-black font-semibold"
                     />
                   </div>
+
+                  <div>
+                    <label className="block text-[11px] font-bold text-zinc-700 mb-1">Remarks</label>
+                    <input
+                      type="text"
+                      value={napsForm.remarks || ''}
+                      onChange={(e) => setNapsForm({ ...napsForm, remarks: e.target.value })}
+                      placeholder="e.g. Verified by State DGT"
+                      className="w-full px-3 py-2 rounded-xl bg-zinc-50 border border-zinc-200 text-zinc-900 text-xs focus:outline-none focus:border-black"
+                    />
+                  </div>
                 </div>
 
+                {/* Row 6: Contract Start Date, Contract End Date, DBT Status */}
                 <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
-                  <div>
-                    <label className="block text-[11px] font-bold text-zinc-700 mb-1">Jurisdiction</label>
-                    <select
-                      value={napsForm.jurisdiction}
-                      onChange={(e) => setNapsForm({ ...napsForm, jurisdiction: e.target.value })}
-                      className="w-full px-3 py-2 rounded-xl bg-zinc-50 border border-zinc-200 text-zinc-900 text-xs focus:outline-none focus:border-black cursor-pointer font-medium"
-                    >
-                      <option value="central">central</option>
-                      <option value="state">state</option>
-                    </select>
-                  </div>
-
                   <div>
                     <label className="block text-[11px] font-bold text-zinc-700 mb-1">Contract Start Date</label>
                     <input
-                      type="text"
-                      value={napsForm.contractStartDate}
+                      type="date"
+                      value={napsForm.contractStartDate || ''}
                       onChange={(e) => setNapsForm({ ...napsForm, contractStartDate: e.target.value })}
-                      placeholder="DD/MM/YYYY"
                       className="w-full px-3 py-2 rounded-xl bg-zinc-50 border border-zinc-200 text-zinc-900 font-mono text-xs focus:outline-none focus:border-black"
                     />
                   </div>
@@ -1864,21 +2190,41 @@ export const SubmissionDetailDrawer: React.FC<SubmissionDetailDrawerProps> = ({
                   <div>
                     <label className="block text-[11px] font-bold text-zinc-700 mb-1">Contract End Date</label>
                     <input
-                      type="text"
-                      value={napsForm.contractEndDate}
+                      type="date"
+                      value={napsForm.contractEndDate || ''}
                       onChange={(e) => setNapsForm({ ...napsForm, contractEndDate: e.target.value })}
-                      placeholder="DD/MM/YYYY"
                       className="w-full px-3 py-2 rounded-xl bg-zinc-50 border border-zinc-200 text-zinc-900 font-mono text-xs focus:outline-none focus:border-black"
                     />
                   </div>
+
+                  <div>
+                    <label className="block text-[11px] font-bold text-zinc-700 mb-1">DBT Status *</label>
+                    <select
+                      value={napsForm.dbtStatus || 'UNPAID'}
+                      onChange={(e) => {
+                        const val = e.target.value as 'PAID' | 'UNPAID' | 'FAIL';
+                        setNapsForm({ 
+                          ...napsForm, 
+                          dbtStatus: val,
+                          paymentStatus: val === 'PAID' ? 'PAID' : val === 'FAIL' ? 'FAILED' : 'PENDING'
+                        });
+                      }}
+                      className="w-full px-3 py-2 rounded-xl bg-zinc-50 border border-zinc-200 text-zinc-900 font-bold text-xs focus:outline-none focus:border-black cursor-pointer"
+                    >
+                      <option value="PAID">PAID</option>
+                      <option value="UNPAID">UNPAID</option>
+                      <option value="FAIL">FAIL</option>
+                    </select>
+                  </div>
                 </div>
 
-                <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                {/* Additional Government Ledger Fields (Month/Year & DBT Amount) */}
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 pt-2 border-t border-zinc-100">
                   <div>
                     <label className="block text-[11px] font-bold text-zinc-700 mb-1">Payout Month & Year *</label>
                     <div className="grid grid-cols-2 gap-1.5">
                       <select
-                        value={(napsForm.payoutMonth || '').split('-')[0] || 'JAN'}
+                        value={(napsForm.payoutMonth || '').split('-')[0] || 'AUG'}
                         onChange={(e) => {
                           const yr = (napsForm.payoutMonth || '').split('-')[1] || new Date().getFullYear().toString();
                           setNapsForm({ ...napsForm, payoutMonth: `${e.target.value}-${yr}` });
@@ -1892,7 +2238,7 @@ export const SubmissionDetailDrawer: React.FC<SubmissionDetailDrawerProps> = ({
                       <select
                         value={(napsForm.payoutMonth || '').split('-')[1] || new Date().getFullYear().toString()}
                         onChange={(e) => {
-                          const mo = (napsForm.payoutMonth || '').split('-')[0] || 'JAN';
+                          const mo = (napsForm.payoutMonth || '').split('-')[0] || 'AUG';
                           setNapsForm({ ...napsForm, payoutMonth: `${mo}-${e.target.value}` });
                         }}
                         className="px-2 py-2 rounded-xl bg-zinc-50 border border-zinc-200 text-zinc-900 font-mono font-bold text-xs focus:outline-none focus:border-black cursor-pointer"
@@ -1905,91 +2251,15 @@ export const SubmissionDetailDrawer: React.FC<SubmissionDetailDrawerProps> = ({
                   </div>
 
                   <div>
-                    <label className="block text-[11px] font-bold text-zinc-700 mb-1">Beneficiary ID (Masked)</label>
-                    <input
-                      type="text"
-                      value={napsForm.beneficiaryId}
-                      onChange={(e) => setNapsForm({ ...napsForm, beneficiaryId: e.target.value })}
-                      placeholder="e.g. *********7799"
-                      className="w-full px-3 py-2 rounded-xl bg-zinc-50 border border-zinc-200 text-zinc-900 font-mono text-xs focus:outline-none focus:border-black"
-                    />
-                  </div>
-
-                  <div>
-                    <label className="block text-[11px] font-bold text-zinc-700 mb-1">DBT Processed PFMS Date</label>
-                    <input
-                      type="text"
-                      value={napsForm.dbtProcessedToPfmsDate || ''}
-                      onChange={(e) => setNapsForm({ ...napsForm, dbtProcessedToPfmsDate: e.target.value })}
-                      placeholder="DD-MM-YYYY (optional)"
-                      className="w-full px-3 py-2 rounded-xl bg-zinc-50 border border-zinc-200 text-zinc-900 font-mono text-xs focus:outline-none focus:border-black"
-                    />
-                  </div>
-                </div>
-
-                <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
-                  <div>
-                    <label className="block text-[11px] font-bold text-zinc-700 mb-1">Candidate DBT Consent</label>
-                    <select
-                      value={napsForm.candidateDbtConsent}
-                      onChange={(e) => setNapsForm({ ...napsForm, candidateDbtConsent: e.target.value as any })}
-                      className="w-full px-3 py-2 rounded-xl bg-zinc-50 border border-zinc-200 text-zinc-900 text-xs focus:outline-none focus:border-black cursor-pointer"
-                    >
-                      <option value="Yes">Yes</option>
-                      <option value="No">No</option>
-                    </select>
-                  </div>
-
-                  <div>
-                    <label className="block text-[11px] font-bold text-zinc-700 mb-1">eKYC Status</label>
-                    <select
-                      value={napsForm.eKycStatus}
-                      onChange={(e) => setNapsForm({ ...napsForm, eKycStatus: e.target.value as any })}
-                      className="w-full px-3 py-2 rounded-xl bg-zinc-50 border border-zinc-200 text-zinc-900 text-xs focus:outline-none focus:border-black cursor-pointer"
-                    >
-                      <option value="Yes">Yes</option>
-                      <option value="No">No</option>
-                    </select>
-                  </div>
-
-                  <div>
-                    <label className="block text-[11px] font-bold text-zinc-700 mb-1">Establishment Shared</label>
-                    <select
-                      value={napsForm.establishmentSharedStatus}
-                      onChange={(e) => setNapsForm({ ...napsForm, establishmentSharedStatus: e.target.value })}
-                      className="w-full px-3 py-2 rounded-xl bg-zinc-50 border border-zinc-200 text-zinc-900 text-xs focus:outline-none focus:border-black cursor-pointer"
-                    >
-                      <option value="paid">paid</option>
-                      <option value="pending">pending</option>
-                    </select>
-                  </div>
-                </div>
-
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                  <div>
-                    <label className="block text-[11px] font-bold text-zinc-700 mb-1">DBT Amount (₹) *</label>
+                    <label className="block text-[11px] font-bold text-zinc-700 mb-1">Govt DBT Share Claim Amount (₹)</label>
                     <input
                       type="number"
-                      required
                       step={100}
                       value={napsForm.amount === 0 ? '' : napsForm.amount}
                       onChange={(e) => setNapsForm({ ...napsForm, amount: e.target.value === '' ? 0 : Number(e.target.value) })}
-                      placeholder="0.00"
-                      className="w-full px-3 py-2 rounded-xl bg-zinc-50 border border-zinc-200 text-zinc-900 font-bold text-xs focus:outline-none focus:border-black"
+                      placeholder="1500.00"
+                      className="w-full px-3 py-2 rounded-xl bg-zinc-50 border border-zinc-200 text-zinc-900 font-mono font-bold text-xs focus:outline-none focus:border-black"
                     />
-                  </div>
-
-                  <div>
-                    <label className="block text-[11px] font-bold text-zinc-700 mb-1">Payment Status *</label>
-                    <select
-                      value={napsForm.paymentStatus}
-                      onChange={(e) => setNapsForm({ ...napsForm, paymentStatus: e.target.value })}
-                      className="w-full px-3 py-2 rounded-xl bg-zinc-50 border border-zinc-200 text-zinc-900 font-bold text-xs focus:outline-none focus:border-black cursor-pointer"
-                    >
-                      <option value="PENDING">PENDING</option>
-                      <option value="PAID">PAID</option>
-                      <option value="FAILED">FAILED</option>
-                    </select>
                   </div>
                 </div>
 
