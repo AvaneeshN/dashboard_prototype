@@ -90,8 +90,8 @@ export const AuthGateway: React.FC = () => {
         }
       } else if (authAction === 'register') {
         // Client Registration
-        if (!fullName.trim() || !email.trim() || !phone.trim()) {
-          setErrorMsg('Please enter your full name, work email address, and contact phone number.');
+        if (!fullName.trim() || !companyName.trim() || !email.trim() || !phone.trim()) {
+          setErrorMsg('Please enter your full name, company / legal entity name, work email address, and contact phone number.');
           setIsLoading(false);
           return;
         }
@@ -362,7 +362,7 @@ export const AuthGateway: React.FC = () => {
                         </div>
 
                         <div className="space-y-1">
-                          <label className="block text-[11px] font-bold text-zinc-600">Company / Organization *</label>
+                          <label className="block text-[11px] font-bold text-zinc-600">Company / Organization / Legal Entity Name *</label>
                           <div className="relative">
                             <Building className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-zinc-400" />
                             <input
@@ -370,7 +370,7 @@ export const AuthGateway: React.FC = () => {
                               required
                               value={companyName}
                               onChange={(e) => setCompanyName(e.target.value)}
-                              placeholder="e.g. NovaTech Solutions Pvt Ltd"
+                              placeholder="e.g. NovaTech Solutions Pvt Ltd / Legal Entity"
                               className="w-full pl-10 pr-3 py-2.5 rounded-2xl bg-zinc-50 border border-zinc-200 text-zinc-900 text-xs placeholder-zinc-400 focus:outline-none focus:border-black focus:bg-white transition-all font-medium"
                             />
                           </div>
