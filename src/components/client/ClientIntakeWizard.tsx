@@ -40,8 +40,8 @@ import { processUploadedFile } from '@/lib/document-utils';
 
 const INITIAL_FORM_STATE: IntakeFormData = {
   companyName: '',
-  establishmentType: 'FOOD SERVICE / NON FOOD ITEMS',
-  establishmentCategory: 'Food Service',
+  establishmentType: '',
+  establishmentCategory: '',
   panNumber: '',
   registeredAddress: '',
   city: '',
@@ -54,12 +54,12 @@ const INITIAL_FORM_STATE: IntakeFormData = {
   contactPhone: '',
   headOfEstablishmentName: '',
   headOfEstablishmentEmail: '',
-  headOfEstablishmentDesignation: 'Director',
+  headOfEstablishmentDesignation: '',
   spocFullName: '',
   spocEmailAddress: '',
   spocPhone: '',
-  spocRoleTitle: 'HR / Compliance SPOC',
-  industry: 'Food Service / Retail',
+  spocRoleTitle: '',
+  industry: '',
   requiredApprenticeCount: 15,
   tradesRequired: [],
   contractTemplateType: 'Standard National Apprenticeship Contract v3',
@@ -87,6 +87,14 @@ export const ClientIntakeWizard: React.FC = () => {
   const saveTimerRef = React.useRef<NodeJS.Timeout | null>(null);
   const [validationErrors, setValidationErrors] = useState<{ field: string; sectionNumber: number; sectionName: string }[]>([]);
 
+  // Helper to filter out legacy mock/prefilled values
+  const cleanVal = (val: any, legacyDefaults: string[] = []) => {
+    if (!val || typeof val !== 'string') return '';
+    const trimmed = val.trim();
+    if (legacyDefaults.some(d => d && d.toLowerCase() === trimmed.toLowerCase())) return '';
+    return trimmed;
+  };
+
   // Initialize from active submission or current user ONCE on mount
   useEffect(() => {
     if (isInitializedRef.current) return;
@@ -105,21 +113,48 @@ export const ClientIntakeWizard: React.FC = () => {
         contactEmail: existing.responses?.contactEmail || existing.client_email || user?.email || '',
         contactPhone: existing.responses?.contactPhone || user?.phone || '',
         panNumber: existing.responses?.panNumber || existing.establishment_details?.pan || '',
-        establishmentType: existing.responses?.establishmentType || existing.establishment_details?.establishmentType || 'FOOD SERVICE / NON FOOD ITEMS',
-        establishmentCategory: existing.responses?.establishmentCategory || existing.establishment_details?.establishmentCategory || 'Food Service',
+        establishmentType: cleanVal(
+          existing.responses?.establishmentType || existing.establishment_details?.establishmentType,
+          ['FOOD SERVICE / NON FOOD ITEMS', 'FOODS SERVICE / NON FOOD ITEMS']
+        ),
+        establishmentCategory: cleanVal(
+          existing.responses?.establishmentCategory || existing.establishment_details?.establishmentCategory,
+          ['Food Service', 'Food Service / Retail']
+        ),
         registeredAddress: existing.responses?.registeredAddress || existing.establishment_details?.address || '',
         city: existing.responses?.city || existing.establishment_details?.city || '',
         district: existing.responses?.district || existing.establishment_details?.district || '',
         state: existing.responses?.state || existing.establishment_details?.state || '',
         pincode: existing.responses?.pincode || existing.establishment_details?.pincode || '',
         landlineNumber: existing.responses?.landlineNumber || existing.establishment_details?.landline || '',
-        headOfEstablishmentName: existing.responses?.headOfEstablishmentName || existing.establishment_details?.headOfEstablishment || existing.client_name || user?.full_name || '',
-        headOfEstablishmentEmail: existing.responses?.headOfEstablishmentEmail || existing.establishment_details?.headOfEstablishmentEmail || existing.client_email || user?.email || '',
-        headOfEstablishmentDesignation: existing.responses?.headOfEstablishmentDesignation || existing.establishment_details?.designation || 'Director',
-        spocFullName: existing.responses?.spocFullName || existing.assigned_company_spoc?.name || user?.apprenticeMetrics?.assignedCompanySpoc?.name || user?.full_name || '',
-        spocEmailAddress: existing.responses?.spocEmailAddress || existing.assigned_company_spoc?.email || user?.apprenticeMetrics?.assignedCompanySpoc?.email || user?.email || '',
-        spocPhone: existing.responses?.spocPhone || existing.assigned_company_spoc?.phone || user?.apprenticeMetrics?.assignedCompanySpoc?.phone || user?.phone || '',
-        spocRoleTitle: existing.responses?.spocRoleTitle || existing.assigned_company_spoc?.roleTitle || 'HR / Compliance SPOC',
+        headOfEstablishmentName: cleanVal(
+          existing.responses?.headOfEstablishmentName || existing.establishment_details?.headOfEstablishment,
+          [user?.full_name || '', 'Alex']
+        ),
+        headOfEstablishmentEmail: cleanVal(
+          existing.responses?.headOfEstablishmentEmail || existing.establishment_details?.headOfEstablishmentEmail,
+          [user?.email || '', 'avnshbeats@gmail.com']
+        ),
+        headOfEstablishmentDesignation: cleanVal(
+          existing.responses?.headOfEstablishmentDesignation || existing.establishment_details?.designation,
+          ['Director']
+        ),
+        spocFullName: cleanVal(
+          existing.responses?.spocFullName || existing.assigned_company_spoc?.name,
+          [user?.full_name || '', 'Alex', 'SPOC Lead']
+        ),
+        spocEmailAddress: cleanVal(
+          existing.responses?.spocEmailAddress || existing.assigned_company_spoc?.email,
+          [user?.email || '', 'avnshbeats@gmail.com']
+        ),
+        spocPhone: cleanVal(
+          existing.responses?.spocPhone || existing.assigned_company_spoc?.phone,
+          [user?.phone || '', '+919999999999']
+        ),
+        spocRoleTitle: cleanVal(
+          existing.responses?.spocRoleTitle || existing.assigned_company_spoc?.roleTitle,
+          ['HR / Compliance SPOC', 'Designated SPOC']
+        ),
         enrollmentScheme: existing.responses?.enrollmentScheme || 'NAPS',
         gstinNumber: existing.responses?.gstinNumber || existing.establishment_details?.gstin || ''
       }));
@@ -130,15 +165,17 @@ export const ClientIntakeWizard: React.FC = () => {
       isInitializedRef.current = true;
       setFormData(prev => ({
         ...prev,
-        companyName: user.company_name || '',
-        contactName: user.full_name || '',
-        contactEmail: user.email || '',
-        contactPhone: user.phone || '',
-        headOfEstablishmentName: user.full_name || '',
-        headOfEstablishmentEmail: user.email || '',
-        spocFullName: user.full_name || '',
-        spocEmailAddress: user.email || '',
-        spocPhone: user.phone || ''
+        companyName: '',
+        contactName: '',
+        contactEmail: '',
+        contactPhone: '',
+        headOfEstablishmentName: '',
+        headOfEstablishmentEmail: '',
+        headOfEstablishmentDesignation: '',
+        spocFullName: '',
+        spocEmailAddress: '',
+        spocPhone: '',
+        spocRoleTitle: ''
       }));
     }
   }, [user, getActiveClientSubmission]);
@@ -630,7 +667,7 @@ export const ClientIntakeWizard: React.FC = () => {
                         required
                         value={formData.establishmentType || ''}
                         onChange={(e) => updateField('establishmentType', e.target.value)}
-                        placeholder="e.g. FOODS SERVICE / NON FOOD ITEMS"
+                        placeholder="e.g. Private Limited / Partnership / Proprietorship"
                         className="w-full px-3.5 py-2.5 rounded-2xl bg-white border border-zinc-200 text-zinc-900 text-xs placeholder-zinc-400 focus:outline-none focus:border-black font-medium"
                       />
                     </div>
@@ -644,7 +681,7 @@ export const ClientIntakeWizard: React.FC = () => {
                         type="text"
                         value={formData.establishmentCategory || ''}
                         onChange={(e) => updateField('establishmentCategory', e.target.value)}
-                        placeholder="e.g. FOOD SERVICE / IT / MANUFACTURING"
+                        placeholder="e.g. Manufacturing / Information Technology / Services"
                         className="w-full px-3.5 py-2.5 rounded-2xl bg-white border border-zinc-200 text-zinc-900 text-xs placeholder-zinc-400 focus:outline-none focus:border-black font-medium"
                       />
                     </div>
@@ -826,7 +863,7 @@ export const ClientIntakeWizard: React.FC = () => {
                         required
                         value={formData.headOfEstablishmentName || ''}
                         onChange={(e) => updateField('headOfEstablishmentName', e.target.value)}
-                        placeholder="e.g. Mansi Gupta C S"
+                        placeholder="e.g. Full Legal Name of Signing Authority"
                         className="w-full px-3.5 py-2.5 rounded-2xl bg-white border border-zinc-200 text-zinc-900 text-xs placeholder-zinc-400 focus:outline-none focus:border-black font-medium"
                       />
                     </div>
@@ -840,7 +877,7 @@ export const ClientIntakeWizard: React.FC = () => {
                         required
                         value={formData.headOfEstablishmentEmail || ''}
                         onChange={(e) => updateField('headOfEstablishmentEmail', e.target.value)}
-                        placeholder="e.g. mansigupta1509@gmail.com"
+                        placeholder="e.g. director@company.com"
                         className="w-full px-3.5 py-2.5 rounded-2xl bg-white border border-zinc-200 text-zinc-900 text-xs placeholder-zinc-400 focus:outline-none focus:border-black font-medium"
                       />
                     </div>
@@ -1511,7 +1548,7 @@ export const ClientIntakeWizard: React.FC = () => {
                         required
                         value={formData.spocFullName || ''}
                         onChange={(e) => updateField('spocFullName', e.target.value)}
-                        placeholder="e.g. Mansi Gupta C S / Alex Rivera"
+                        placeholder="e.g. Full Name of SPOC"
                         className="w-full px-3.5 py-2.5 rounded-2xl bg-white border border-zinc-200 text-zinc-900 text-xs placeholder-zinc-400 focus:outline-none focus:border-black font-medium"
                       />
                     </div>
@@ -1525,7 +1562,7 @@ export const ClientIntakeWizard: React.FC = () => {
                         required
                         value={formData.spocEmailAddress || ''}
                         onChange={(e) => updateField('spocEmailAddress', e.target.value)}
-                        placeholder="e.g. hr-spoc@company.com"
+                        placeholder="e.g. spoc@company.com"
                         className="w-full px-3.5 py-2.5 rounded-2xl bg-white border border-zinc-200 text-zinc-900 text-xs placeholder-zinc-400 focus:outline-none focus:border-black font-semibold"
                       />
                     </div>
@@ -1539,7 +1576,7 @@ export const ClientIntakeWizard: React.FC = () => {
                         required
                         value={formData.spocPhone || ''}
                         onChange={(e) => updateField('spocPhone', e.target.value)}
-                        placeholder="+91 98765 00000"
+                        placeholder="e.g. +91 98765 43210"
                         className="w-full px-3.5 py-2.5 rounded-2xl bg-white border border-zinc-200 text-zinc-900 text-xs placeholder-zinc-400 focus:outline-none focus:border-black font-medium"
                       />
                     </div>
@@ -1552,7 +1589,7 @@ export const ClientIntakeWizard: React.FC = () => {
                         type="text"
                         value={formData.spocRoleTitle || ''}
                         onChange={(e) => updateField('spocRoleTitle', e.target.value)}
-                        placeholder="e.g. HR Operations Lead / Compliance SPOC"
+                        placeholder="e.g. HR Operations Lead / Compliance Officer"
                         className="w-full px-3.5 py-2.5 rounded-2xl bg-white border border-zinc-200 text-zinc-900 text-xs placeholder-zinc-400 focus:outline-none focus:border-black font-medium"
                       />
                     </div>

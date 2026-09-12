@@ -794,9 +794,9 @@ export const StoreProvider: React.FC<{ children: React.ReactNode }> = ({ childre
       contactEmail: mergedResponses.contactEmail || '',
       landline: mergedResponses.landlineNumber || '',
       gstin: mergedResponses.gstinNumber || '',
-      headOfEstablishment: mergedResponses.headOfEstablishmentName || mergedResponses.contactName || '',
-      headOfEstablishmentEmail: mergedResponses.headOfEstablishmentEmail || mergedResponses.contactEmail || '',
-      designation: mergedResponses.headOfEstablishmentDesignation || 'Director',
+      headOfEstablishment: mergedResponses.headOfEstablishmentName || '',
+      headOfEstablishmentEmail: mergedResponses.headOfEstablishmentEmail || '',
+      designation: mergedResponses.headOfEstablishmentDesignation || '',
       documents: {
         panDoc: mergedResponses.companyDocs?.panDoc,
         gstDoc: mergedResponses.companyDocs?.gstDoc,
@@ -807,10 +807,10 @@ export const StoreProvider: React.FC<{ children: React.ReactNode }> = ({ childre
 
     // Auto-configure SPOC if provided in Section 3
     const spocData = (mergedResponses.spocEmailAddress || mergedResponses.spocFullName) ? {
-      name: mergedResponses.spocFullName || mergedResponses.contactName || 'SPOC Lead',
-      email: (mergedResponses.spocEmailAddress || mergedResponses.contactEmail || '').trim().toLowerCase(),
-      phone: mergedResponses.spocPhone || mergedResponses.contactPhone || '',
-      roleTitle: mergedResponses.spocRoleTitle || 'Designated SPOC',
+      name: mergedResponses.spocFullName || '',
+      email: (mergedResponses.spocEmailAddress || '').trim().toLowerCase(),
+      phone: mergedResponses.spocPhone || '',
+      roleTitle: mergedResponses.spocRoleTitle || '',
       assignedAt: existing?.assigned_company_spoc?.assignedAt || new Date().toISOString()
     } : existing?.assigned_company_spoc;
 
