@@ -1534,6 +1534,51 @@ export const SubmissionDetailDrawer: React.FC<SubmissionDetailDrawerProps> = ({
                       </div>
                     );
                   })()}
+
+                  {/* NATS Structured Training Module Details Card */}
+                  {Boolean(responses?.structuredTrainingModule || currentSub.nats_establishment_details?.structuredTrainingModule) && (
+                    <div className="p-5 rounded-3xl bg-zinc-50 border border-zinc-200 space-y-3">
+                      <div className="flex items-center justify-between border-b border-zinc-200 pb-2.5">
+                        <span className="font-mono font-extrabold text-xs text-zinc-900 uppercase tracking-wider">
+                          NATS Structured Training Module Breakdown
+                        </span>
+                        <span className="px-2.5 py-0.5 rounded-full text-[10px] font-mono font-bold bg-purple-100 text-purple-900 border border-purple-200">
+                          NATS Curricular Specs
+                        </span>
+                      </div>
+                      {(() => {
+                        const moduleData = responses?.structuredTrainingModule || currentSub.nats_establishment_details?.structuredTrainingModule;
+                        return (
+                          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 text-xs">
+                            <div>
+                              <span className="text-zinc-500 font-medium">What apprentice will learn:</span>
+                              <div className="font-semibold text-zinc-800 mt-0.5">{moduleData?.learningObjectives || '-'}</div>
+                            </div>
+                            <div>
+                              <span className="text-zinc-500 font-medium">Duration of training:</span>
+                              <div className="font-semibold text-zinc-800 mt-0.5">{moduleData?.trainingDuration || '-'}</div>
+                            </div>
+                            <div>
+                              <span className="text-zinc-500 font-medium">Department-wise exposure:</span>
+                              <div className="font-semibold text-zinc-800 mt-0.5">{moduleData?.departmentWiseExposure || '-'}</div>
+                            </div>
+                            <div>
+                              <span className="text-zinc-500 font-medium">Skills to be developed:</span>
+                              <div className="font-semibold text-zinc-800 mt-0.5">{moduleData?.skillsToBeDeveloped || '-'}</div>
+                            </div>
+                            <div>
+                              <span className="text-zinc-500 font-medium">Monthly training breakup:</span>
+                              <div className="font-semibold text-zinc-800 mt-0.5">{moduleData?.monthlyTrainingBreakup || '-'}</div>
+                            </div>
+                            <div>
+                              <span className="text-zinc-500 font-medium">Supervisor / Training Officer:</span>
+                              <div className="font-semibold text-zinc-800 mt-0.5">{moduleData?.supervisorOrOfficerDetails || '-'}</div>
+                            </div>
+                          </div>
+                        );
+                      })()}
+                    </div>
+                  )}
                 </div>
               )}
 

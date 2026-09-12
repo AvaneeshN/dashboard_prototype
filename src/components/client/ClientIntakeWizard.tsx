@@ -49,6 +49,7 @@ const INITIAL_FORM_STATE: IntakeFormData = {
   cnIssueNotes: '',
   attachedDocsName: '',
   specialInstructions: '',
+  enrollmentScheme: 'NAPS',
   agreedToTerms: true
 };
 
@@ -168,20 +169,78 @@ export const ClientIntakeWizard: React.FC = () => {
         errors.push({ field: 'Company GSTIN Number', sectionNumber: 2, sectionName: 'Verification & Submit' });
       }
 
-      // Dynamic validation for all configured mandatory compliance documents
-      requiredDocuments.forEach(docReq => {
-        if (docReq.mandatory) {
-          const uploaded = data.companyDocs?.dynamicDocs?.[docReq.id] ||
-            (docReq.id === 'gst' && (data.companyDocs?.gstDoc || data.companyDocs?.gstFileName)) ||
-            (docReq.id === 'cheque' && (data.companyDocs?.chequeDoc || data.companyDocs?.cancelledChequeFileName)) ||
-            (docReq.id === 'coi' && (data.companyDocs?.coiDoc || data.companyDocs?.coiFileName)) ||
-            (docReq.id === 'signatory' && (data.companyDocs?.signatoryDoc || data.companyDocs?.signatoryLetterFileName));
+      const isNats = data.enrollmentScheme === 'NATS';
 
-          if (!uploaded) {
-            errors.push({ field: `${docReq.name} (Mandatory Document)`, sectionNumber: 2, sectionName: 'Verification & Submit' });
-          }
+      if (isNats) {
+        // NATS Mandatory Documents:
+        // 1. PAN Card
+        const panUploaded = data.companyDocs?.panDoc || data.companyDocs?.panFileName || data.companyDocs?.dynamicDocs?.['pan'];
+        if (!panUploaded) errors.push({ field: 'PAN Card (Mandatory NATS Document)', sectionNumber: 2, sectionName: 'Verification & Submit' });
+
+        // 2. TAN
+        const tanUploaded = data.companyDocs?.tanDoc || data.companyDocs?.tanFileName || data.companyDocs?.dynamicDocs?.['tan'];
+        if (!tanUploaded) errors.push({ field: 'TAN Document / Details (Mandatory NATS Document)', sectionNumber: 2, sectionName: 'Verification & Submit' });
+
+        // 3. GST Certificate
+        const gstUploaded = data.companyDocs?.gstDoc || data.companyDocs?.gstFileName || data.companyDocs?.dynamicDocs?.['gst'];
+        if (!gstUploaded) errors.push({ field: 'GST Certificate (Mandatory NATS Document)', sectionNumber: 2, sectionName: 'Verification & Submit' });
+
+        // 4. ITR Acknowledgement
+        const itrUploaded = data.companyDocs?.itrDoc || data.companyDocs?.itrFileName || data.companyDocs?.dynamicDocs?.['itr'];
+        if (!itrUploaded) errors.push({ field: 'ITR Acknowledgement (Mandatory NATS Document)', sectionNumber: 2, sectionName: 'Verification & Submit' });
+
+        // 5. Incorporation / Registration Certificate
+        const coiUploaded = data.companyDocs?.coiDoc || data.companyDocs?.coiFileName || data.companyDocs?.dynamicDocs?.['coi'];
+        if (!coiUploaded) errors.push({ field: 'Incorporation / Registration Certificate (Mandatory NATS Document)', sectionNumber: 2, sectionName: 'Verification & Submit' });
+
+        // 6. EPFO / ESIC Registration (if applicable)
+        const epfoUploaded = data.companyDocs?.epfoEsicDoc || data.companyDocs?.epfoEsicFileName || data.companyDocs?.dynamicDocs?.['epfo_esic'] || data.companyDocs?.epfoRegistrationCode;
+        if (!epfoUploaded) errors.push({ field: 'EPFO / ESIC Registration (Mandatory NATS Document)', sectionNumber: 2, sectionName: 'Verification & Submit' });
+
+        // 7. Cancelled Cheque
+        const chequeUploaded = data.companyDocs?.chequeDoc || data.companyDocs?.cancelledChequeFileName || data.companyDocs?.dynamicDocs?.['cheque'];
+        if (!chequeUploaded) errors.push({ field: 'Cancelled Cheque (Mandatory NATS Document)', sectionNumber: 2, sectionName: 'Verification & Submit' });
+
+        // 8. Structured Training Module (Document + Details)
+        const trainingUploaded = data.companyDocs?.trainingModuleDoc || data.companyDocs?.trainingModuleFileName || data.companyDocs?.dynamicDocs?.['training_module'];
+        if (!trainingUploaded) errors.push({ field: 'Structured Training Module Document (Mandatory NATS Document)', sectionNumber: 2, sectionName: 'Verification & Submit' });
+
+        if (!data.structuredTrainingModule?.learningObjectives?.trim()) {
+          errors.push({ field: 'Structured Module: What Apprentice Will Learn', sectionNumber: 2, sectionName: 'Verification & Submit' });
         }
-      });
+        if (!data.structuredTrainingModule?.trainingDuration?.trim()) {
+          errors.push({ field: 'Structured Module: Duration of Training', sectionNumber: 2, sectionName: 'Verification & Submit' });
+        }
+        if (!data.structuredTrainingModule?.departmentWiseExposure?.trim()) {
+          errors.push({ field: 'Structured Module: Department-wise Exposure', sectionNumber: 2, sectionName: 'Verification & Submit' });
+        }
+        if (!data.structuredTrainingModule?.skillsToBeDeveloped?.trim()) {
+          errors.push({ field: 'Structured Module: Skills to be Developed', sectionNumber: 2, sectionName: 'Verification & Submit' });
+        }
+        if (!data.structuredTrainingModule?.monthlyTrainingBreakup?.trim()) {
+          errors.push({ field: 'Structured Module: Monthly Training Breakup', sectionNumber: 2, sectionName: 'Verification & Submit' });
+        }
+        if (!data.structuredTrainingModule?.supervisorOrOfficerDetails?.trim()) {
+          errors.push({ field: 'Structured Module: Supervisor / Training Officer Details', sectionNumber: 2, sectionName: 'Verification & Submit' });
+        }
+      } else {
+        // NAPS Mandatory Documents:
+        // 1. PAN
+        const panUploaded = data.companyDocs?.panDoc || data.companyDocs?.panFileName || data.companyDocs?.dynamicDocs?.['pan'];
+        if (!panUploaded) errors.push({ field: 'PAN Card (Mandatory NAPS Document)', sectionNumber: 2, sectionName: 'Verification & Submit' });
+
+        // 2. GST Registration
+        const gstUploaded = data.companyDocs?.gstDoc || data.companyDocs?.gstFileName || data.companyDocs?.dynamicDocs?.['gst'];
+        if (!gstUploaded) errors.push({ field: 'GST Registration (Mandatory NAPS Document)', sectionNumber: 2, sectionName: 'Verification & Submit' });
+
+        // 3. Cancelled Cheque
+        const chequeUploaded = data.companyDocs?.chequeDoc || data.companyDocs?.cancelledChequeFileName || data.companyDocs?.dynamicDocs?.['cheque'];
+        if (!chequeUploaded) errors.push({ field: 'Cancelled Cheque (Mandatory NAPS Document)', sectionNumber: 2, sectionName: 'Verification & Submit' });
+
+        // 4. Signature & Seal of Authorized Signatory
+        const signatoryUploaded = data.companyDocs?.signatoryDoc || data.companyDocs?.signatoryLetterFileName || data.companyDocs?.dynamicDocs?.['signatory'];
+        if (!signatoryUploaded) errors.push({ field: 'Signature & Seal of Authorized Signatory (Mandatory NAPS Document)', sectionNumber: 2, sectionName: 'Verification & Submit' });
+      }
 
       if (!data.agreedToTerms) {
         errors.push({ field: 'Acceptance of Regulatory Declarations & Terms', sectionNumber: 2, sectionName: 'Verification & Submit' });
@@ -399,8 +458,61 @@ export const ClientIntakeWizard: React.FC = () => {
                     SECTION 01: REQUIREMENTS & QUOTA SCOPE
                   </h3>
                   <p className="text-xs text-zinc-500 mt-1 font-medium">
-                    Define your organization details and apprentice quota headcount.
+                    Select your regulatory apprenticeship scheme, define organization details, and specify apprentice quota.
                   </p>
+                </div>
+
+                {/* Scheme Selector: NAPS vs NATS */}
+                <div className="p-4 rounded-3xl bg-zinc-50 border border-zinc-200 space-y-2.5">
+                  <div className="flex items-center justify-between">
+                    <label className="block text-xs font-bold text-zinc-900">
+                      Apprenticeship Scheme Enrollment *
+                    </label>
+                    <span className="text-[10px] font-mono text-zinc-500">
+                      Determines required corporate verification documents
+                    </span>
+                  </div>
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                    <button
+                      type="button"
+                      onClick={() => updateField('enrollmentScheme', 'NAPS')}
+                      className={`p-3.5 rounded-2xl border text-left transition-all cursor-pointer ${
+                        (formData.enrollmentScheme || 'NAPS') === 'NAPS'
+                          ? 'border-black bg-white shadow-sm ring-2 ring-black/5'
+                          : 'border-zinc-200 bg-zinc-100/60 hover:bg-white text-zinc-600'
+                      }`}
+                    >
+                      <div className="flex items-center justify-between mb-1">
+                        <span className="font-extrabold text-xs text-zinc-900 font-mono">NAPS Scheme</span>
+                        {(formData.enrollmentScheme || 'NAPS') === 'NAPS' && (
+                          <span className="w-2 h-2 rounded-full bg-emerald-600" />
+                        )}
+                      </div>
+                      <p className="text-[11px] text-zinc-600 font-medium leading-snug">
+                        National Apprenticeship Promotion Scheme (MSDE). Direct DBT govt subsidy transfer for candidates.
+                      </p>
+                    </button>
+
+                    <button
+                      type="button"
+                      onClick={() => updateField('enrollmentScheme', 'NATS')}
+                      className={`p-3.5 rounded-2xl border text-left transition-all cursor-pointer ${
+                        formData.enrollmentScheme === 'NATS'
+                          ? 'border-black bg-white shadow-sm ring-2 ring-black/5'
+                          : 'border-zinc-200 bg-zinc-100/60 hover:bg-white text-zinc-600'
+                      }`}
+                    >
+                      <div className="flex items-center justify-between mb-1">
+                        <span className="font-extrabold text-xs text-zinc-900 font-mono">NATS Scheme</span>
+                        {formData.enrollmentScheme === 'NATS' && (
+                          <span className="w-2 h-2 rounded-full bg-emerald-600" />
+                        )}
+                      </div>
+                      <p className="text-[11px] text-zinc-600 font-medium leading-snug">
+                        National Apprenticeship Training Scheme (MoE / AICTE). Structured training modules for graduates & diploma holders.
+                      </p>
+                    </button>
+                  </div>
                 </div>
 
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
@@ -543,85 +655,207 @@ export const ClientIntakeWizard: React.FC = () => {
                   </div>
                 </div>
 
-                {/* Structured Document Slots */}
-                <div className="space-y-2.5">
-                  <div className="flex items-center justify-between">
-                    <label className="block text-xs font-bold text-zinc-900">
-                      Corporate Compliance Files ({requiredDocuments.length} Requirements)
-                    </label>
-                    <span className="text-[10px] font-mono text-zinc-400">
-                      Files are securely stored in private cloud storage
-                    </span>
-                  </div>
+                {/* Structured Document Slots based on Scheme */}
+                {(() => {
+                  const isNats = formData.enrollmentScheme === 'NATS';
 
-                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                    {requiredDocuments.map((docReq) => {
-                      const dynamicDoc = formData.companyDocs?.dynamicDocs?.[docReq.id];
-                      const uploadedFileName = dynamicDoc?.name ||
-                        (docReq.id === 'gst' ? formData.companyDocs?.gstFileName : '') ||
-                        (docReq.id === 'cheque' ? formData.companyDocs?.cancelledChequeFileName : '') ||
-                        (docReq.id === 'coi' ? formData.companyDocs?.coiFileName : '') ||
-                        (docReq.id === 'signatory' ? formData.companyDocs?.signatoryLetterFileName : '');
+                  const natsDocsConfig = [
+                    { id: 'pan', name: 'PAN Card', category: 'PAN', desc: 'Permanent Account Number card for company registration', allowed: ['.pdf', '.jpg', '.jpeg', '.png'], file: formData.companyDocs?.panDoc?.name || formData.companyDocs?.panFileName || formData.companyDocs?.dynamicDocs?.['pan']?.name },
+                    { id: 'tan', name: 'TAN Card / Number Proof', category: 'TAN', desc: 'Tax Deduction and Collection Account Number proof', allowed: ['.pdf', '.jpg', '.jpeg', '.png'], file: formData.companyDocs?.tanDoc?.name || formData.companyDocs?.tanFileName || formData.companyDocs?.dynamicDocs?.['tan']?.name },
+                    { id: 'gst', name: 'GST Certificate', category: 'GST', desc: 'Official Goods and Services Tax registration certificate', allowed: ['.pdf', '.jpg', '.jpeg', '.png'], file: formData.companyDocs?.gstDoc?.name || formData.companyDocs?.gstFileName || formData.companyDocs?.dynamicDocs?.['gst']?.name },
+                    { id: 'itr', name: 'ITR Acknowledgement', category: 'ITR', desc: 'Income Tax Return acknowledgement filing for previous assessment year', allowed: ['.pdf'], file: formData.companyDocs?.itrDoc?.name || formData.companyDocs?.itrFileName || formData.companyDocs?.dynamicDocs?.['itr']?.name },
+                    { id: 'coi', name: 'Incorporation / Registration Certificate', category: 'COI', desc: 'Certificate of Incorporation (MCA) or formal firm registration certificate', allowed: ['.pdf', '.jpg', '.png'], file: formData.companyDocs?.coiDoc?.name || formData.companyDocs?.coiFileName || formData.companyDocs?.dynamicDocs?.['coi']?.name },
+                    { id: 'epfo_esic', name: 'EPFO / ESIC Registration', category: 'EPFO', desc: 'EPFO or ESIC establishment registration code certificate (if applicable)', allowed: ['.pdf', '.jpg', '.png'], file: formData.companyDocs?.epfoEsicDoc?.name || formData.companyDocs?.epfoEsicFileName || formData.companyDocs?.dynamicDocs?.['epfo_esic']?.name },
+                    { id: 'cheque', name: 'Cancelled Cheque', category: 'Cheque', desc: 'Corporate bank account cancelled cheque copy for direct stipend/reimbursement transfer', allowed: ['.pdf', '.jpg', '.png'], file: formData.companyDocs?.chequeDoc?.name || formData.companyDocs?.cancelledChequeFileName || formData.companyDocs?.dynamicDocs?.['cheque']?.name },
+                    { id: 'training_module', name: 'Structured Training Module Document', category: 'Training Module', desc: 'Official apprenticeship curriculum syllabus and departmental training plan document', allowed: ['.pdf', '.docx', '.doc'], file: formData.companyDocs?.trainingModuleDoc?.name || formData.companyDocs?.trainingModuleFileName || formData.companyDocs?.dynamicDocs?.['training_module']?.name }
+                  ];
 
-                      return (
-                        <div key={docReq.id} className="p-4 rounded-2xl border border-zinc-200 bg-zinc-50 hover:border-zinc-300 transition-all flex flex-col justify-between">
-                          <div>
-                            <div className="flex items-center justify-between mb-1.5">
-                              <span className="text-xs font-bold text-zinc-900">
-                                {docReq.name} {docReq.mandatory && <span className="text-rose-600">*</span>}
-                              </span>
-                              {docReq.mandatory ? (
+                  const napsDocsConfig = [
+                    { id: 'pan', name: 'PAN Card', category: 'PAN', desc: 'Entity PAN Card issued by the Income Tax Department', allowed: ['.pdf', '.jpg', '.jpeg', '.png'], file: formData.companyDocs?.panDoc?.name || formData.companyDocs?.panFileName || formData.companyDocs?.dynamicDocs?.['pan']?.name },
+                    { id: 'gst', name: 'GST Registration', category: 'GST', desc: 'Official Goods and Services Tax registration certificate (Form GST REG-06)', allowed: ['.pdf', '.jpg', '.jpeg', '.png'], file: formData.companyDocs?.gstDoc?.name || formData.companyDocs?.gstFileName || formData.companyDocs?.dynamicDocs?.['gst']?.name },
+                    { id: 'cheque', name: 'Cancelled Cheque', category: 'Cheque', desc: 'Bank passbook copy or cancelled cheque for DBT subsidy reimbursements and stipend reconciliation', allowed: ['.pdf', '.jpg', '.jpeg', '.png'], file: formData.companyDocs?.chequeDoc?.name || formData.companyDocs?.cancelledChequeFileName || formData.companyDocs?.dynamicDocs?.['cheque']?.name },
+                    { id: 'signatory', name: 'Signature & Seal of Authorized Signatory', category: 'Signatory Letter', desc: 'Authorized signatory identification document with official entity rubber stamp/seal', allowed: ['.pdf', '.jpg', '.jpeg', '.png'], file: formData.companyDocs?.signatoryDoc?.name || formData.companyDocs?.signatoryLetterFileName || formData.companyDocs?.dynamicDocs?.['signatory']?.name }
+                  ];
+
+                  const activeDocs = isNats ? natsDocsConfig : napsDocsConfig;
+
+                  return (
+                    <div className="space-y-4">
+                      <div className="flex items-center justify-between">
+                        <label className="block text-xs font-bold text-zinc-900">
+                          {isNats ? 'NATS Corporate Establishment Documents (8 Requirements)' : 'NAPS Establishment Compliance Documents (4 Requirements)'}
+                        </label>
+                        <span className="text-[10px] font-mono px-2 py-0.5 rounded-full font-bold bg-purple-100 text-purple-900 border border-purple-200">
+                          {formData.enrollmentScheme || 'NAPS'} Mode
+                        </span>
+                      </div>
+
+                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                        {activeDocs.map((docItem) => (
+                          <div key={docItem.id} className="p-4 rounded-2xl border border-zinc-200 bg-zinc-50 hover:border-zinc-300 transition-all flex flex-col justify-between">
+                            <div>
+                              <div className="flex items-center justify-between mb-1.5">
+                                <span className="text-xs font-bold text-zinc-900">
+                                  {docItem.name} <span className="text-rose-600">*</span>
+                                </span>
                                 <span className="text-[10px] font-mono px-1.5 py-0.5 rounded-full bg-rose-50 text-rose-700 border border-rose-200 font-bold">
                                   Required *
                                 </span>
-                              ) : (
-                                <span className="text-[10px] font-mono px-1.5 py-0.5 rounded-full bg-zinc-200 text-zinc-700 font-bold">
-                                  Optional
-                                </span>
-                              )}
+                              </div>
+                              <p className="text-[11px] text-zinc-500 mb-3">{docItem.desc}</p>
                             </div>
-                            <p className="text-[11px] text-zinc-500 mb-3">{docReq.description}</p>
+
+                            <label className="flex items-center gap-2 text-xs font-semibold text-zinc-700 hover:text-black cursor-pointer p-2 rounded-xl bg-white border border-zinc-200 hover:border-zinc-400 transition-all">
+                              <UploadCloud className="w-4 h-4 text-zinc-400 shrink-0" />
+                              <span className="truncate">
+                                {docItem.file || `Attach ${docItem.name} (${docItem.allowed.join('/')})`}
+                              </span>
+                              <input
+                                type="file"
+                                accept={docItem.allowed.join(',')}
+                                className="hidden"
+                                onChange={async (e) => {
+                                  if (e.target.files?.[0]) {
+                                    const file = e.target.files[0];
+                                    const clientId = user?.id || 'client';
+                                    const doc = await processUploadedFile(file, docItem.category as any, clientId);
+                                    const currentCompanyDocs = formData.companyDocs || {};
+                                    const currentDynamic = currentCompanyDocs.dynamicDocs || {};
+
+                                    const updatedDocs = {
+                                      ...currentCompanyDocs,
+                                      dynamicDocs: {
+                                        ...currentDynamic,
+                                        [docItem.id]: doc
+                                      },
+                                      ...(docItem.id === 'pan' ? { panFileName: file.name, panDoc: doc } : {}),
+                                      ...(docItem.id === 'tan' ? { tanFileName: file.name, tanDoc: doc } : {}),
+                                      ...(docItem.id === 'gst' ? { gstFileName: file.name, gstDoc: doc } : {}),
+                                      ...(docItem.id === 'itr' ? { itrFileName: file.name, itrDoc: doc } : {}),
+                                      ...(docItem.id === 'coi' ? { coiFileName: file.name, coiDoc: doc } : {}),
+                                      ...(docItem.id === 'epfo_esic' ? { epfoEsicFileName: file.name, epfoEsicDoc: doc } : {}),
+                                      ...(docItem.id === 'cheque' ? { cancelledChequeFileName: file.name, chequeDoc: doc } : {}),
+                                      ...(docItem.id === 'signatory' ? { signatoryLetterFileName: file.name, signatoryDoc: doc } : {}),
+                                      ...(docItem.id === 'training_module' ? { trainingModuleFileName: file.name, trainingModuleDoc: doc } : {})
+                                    };
+
+                                    updateField('companyDocs', updatedDocs);
+                                  }
+                                }}
+                              />
+                            </label>
+                          </div>
+                        ))}
+                      </div>
+
+                      {/* NATS Structured Training Module Breakdown Fields */}
+                      {isNats && (
+                        <div className="p-4 rounded-3xl bg-zinc-50 border border-zinc-200 space-y-3 pt-4">
+                          <div className="border-b border-zinc-200 pb-2">
+                            <span className="font-extrabold text-xs text-zinc-900 font-mono uppercase tracking-wider block">
+                              Structured Training Module Details (Mandatory for NATS) *
+                            </span>
+                            <p className="text-[11px] text-zinc-500 mt-0.5">
+                              Please furnish comprehensive apprenticeship training curriculum details as mandated by NATS AICTE/MoE guidelines.
+                            </p>
                           </div>
 
-                          <label className="flex items-center gap-2 text-xs font-semibold text-zinc-700 hover:text-black cursor-pointer p-2 rounded-xl bg-white border border-zinc-200 hover:border-zinc-400 transition-all">
-                            <UploadCloud className="w-4 h-4 text-zinc-400 shrink-0" />
-                            <span className="truncate">
-                              {uploadedFileName || `Attach ${docReq.name} (${(docReq.allowedExtensions || ['.pdf', '.docx', '.jpg']).join('/')})`}
-                            </span>
-                            <input
-                              type="file"
-                              accept={docReq.allowedExtensions?.join(',') || '.pdf,.docx,.doc,.jpg,.jpeg,.png,.txt'}
-                              className="hidden"
-                              onChange={async (e) => {
-                                if (e.target.files?.[0]) {
-                                  const file = e.target.files[0];
-                                  const clientId = user?.id || 'client';
-                                  const doc = await processUploadedFile(file, docReq.category, clientId);
-                                  const currentCompanyDocs = formData.companyDocs || {};
-                                  const currentDynamic = currentCompanyDocs.dynamicDocs || {};
+                          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 text-xs">
+                            <div>
+                              <label className="block font-bold text-zinc-700 mb-1">What apprentice will learn *</label>
+                              <input
+                                type="text"
+                                required
+                                placeholder="Core technical competencies, hands-on production workflows..."
+                                value={formData.structuredTrainingModule?.learningObjectives || ''}
+                                onChange={(e) => updateField('structuredTrainingModule', {
+                                  ...(formData.structuredTrainingModule || {}),
+                                  learningObjectives: e.target.value
+                                })}
+                                className="w-full px-3 py-2 rounded-xl bg-white border border-zinc-200 text-zinc-900 text-xs focus:outline-none focus:border-black font-medium"
+                              />
+                            </div>
 
-                                  const updatedDocs = {
-                                    ...currentCompanyDocs,
-                                    dynamicDocs: {
-                                      ...currentDynamic,
-                                      [docReq.id]: doc
-                                    },
-                                    ...(docReq.id === 'gst' ? { gstFileName: file.name, gstDoc: doc } : {}),
-                                    ...(docReq.id === 'cheque' ? { cancelledChequeFileName: file.name, chequeDoc: doc } : {}),
-                                    ...(docReq.id === 'coi' ? { coiFileName: file.name, coiDoc: doc } : {}),
-                                    ...(docReq.id === 'signatory' ? { signatoryLetterFileName: file.name, signatoryDoc: doc } : {})
-                                  };
+                            <div>
+                              <label className="block font-bold text-zinc-700 mb-1">Duration of training *</label>
+                              <input
+                                type="text"
+                                required
+                                placeholder="e.g. 12 Months (52 Weeks)"
+                                value={formData.structuredTrainingModule?.trainingDuration || ''}
+                                onChange={(e) => updateField('structuredTrainingModule', {
+                                  ...(formData.structuredTrainingModule || {}),
+                                  trainingDuration: e.target.value
+                                })}
+                                className="w-full px-3 py-2 rounded-xl bg-white border border-zinc-200 text-zinc-900 text-xs focus:outline-none focus:border-black font-medium"
+                              />
+                            </div>
 
-                                  updateField('companyDocs', updatedDocs);
-                                }
-                              }}
-                            />
-                          </label>
+                            <div>
+                              <label className="block font-bold text-zinc-700 mb-1">Department-wise exposure *</label>
+                              <input
+                                type="text"
+                                required
+                                placeholder="e.g. QA (3 mos), Operations (6 mos), Maintenance (3 mos)"
+                                value={formData.structuredTrainingModule?.departmentWiseExposure || ''}
+                                onChange={(e) => updateField('structuredTrainingModule', {
+                                  ...(formData.structuredTrainingModule || {}),
+                                  departmentWiseExposure: e.target.value
+                                })}
+                                className="w-full px-3 py-2 rounded-xl bg-white border border-zinc-200 text-zinc-900 text-xs focus:outline-none focus:border-black font-medium"
+                              />
+                            </div>
+
+                            <div>
+                              <label className="block font-bold text-zinc-700 mb-1">Skills to be developed *</label>
+                              <input
+                                type="text"
+                                required
+                                placeholder="e.g. Equipment diagnostic calibration, standard operating procedures..."
+                                value={formData.structuredTrainingModule?.skillsToBeDeveloped || ''}
+                                onChange={(e) => updateField('structuredTrainingModule', {
+                                  ...(formData.structuredTrainingModule || {}),
+                                  skillsToBeDeveloped: e.target.value
+                                })}
+                                className="w-full px-3 py-2 rounded-xl bg-white border border-zinc-200 text-zinc-900 text-xs focus:outline-none focus:border-black font-medium"
+                              />
+                            </div>
+
+                            <div>
+                              <label className="block font-bold text-zinc-700 mb-1">Monthly training breakup *</label>
+                              <input
+                                type="text"
+                                required
+                                placeholder="e.g. M1-M2: Induction & Safety, M3-M8: Department rotations, M9-M12: Project work"
+                                value={formData.structuredTrainingModule?.monthlyTrainingBreakup || ''}
+                                onChange={(e) => updateField('structuredTrainingModule', {
+                                  ...(formData.structuredTrainingModule || {}),
+                                  monthlyTrainingBreakup: e.target.value
+                                })}
+                                className="w-full px-3 py-2 rounded-xl bg-white border border-zinc-200 text-zinc-900 text-xs focus:outline-none focus:border-black font-medium"
+                              />
+                            </div>
+
+                            <div>
+                              <label className="block font-bold text-zinc-700 mb-1">Supervisor / Training Officer details *</label>
+                              <input
+                                type="text"
+                                required
+                                placeholder="e.g. Rajesh Kumar (Senior Training Manager, rajesh@co.in, +91 98765 43210)"
+                                value={formData.structuredTrainingModule?.supervisorOrOfficerDetails || ''}
+                                onChange={(e) => updateField('structuredTrainingModule', {
+                                  ...(formData.structuredTrainingModule || {}),
+                                  supervisorOrOfficerDetails: e.target.value
+                                })}
+                                className="w-full px-3 py-2 rounded-xl bg-white border border-zinc-200 text-zinc-900 text-xs focus:outline-none focus:border-black font-medium"
+                              />
+                            </div>
+                          </div>
                         </div>
-                      );
-                    })}
-                  </div>
-                </div>
+                      )}
+                    </div>
+                  );
+                })()}
 
                 {/* Final Review Summary Card */}
                 <div className="p-4 rounded-2xl bg-zinc-50 border border-zinc-200 space-y-2 text-xs">

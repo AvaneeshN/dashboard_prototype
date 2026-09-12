@@ -46,7 +46,8 @@ import {
   Paperclip,
   Table,
   Filter,
-  Lock
+  Lock,
+  AlertCircle
 } from 'lucide-react';
 import { 
   ResponsiveContainer, 
@@ -183,6 +184,8 @@ export const ClientDashboard: React.FC = () => {
     spocEmail: '',
     spocName: ''
   });
+
+  const [candidateSubmitErrors, setCandidateSubmitErrors] = useState<string[]>([]);
 
   // Candidate Document State
   const [candidateDocs, setCandidateDocs] = useState<{
@@ -646,8 +649,48 @@ export const ClientDashboard: React.FC = () => {
   // Handle Adding New Candidate & Triggering SPOC Email
   const handleAddCandidateSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!candidateForm.name || !candidateForm.tradeOrRole || !candidateForm.phone) return;
+    const errors: string[] = [];
 
+    // Mandatory Bio & Details Validation
+    if (!candidateForm.name?.trim()) errors.push('Candidate Full Name is required.');
+    if (!candidateForm.phone?.trim()) errors.push('Contact Phone is required.');
+    if (!candidateForm.email?.trim()) errors.push('Candidate Email Address is required.');
+    if (!candidateForm.aadhaarNumber?.trim()) errors.push('Aadhaar Card Number is required.');
+    if (!candidateForm.tradeOrRole?.trim()) errors.push('Curriculum is required.');
+    if (!candidateForm.stipendAmount || Number(candidateForm.stipendAmount) < 1000) errors.push('Monthly Stipend is required and must be at least ₹1,000.');
+    if (!candidateForm.joiningDate) errors.push('Date of Joining (DOJ) is required.');
+    if (!candidateForm.contractExpireDate) errors.push('Contract Expiry Date is required.');
+    if (!candidateForm.bankName?.trim()) errors.push('Bank Name is required.');
+    if (!candidateForm.bankAccountNumber?.trim()) errors.push('Bank Account Number is required.');
+    if (!candidateForm.ifscCode?.trim()) errors.push('Bank IFSC Code is required.');
+    if (!candidateForm.spocEmail?.trim() && !currentSpoc?.email) errors.push('SPOC Email ID is required.');
+
+    // Scheme-specific document and data validation
+    if (candidateForm.enrollmentScheme === 'NATS') {
+      if (!candidateForm.panNumber?.trim()) errors.push('PAN Card Number is required for NATS candidates.');
+      if (!candidateDocs.panDoc) errors.push('Candidate PAN Card Document is required for NATS.');
+      if (!candidateDocs.allSemesterDoc) errors.push('All Semester Marksheets Document is required for NATS.');
+      if (!candidateDocs.docGrad && !candidateDocs.educationDoc) errors.push('Degree / Provisional Certificate is required for NATS.');
+      if (!candidateDocs.photoDoc) errors.push('Candidate Passport Photo is required.');
+      if (!candidateDocs.signatureDoc) errors.push('Candidate Signature is required.');
+      if (!candidateDocs.aadhaarDoc) errors.push('Candidate Aadhaar Card Document is required.');
+    } else {
+      // NAPS / Standard
+      if (!candidateDocs.photoDoc) errors.push('Candidate Passport Photo is required.');
+      if (!candidateDocs.signatureDoc) errors.push('Candidate Signature is required.');
+      if (!candidateDocs.aadhaarDoc) errors.push('Candidate Aadhaar Card Document is required.');
+      if (!candidateDocs.doc10th) errors.push('10th Marksheet is required.');
+      if (!candidateDocs.doc12th) errors.push('12th Marksheet is required.');
+      if (!candidateDocs.docGrad && !candidateDocs.educationDoc) errors.push('Graduation Certificate / Degree is required.');
+      if (!candidateDocs.bankProofDoc) errors.push('Cancelled Cheque / Bank Proof is required.');
+    }
+
+    if (errors.length > 0) {
+      setCandidateSubmitErrors(errors);
+      return;
+    }
+
+    setCandidateSubmitErrors([]);
     const expiryDate = candidateForm.contractExpireDate || (candidateForm.joiningDate ? new Date(new Date(candidateForm.joiningDate).setFullYear(new Date(candidateForm.joiningDate).getFullYear() + 1)).toISOString().split('T')[0] : '');
 
     const newCandidate = await addApprentice({
@@ -2481,6 +2524,21 @@ export const ClientDashboard: React.FC = () => {
                 </button>
               </div>
 
+              {/* Validation Errors Alert Banner */}
+              {candidateSubmitErrors.length > 0 && (
+                <div className="p-3.5 rounded-2xl bg-rose-50 border border-rose-200 text-rose-800 text-xs space-y-1.5">
+                  <div className="flex items-center gap-2 font-bold text-rose-900">
+                    <AlertCircle className="w-4 h-4 text-rose-600 shrink-0" />
+                    <span>Please complete all mandatory candidate fields and documents (*):</span>
+                  </div>
+                  <ul className="list-disc pl-5 space-y-0.5 text-[11px] text-rose-700">
+                    {candidateSubmitErrors.map((err, idx) => (
+                      <li key={idx}><strong>{err}</strong></li>
+                    ))}
+                  </ul>
+                </div>
+              )}
+
               <form onSubmit={handleAddCandidateSubmit} className="space-y-4 text-xs">
                 {/* 1. Candidate Bio Details */}
                 <div className="space-y-2">
@@ -2513,9 +2571,10 @@ export const ClientDashboard: React.FC = () => {
                     </div>
 
                     <div>
-                      <label className="block font-bold text-zinc-700 mb-1">Email Address</label>
+                      <label className="block font-bold text-zinc-700 mb-1">Email Address *</label>
                       <input
                         type="email"
+                        required
                         placeholder="priya@portal.edu"
                         value={candidateForm.email}
                         onChange={(e) => setCandidateForm({ ...candidateForm, email: e.target.value })}

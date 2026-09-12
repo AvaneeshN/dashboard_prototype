@@ -334,10 +334,24 @@ export interface IntakeCompanyDocs {
   cancelledChequeFileName?: string;
   chequeDoc?: UploadedDocument;
   epfoRegistrationCode?: string;
+  // Additional documents for NAPS / NATS
+  panFileName?: string;
+  panDoc?: UploadedDocument;
+  tanFileName?: string;
+  tanDoc?: UploadedDocument;
+  itrFileName?: string;
+  itrDoc?: UploadedDocument;
+  epfoEsicFileName?: string;
+  epfoEsicDoc?: UploadedDocument;
+  trainingModuleFileName?: string;
+  trainingModuleDoc?: UploadedDocument;
   dynamicDocs?: Record<string, UploadedDocument>;
 }
 
 export interface IntakeFormData {
+  // Enrollment Scheme for Onboarding
+  enrollmentScheme?: 'NAPS' | 'NATS';
+
   // Step 1: Company & Apprentice Requirement
   companyName: string;
   gstinNumber?: string;
@@ -382,7 +396,9 @@ export interface IntakeFormData {
   uploadedFileName?: string;
   attachedDocsName?: string;
   specialInstructions?: string;
-  additionalNotes?: string;
+  // NATS Structured Training Module Details
+  structuredTrainingModule?: StructuredTrainingModuleConfig;
+
   agreedToTerms: boolean;
 }
 
