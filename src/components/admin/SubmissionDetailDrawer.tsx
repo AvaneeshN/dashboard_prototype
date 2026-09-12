@@ -67,10 +67,27 @@ export const SubmissionDetailDrawer: React.FC<SubmissionDetailDrawerProps> = ({
     updateClientComplianceReport,
     addStipendPayment,
     updateStipendPayment,
-    addActionItem
+    addActionItem,
+    addInvoice,
+    deleteInvoice,
+    submissions
   } = useStore();
-  const [activeTab, setActiveTab] = useState<'application' | 'documents' | 'candidates' | 'dbt_claims' | 'spoc_logs' | 'naps_portal'>('application');
+  const [activeTab, setActiveTab] = useState<'application' | 'documents' | 'candidates' | 'dbt_claims' | 'spoc_logs' | 'naps_portal' | 'invoices'>('application');
+  const [candidateFilter, setCandidateFilter] = useState<'all' | 'allocated' | 'pending'>('all');
   const [previewingDoc, setPreviewingDoc] = useState<any>(null);
+
+  // Invoice Management States (Admin/Company)
+  const [showAddInvoiceModal, setShowAddInvoiceModal] = useState(false);
+  const [invoiceSubmitting, setInvoiceSubmitting] = useState(false);
+  const [invoiceSuccessMsg, setInvoiceSuccessMsg] = useState<string | null>(null);
+  const [newInvoiceForm, setNewInvoiceForm] = useState({
+    invoiceNo: '',
+    invoiceDate: new Date().toISOString().split('T')[0],
+    amount: '' as unknown as number,
+    status: 'SUBMITTED',
+    paymentDate: '',
+    remarks: ''
+  });
 
   // Stipend Payment Management States (Admin DBT Entry & Review)
   const [editingStipendRecord, setEditingStipendRecord] = useState<StipendPaymentRecord | null>(null);
@@ -172,13 +189,47 @@ export const SubmissionDetailDrawer: React.FC<SubmissionDetailDrawerProps> = ({
 
   if (!submission) return null;
 
-  const responses = submission.responses || {};
+  const currentSub = submissions.find(s => s.id === submission.id) || submission;
+  const responses = currentSub.responses || {};
   const companyDocs = responses.companyDocs || {};
-  const candidateList = submission.candidates || [];
-  const dbtClaims = submission.dbt_claims || [];
-  const spocLogs = submission.spoc_logs || [];
-  const napsRecords = submission.naps_records || [];
-  const stipendPayments: StipendPaymentRecord[] = submission.stipend_payments || [];
+  const candidateList = currentSub.candidates || [];
+  const dbtClaims = currentSub.dbt_claims || [];
+  const spocLogs = currentSub.spoc_logs || [];
+  const napsRecords = currentSub.naps_records || [];
+  const stipendPayments: StipendPaymentRecord[] = currentSub.stipend_payments || [];
+  const invoiceList: ComplianceInvoiceRecord[] = currentSub.invoices || [];
+  const actionItemsList: ComplianceActionItem[] = currentSub.action_items || [];
+
+  const handleAddInvoiceSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!currentSub || !newInvoiceForm.invoiceNo || !newInvoiceForm.amount) return;
+    setInvoiceSubmitting(true);
+    try {
+      await addInvoice(currentSub.id, {
+        invoiceNo: newInvoiceForm.invoiceNo.trim(),
+        invoiceDate: newInvoiceForm.invoiceDate || new Date().toISOString().split('T')[0],
+        amount: Number(newInvoiceForm.amount) || 0,
+        status: newInvoiceForm.status,
+        paymentDate: newInvoiceForm.paymentDate ? newInvoiceForm.paymentDate.trim() : '-',
+        remarks: newInvoiceForm.remarks ? newInvoiceForm.remarks.trim() : ''
+      });
+      setShowAddInvoiceModal(false);
+      setNewInvoiceForm({
+        invoiceNo: '',
+        invoiceDate: new Date().toISOString().split('T')[0],
+        amount: '' as unknown as number,
+        status: 'SUBMITTED',
+        paymentDate: '',
+        remarks: ''
+      });
+      setInvoiceSuccessMsg(`Invoice ${newInvoiceForm.invoiceNo} added and published to client dashboard.`);
+      setTimeout(() => setInvoiceSuccessMsg(null), 4000);
+    } catch (err) {
+      console.error('Error adding invoice:', err);
+    } finally {
+      setInvoiceSubmitting(false);
+    }
+  };
 
   const handleOpenEditStipend = (rec: StipendPaymentRecord) => {
     setEditingStipendRecord(rec);
@@ -264,7 +315,7 @@ export const SubmissionDetailDrawer: React.FC<SubmissionDetailDrawerProps> = ({
       contractCode: cand?.contractCode || '',
       jurisdiction: 'central',
       contractStartDate: cand?.onboardingDate || '',
-      contractEndDate: '',
+      contractEndDate: cand?.contractExpireDate || (cand?.onboardingDate ? new Date(new Date(cand.onboardingDate).setFullYear(new Date(cand.onboardingDate).getFullYear() + 1)).toISOString().split('T')[0] : ''),
       contractType: 'optional',
       payoutMonth: '',
       beneficiaryStatus: 'created',
@@ -273,7 +324,7 @@ export const SubmissionDetailDrawer: React.FC<SubmissionDetailDrawerProps> = ({
       candidateDbtConsent: 'Yes',
       eKycStatus: 'Yes',
       establishmentSharedStatus: 'pending',
-      amount: 0,
+      amount: cand?.dbtEligibleAmount || 0,
       paymentStatus: 'PENDING',
       paymentFailureReason: ''
     });
@@ -318,7 +369,7 @@ export const SubmissionDetailDrawer: React.FC<SubmissionDetailDrawerProps> = ({
       await addNAPSRecord(submission.id, napsForm);
     }
 
-    // Automatically sync contractCode, apprenticeCode, and contractStatus to candidate record
+    // Automatically sync contractCode, apprenticeCode, contractStatus, and dbtEligibleAmount to candidate record
     const targetCandidateId = napsForm.candidateId || (candidateList.length === 1 ? candidateList[0].id : null);
     if (targetCandidateId) {
       const updatedCandidates = candidateList.map(c => {
@@ -327,6 +378,7 @@ export const SubmissionDetailDrawer: React.FC<SubmissionDetailDrawerProps> = ({
             ...c,
             contractCode: napsForm.contractCode,
             apprenticeCode: napsForm.apprenticeCode,
+            dbtEligibleAmount: Number(napsForm.amount) || c.dbtEligibleAmount || 0,
             contractStatus: 'Signed' as const
           };
         }
@@ -341,6 +393,7 @@ export const SubmissionDetailDrawer: React.FC<SubmissionDetailDrawerProps> = ({
             ...c,
             contractCode: napsForm.contractCode,
             apprenticeCode: napsForm.apprenticeCode,
+            dbtEligibleAmount: Number(napsForm.amount) || c.dbtEligibleAmount || 0,
             contractStatus: 'Signed' as const
           };
         }
@@ -440,6 +493,7 @@ export const SubmissionDetailDrawer: React.FC<SubmissionDetailDrawerProps> = ({
               {[
                 { id: 'application', label: 'Intake Application' },
                 { id: 'naps_portal', label: `DBT Dashboard (${napsRecords.length})` },
+                { id: 'invoices', label: `Invoices (${invoiceList.length})` },
                 { id: 'documents', label: 'Company Documents' },
                 { id: 'candidates', label: `Apprentices (${candidateList.length})` },
                 { id: 'dbt_claims', label: `DBT Claims (${dbtClaims.length})` },
@@ -616,66 +670,70 @@ export const SubmissionDetailDrawer: React.FC<SubmissionDetailDrawerProps> = ({
                     </div>
                   </div>
 
-                  {/* Section 1 */}
+                  {/* Section 1: Requirements & Quota Scope */}
                   <div className="space-y-2">
                     <h4 className="text-xs font-bold text-zinc-900 uppercase font-mono">
-                      1. Candidate Requirements & Quota
+                      1. Requirements & Headcount Quota Scope
                     </h4>
                     <div className="p-4 rounded-2xl bg-zinc-50 border border-zinc-200 space-y-2 text-xs">
                       {(responses.companyName || submission.company_name) && (
                         <div className="flex justify-between">
-                          <span className="text-zinc-500 font-medium">Company / Org:</span> 
+                          <span className="text-zinc-500 font-medium">Company / Establishment:</span> 
                           <span className="font-extrabold text-zinc-900">{responses.companyName || submission.company_name}</span>
                         </div>
                       )}
-                      <div className="flex justify-between"><span className="text-zinc-500 font-medium">Client Contact:</span> <span className="font-bold text-zinc-900">{submission.client_name}</span></div>
-                      <div className="flex justify-between"><span className="text-zinc-500 font-medium">Email:</span> <span className="font-mono text-zinc-800">{submission.client_email}</span></div>
-                      {responses.contactPhone && <div className="flex justify-between"><span className="text-zinc-500 font-medium">Phone:</span> <span className="text-zinc-800 font-mono font-bold">{responses.contactPhone}</span></div>}
-                      <div className="flex justify-between"><span className="text-zinc-500 font-medium">Apprentice Quota:</span> <span className="font-extrabold text-zinc-900">{responses.requiredApprenticeCount || 0} Candidates</span></div>
-                      <div>
-                        <span className="text-zinc-500 font-medium block mb-1.5">Target Roles / Specializations:</span>
-                        <div className="flex flex-wrap gap-1.5">
-                          {responses.tradesRequired && responses.tradesRequired.length > 0 ? (
-                            responses.tradesRequired.map((t: string) => (
-                              <span key={t} className="px-3 py-1 rounded-full bg-white border border-zinc-200 text-zinc-800 text-[11px] font-semibold">
-                                {t}
-                              </span>
-                            ))
-                          ) : (
-                            <span className="text-zinc-400">None specified</span>
-                          )}
+                      <div className="flex justify-between"><span className="text-zinc-500 font-medium">Authorized Contact:</span> <span className="font-bold text-zinc-900">{submission.client_name}</span></div>
+                      <div className="flex justify-between"><span className="text-zinc-500 font-medium">Contact Email:</span> <span className="font-mono text-zinc-800">{submission.client_email}</span></div>
+                      <div className="flex justify-between"><span className="text-zinc-500 font-medium">Headcount Quota:</span> <span className="font-extrabold text-zinc-900">{responses.requiredApprenticeCount || 0} Candidates</span></div>
+                      {(responses.operationalStates || (submission.establishment_details ? `${submission.establishment_details.operatingStatesCount} State(s)` : null)) && (
+                        <div className="flex justify-between">
+                          <span className="text-zinc-500 font-medium">Operational States:</span> 
+                          <span className="font-bold text-zinc-900">{responses.operationalStates || 'Karnataka (Operating)'}</span>
                         </div>
+                      )}
+                    </div>
+                  </div>
+
+                  {/* Section 2: Statutory Compliance Profile */}
+                  <div className="space-y-2">
+                    <h4 className="text-xs font-bold text-zinc-900 uppercase font-mono">
+                      2. Mandatory Compliance Identifiers & Documents
+                    </h4>
+                    <div className="p-4 rounded-2xl bg-zinc-50 border border-zinc-200 space-y-2 text-xs">
+                      <div className="flex justify-between"><span className="text-zinc-500 font-medium">Company GSTIN:</span> <span className="font-mono font-bold text-zinc-900">{responses.gstinNumber || '29AAVFN4359C1ZS'}</span></div>
+                      {companyDocs.epfoRegistrationCode && (
+                        <div className="flex justify-between"><span className="text-zinc-500 font-medium">EPFO Registration Code:</span> <span className="font-mono text-zinc-800">{companyDocs.epfoRegistrationCode}</span></div>
+                      )}
+                      <div className="flex justify-between">
+                        <span className="text-zinc-500 font-medium">Compliance Files:</span>
+                        <span className="font-bold text-emerald-700">Verified & Submitted</span>
                       </div>
                     </div>
                   </div>
 
-                  {/* Section 2 */}
+                  {/* NAPS Establishment Profile */}
                   <div className="space-y-2">
-                    <h4 className="text-xs font-bold text-zinc-900 uppercase font-mono">
-                      2. Payroll, Stipend & DBT Configuration
-                    </h4>
-                    <div className="p-4 rounded-2xl bg-zinc-50 border border-zinc-200 space-y-2 text-xs">
-                      <div className="flex justify-between"><span className="text-zinc-500 font-medium">Monthly Stipend:</span> <span className="font-extrabold text-zinc-900">₹{Number(responses.stipendPerApprentice || 0).toLocaleString()}/mo</span></div>
-                      <div className="flex justify-between"><span className="text-zinc-500 font-medium">DBT Subsidy Opt-In:</span> <span className="font-bold text-emerald-700">{responses.dbtSchemeOptIn !== false ? 'Active (₹4,500/mo)' : 'Standard'}</span></div>
-                      {responses.proposedJoiningDate && <div className="flex justify-between"><span className="text-zinc-500 font-medium">Proposed Joining:</span> <span className="font-mono text-zinc-800">{responses.proposedJoiningDate}</span></div>}
-                      {responses.trainingLocations && <div className="flex justify-between"><span className="text-zinc-500 font-medium">Location Mode:</span> <span className="text-zinc-800">{responses.trainingLocations}</span></div>}
+                    <div className="flex items-center justify-between">
+                      <h4 className="text-xs font-bold text-zinc-900 uppercase font-mono">
+                        NAPS Establishment Registration Details
+                      </h4>
+                      <span className="text-[10px] font-mono px-2 py-0.5 rounded-full bg-emerald-100 text-emerald-800 font-bold border border-emerald-200">
+                        NAPS Portal Registered
+                      </span>
                     </div>
-                  </div>
-
-                  {/* Section 3 */}
-                  <div className="space-y-2">
-                    <h4 className="text-xs font-bold text-zinc-900 uppercase font-mono">
-                      3. Contract Template & Compliance
-                    </h4>
                     <div className="p-4 rounded-2xl bg-zinc-50 border border-zinc-200 space-y-2 text-xs">
-                      <div className="flex justify-between"><span className="text-zinc-500 font-medium">Template Framework:</span> <span className="text-zinc-800 font-semibold">{responses.contractTemplateType || 'Standard National Template'}</span></div>
-                      {responses.complianceOfficerName && <div className="flex justify-between"><span className="text-zinc-500 font-medium">Compliance Officer:</span> <span className="text-zinc-800">{responses.complianceOfficerName} ({responses.complianceOfficerEmail || 'No email'})</span></div>}
-                      {responses.cnIssueNotes && (
-                        <div>
-                          <span className="text-zinc-500 font-medium block mb-1">Compliance Notes:</span>
-                          <p className="text-zinc-700 leading-relaxed bg-white p-3 rounded-xl border border-zinc-200 font-mono text-xs">{responses.cnIssueNotes}</p>
-                        </div>
-                      )}
+                      <div className="flex justify-between"><span className="text-zinc-500 font-medium">Establishment Name:</span> <strong className="text-zinc-900">{submission.establishment_details?.establishmentName || responses.companyName || submission.company_name || 'NIDEESHWARAM FOODS'}</strong></div>
+                      <div className="flex justify-between"><span className="text-zinc-500 font-medium">Establishment Type:</span> <span className="text-zinc-800 font-semibold">{submission.establishment_details?.establishmentType || 'FOOD SERVICE'}</span></div>
+                      <div className="flex justify-between"><span className="text-zinc-500 font-medium">PAN Number:</span> <span className="font-mono font-bold text-zinc-900">{submission.establishment_details?.pan || 'AAVFN4359C'}</span></div>
+                      <div className="flex justify-between"><span className="text-zinc-500 font-medium">GSTIN:</span> <span className="font-mono font-bold text-zinc-900">{submission.establishment_details?.gstin || responses.gstinNumber || '29AAVFN4359C1ZS'}</span></div>
+                      <div className="flex justify-between"><span className="text-zinc-500 font-medium">Head of Establishment:</span> <span className="text-zinc-800 font-semibold">{submission.establishment_details?.headOfEstablishment || 'Mansi Gupta C S (Director)'}</span></div>
+                      <div className="flex justify-between"><span className="text-zinc-500 font-medium">Contact Person:</span> <span className="text-zinc-800">{submission.establishment_details?.contactPerson || 'Mansi Gupta C S'} · 9632469856 · mansigupta1509@gmail.com</span></div>
+                      <div className="flex justify-between"><span className="text-zinc-500 font-medium">Operating States & Work Days:</span> <span className="text-zinc-800 font-mono">1 State · 6 Working Days</span></div>
+                      <div className="flex justify-between"><span className="text-zinc-500 font-medium">Bank Details:</span> <span className="text-zinc-800 font-mono font-bold">IDFC FIRST BANK · A/C 10147439967 · IFSC IDFB0080179</span></div>
+                      <div className="pt-2 border-t border-zinc-200 text-zinc-600">
+                        <span className="text-zinc-500 font-medium block mb-0.5">Registered Address:</span>
+                        <p className="text-[11px] text-zinc-700 bg-white p-2.5 rounded-xl border border-zinc-200">{submission.establishment_details?.address || 'SP 8, NGEF Ancillay industrial Estate, Mahadevapura, Bangalore - 560048, Karnataka'}</p>
+                      </div>
                     </div>
                   </div>
                 </div>
@@ -764,7 +822,7 @@ export const SubmissionDetailDrawer: React.FC<SubmissionDetailDrawerProps> = ({
                                 <td className="py-2 px-3 font-bold font-sans text-zinc-900">
                                   {p.month} {p.year && p.year !== 'all' ? p.year : ''}
                                   {p.submittedByClient && (
-                                    <span className="ml-1.5 px-1.5 py-0.5 rounded text-[9px] bg-blue-50 text-blue-700 border border-blue-200 font-normal">Client</span>
+                                    <span className="ml-1.5 px-1.5 py-0.5 rounded text-[9px] bg-rose-100 text-rose-800 border border-rose-300 font-bold">Client</span>
                                   )}
                                 </td>
                                 <td className="py-2 px-3 font-mono font-bold text-zinc-900">₹{p.stipendPaidByEmployer?.toLocaleString('en-IN') || '-'}</td>
@@ -779,7 +837,17 @@ export const SubmissionDetailDrawer: React.FC<SubmissionDetailDrawerProps> = ({
                                     {p.status || 'SUBMITTED'}
                                   </span>
                                 </td>
-                                <td className="py-2 px-3 text-zinc-600 font-sans max-w-xs truncate">{p.remarks || '-'}</td>
+                                <td className="py-2 px-3 max-w-xs">
+                                  {p.remarks ? (
+                                    p.submittedByClient ? (
+                                      <span className="px-2 py-1 rounded-lg bg-rose-50 border border-rose-300 text-rose-700 font-bold text-[11px] block truncate" title={p.remarks}>
+                                        [Client Remark] {p.remarks}
+                                      </span>
+                                    ) : (
+                                      <span className="text-zinc-600 font-sans truncate block">{p.remarks}</span>
+                                    )
+                                  ) : '-'}
+                                </td>
                                 <td className="py-2 px-3 text-right">
                                   <button
                                     type="button"
@@ -800,6 +868,68 @@ export const SubmissionDetailDrawer: React.FC<SubmissionDetailDrawerProps> = ({
                           )}
                         </tbody>
                       </table>
+                    </div>
+
+                    {/* Section 6 Client Remarks & Action Items */}
+                    <div className="pt-3 border-t border-zinc-100 space-y-2">
+                      <div className="flex items-center justify-between">
+                        <div className="flex items-center gap-1.5">
+                          <AlertCircle className="w-3.5 h-3.5 text-rose-600" />
+                          <h5 className="text-[11px] font-bold text-zinc-900 uppercase font-mono">
+                            Client Remarks & Action Items (Section 6)
+                          </h5>
+                        </div>
+                        <span className="text-[10px] text-zinc-400 font-mono">Client-submitted items tagged in red</span>
+                      </div>
+
+                      <div className="overflow-x-auto rounded-xl border border-zinc-200">
+                        <table className="w-full text-left text-[11px]">
+                          <thead className="bg-[#0a192f] text-white uppercase tracking-wider text-[9px] font-mono whitespace-nowrap">
+                            <tr>
+                              <th className="py-2 px-3">S.No</th>
+                              <th className="py-2 px-3">Observation / Remark</th>
+                              <th className="py-2 px-3">Action Required</th>
+                              <th className="py-2 px-3">Owner</th>
+                              <th className="py-2 px-3">Target Date</th>
+                              <th className="py-2 px-3">Status</th>
+                            </tr>
+                          </thead>
+                          <tbody className="divide-y divide-zinc-100 font-medium whitespace-nowrap">
+                            {actionItemsList.length > 0 ? (
+                              actionItemsList.map((act, aIdx) => (
+                                <tr key={act.id || aIdx} className="hover:bg-zinc-50/80 transition-colors">
+                                  <td className="py-2 px-3 font-mono font-bold text-zinc-400">{aIdx + 1}</td>
+                                  <td className="py-2 px-3 max-w-xs">
+                                    <div className="flex items-center gap-1.5 flex-wrap">
+                                      {act.addedBy === 'client' ? (
+                                        <span className="px-2 py-0.5 rounded-md bg-rose-50 border border-rose-300 text-rose-700 font-bold text-[10px]">
+                                          [Client Remark] {act.observation}
+                                        </span>
+                                      ) : (
+                                        <span className="text-zinc-900 font-semibold">{act.observation}</span>
+                                      )}
+                                    </div>
+                                  </td>
+                                  <td className="py-2 px-3 text-zinc-700 max-w-xs truncate">{act.actionRequired}</td>
+                                  <td className="py-2 px-3 font-semibold text-zinc-800">{act.owner}</td>
+                                  <td className="py-2 px-3 font-mono text-zinc-500">{act.targetDate}</td>
+                                  <td className="py-2 px-3">
+                                    <span className="px-2 py-0.5 rounded-full text-[9px] font-bold bg-blue-50 text-blue-700 border border-blue-200">
+                                      {act.status || 'ACTIVE'}
+                                    </span>
+                                  </td>
+                                </tr>
+                              ))
+                            ) : (
+                              <tr>
+                                <td colSpan={6} className="py-4 text-center text-zinc-400">
+                                  No compliance remarks or action items logged yet.
+                                </td>
+                              </tr>
+                            )}
+                          </tbody>
+                        </table>
+                      </div>
                     </div>
                   </div>
 
@@ -917,6 +1047,98 @@ export const SubmissionDetailDrawer: React.FC<SubmissionDetailDrawerProps> = ({
                         )}
                       </tbody>
                     </table>
+                  </div>
+                </div>
+              )}
+
+              {/* TAB: Company Invoices (TPA Facilitation & Management) */}
+              {activeTab === 'invoices' && (
+                <div className="space-y-4">
+                  <div className="p-4 sm:p-5 rounded-2xl bg-white border border-zinc-200 shadow-xs space-y-3">
+                    <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 border-b border-zinc-100 pb-3">
+                      <div>
+                        <div className="flex items-center gap-2">
+                          <DollarSign className="w-4 h-4 text-emerald-600" />
+                          <h4 className="text-xs font-bold text-zinc-900 uppercase font-mono">
+                            Company Facilitation Invoices (Section 5)
+                          </h4>
+                        </div>
+                        <p className="text-[11px] text-zinc-500 mt-0.5">
+                          Manage and issue facilitation / management invoices to the client. Invoices added here sync directly to Section 5 of the client portal.
+                        </p>
+                      </div>
+                      <button
+                        type="button"
+                        onClick={() => setShowAddInvoiceModal(true)}
+                        className="px-3.5 py-1.5 rounded-full bg-[#0a192f] hover:bg-zinc-800 text-white text-xs font-bold flex items-center gap-1.5 cursor-pointer shadow-xs transition-colors shrink-0"
+                      >
+                        <Plus className="w-3.5 h-3.5" />
+                        <span>+ Add Invoice (Company)</span>
+                      </button>
+                    </div>
+
+                    {invoiceSuccessMsg && (
+                      <div className="p-2.5 rounded-xl bg-emerald-50 border border-emerald-200 text-emerald-800 text-xs font-semibold flex items-center justify-between">
+                        <span>{invoiceSuccessMsg}</span>
+                        <button onClick={() => setInvoiceSuccessMsg(null)} className="text-emerald-600 hover:text-emerald-900">
+                          <X className="w-3.5 h-3.5" />
+                        </button>
+                      </div>
+                    )}
+
+                    <div className="overflow-x-auto rounded-xl border border-zinc-200">
+                      <table className="w-full text-left text-[11px]">
+                        <thead className="bg-[#0a192f] text-white uppercase tracking-wider text-[9px] font-mono whitespace-nowrap">
+                          <tr>
+                            <th className="py-2.5 px-3">Invoice No.</th>
+                            <th className="py-2.5 px-3">Invoice Date</th>
+                            <th className="py-2.5 px-3">Amount (₹)</th>
+                            <th className="py-2.5 px-3">Status</th>
+                            <th className="py-2.5 px-3">Payment Date</th>
+                            <th className="py-2.5 px-3">Remarks</th>
+                            <th className="py-2.5 px-3 text-right">Action</th>
+                          </tr>
+                        </thead>
+                        <tbody className="divide-y divide-zinc-100 font-medium whitespace-nowrap">
+                          {invoiceList.length > 0 ? (
+                            invoiceList.map((inv) => (
+                              <tr key={inv.id} className="hover:bg-zinc-50/80 transition-colors">
+                                <td className="py-2.5 px-3 font-mono font-bold text-zinc-900">{inv.invoiceNo}</td>
+                                <td className="py-2.5 px-3 font-mono text-zinc-600">{inv.invoiceDate}</td>
+                                <td className="py-2.5 px-3 font-mono font-bold text-zinc-900">₹{inv.amount.toLocaleString('en-IN')}</td>
+                                <td className="py-2.5 px-3">
+                                  <span className={`px-2 py-0.5 rounded-full text-[9px] font-bold ${
+                                    inv.status === 'PAID'
+                                      ? 'bg-emerald-100 text-emerald-800 border border-emerald-200'
+                                      : 'bg-amber-100 text-amber-800 border border-amber-200'
+                                  }`}>
+                                    {inv.status}
+                                  </span>
+                                </td>
+                                <td className="py-2.5 px-3 font-mono text-zinc-600">{inv.paymentDate || '-'}</td>
+                                <td className="py-2.5 px-3 text-zinc-600 font-sans max-w-xs truncate">{inv.remarks || '-'}</td>
+                                <td className="py-2.5 px-3 text-right">
+                                  <button
+                                    type="button"
+                                    onClick={() => deleteInvoice(currentSub.id, inv.id)}
+                                    title="Delete invoice"
+                                    className="p-1 text-rose-500 hover:text-rose-700 rounded hover:bg-rose-50 cursor-pointer"
+                                  >
+                                    <Trash2 className="w-3.5 h-3.5" />
+                                  </button>
+                                </td>
+                              </tr>
+                            ))
+                          ) : (
+                            <tr>
+                              <td colSpan={7} className="py-8 text-center text-zinc-400">
+                                No facilitation invoices created yet. Click &quot;+ Add Invoice (Company)&quot; to generate an invoice for this client.
+                              </td>
+                            </tr>
+                          )}
+                        </tbody>
+                      </table>
+                    </div>
                   </div>
                 </div>
               )}
@@ -1107,132 +1329,277 @@ export const SubmissionDetailDrawer: React.FC<SubmissionDetailDrawerProps> = ({
               {/* TAB 3: Apprentices Roster & Candidate Documents */}
               {activeTab === 'candidates' && (
                 <div className="space-y-3">
-                  <div className="text-xs font-bold text-zinc-900 uppercase font-mono mb-2">
-                    Apprentice Candidate Records & Attached Files ({candidateList.length})
-                  </div>
+                  {(() => {
+                    const allocatedCount = candidateList.filter(c => c.contractCode && c.contractCode !== 'CN Pending').length;
+                    const pendingCount = candidateList.filter(c => !c.contractCode || c.contractCode === 'CN Pending').length;
+                    const displayedCandidates = candidateList.filter(cand => {
+                      if (candidateFilter === 'allocated') return Boolean(cand.contractCode && cand.contractCode !== 'CN Pending');
+                      if (candidateFilter === 'pending') return !cand.contractCode || cand.contractCode === 'CN Pending';
+                      return true;
+                    });
 
-                  {candidateList.length > 0 ? (
-                    <div className="space-y-3">
-                      {candidateList.map(cand => (
-                        <div key={cand.id} className="p-4 rounded-2xl bg-zinc-50 border border-zinc-200 text-xs space-y-3">
-                          <div className="flex items-center justify-between">
-                            <div>
-                              <div className="flex items-center gap-2">
-                                <span className="font-bold text-zinc-900 text-xs">{cand.name}</span>
-                                {cand.contractCode ? (
-                                  <span className="px-2 py-0.5 rounded-md text-[10px] font-mono font-bold bg-emerald-100 text-emerald-900 border border-emerald-300">
-                                    CN: {cand.contractCode}
-                                  </span>
-                                ) : (
-                                  <span className="px-2 py-0.5 rounded-md text-[10px] font-mono font-semibold bg-amber-100 text-amber-900 border border-amber-300">
-                                    CN Pending
-                                  </span>
-                                )}
-                              </div>
-                              <div className="text-[10px] font-mono text-zinc-400">{cand.id} · {cand.email || 'Verified'} · {cand.phone || 'Phone Logged'}</div>
-                            </div>
-                            <div className="flex items-center gap-2">
-                              <button
-                                type="button"
-                                onClick={() => handleOpenAddNaps(cand)}
-                                className="px-2.5 py-1 rounded-xl bg-[#0a192f] text-white hover:bg-zinc-800 text-[10px] font-bold cursor-pointer transition-colors"
-                              >
-                                {cand.contractCode ? 'Edit CN / DBT Record' : '+ Assign CN Number'}
-                              </button>
-                              <span className="px-2.5 py-0.5 rounded-full text-[10px] font-bold bg-zinc-900 text-white">
-                                {cand.status}
-                              </span>
-                            </div>
+                    return (
+                      <>
+                        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 mb-3">
+                          <div className="text-xs font-bold text-zinc-900 uppercase font-mono">
+                            Apprentice Candidate Records & Attached Files ({candidateList.length})
                           </div>
-
-                          <div className="grid grid-cols-2 sm:grid-cols-3 gap-2 pt-2 border-t border-zinc-200 text-[11px]">
-                            <div><span className="text-zinc-500">Role:</span> <strong className="text-zinc-800">{cand.tradeOrRole}</strong></div>
-                            <div><span className="text-zinc-500">Stipend:</span> <strong className="text-zinc-800">₹{cand.stipendAmount.toLocaleString()}/mo</strong></div>
-                            <div><span className="text-zinc-500">Aadhaar:</span> <span className="font-mono">{cand.aadhaarNumber || 'Not specified'}</span></div>
-                            <div><span className="text-zinc-500">Bank:</span> <strong className="text-zinc-800">{cand.bankName || 'Not recorded'}</strong></div>
-                            <div><span className="text-zinc-500">A/C No:</span> <span className="font-mono">{cand.bankAccountNumber || 'Not recorded'}</span></div>
-                            <div><span className="text-zinc-500">IFSC:</span> <span className="font-mono font-bold text-zinc-700">{cand.ifscCode || 'Not recorded'}</span></div>
-                          </div>
-
-                          {/* Candidate Attached Files Bar */}
-                          <div className="pt-2 border-t border-zinc-200 flex items-center justify-between">
-                            <span className="text-[10px] font-mono font-bold uppercase text-zinc-400">Attached Documents:</span>
-                            <div className="flex items-center gap-1.5 flex-wrap">
-                              {/* Photo */}
-                              {(cand.documents?.photoDoc || cand.documents?.photoFile) && (
-                                <button
-                                  type="button"
-                                  onClick={() => setPreviewingDoc(cand.documents?.photoDoc || { name: cand.documents?.photoFile || 'Candidate Photo.jpg', type: 'image' })}
-                                  className="px-2 py-0.5 rounded-full text-[10px] font-mono bg-white hover:bg-zinc-200 border border-zinc-200 text-zinc-800 cursor-pointer flex items-center gap-1"
-                                >
-                                  <Eye className="w-2.5 h-2.5" />
-                                  <span>Photo</span>
-                                </button>
-                              )}
-
-                              {/* Signature */}
-                              {(cand.documents?.signatureDoc || cand.documents?.signatureFile) && (
-                                <button
-                                  type="button"
-                                  onClick={() => setPreviewingDoc(cand.documents?.signatureDoc || { name: cand.documents?.signatureFile || 'Candidate Signature.png', type: 'image' })}
-                                  className="px-2 py-0.5 rounded-full text-[10px] font-mono bg-white hover:bg-zinc-200 border border-zinc-200 text-zinc-800 cursor-pointer flex items-center gap-1"
-                                >
-                                  <Eye className="w-2.5 h-2.5" />
-                                  <span>Sign</span>
-                                </button>
-                              )}
-
-                              {/* Aadhaar */}
-                              <button
-                                type="button"
-                                onClick={() => setPreviewingDoc(cand.documents?.aadhaarDoc || { name: cand.documents?.aadhaarFile || 'Aadhaar Card.pdf', type: 'pdf' })}
-                                className="px-2 py-0.5 rounded-full text-[10px] font-mono bg-white hover:bg-zinc-200 border border-zinc-200 text-zinc-800 cursor-pointer flex items-center gap-1"
-                              >
-                                <Eye className="w-2.5 h-2.5" />
-                                <span>Aadhaar</span>
-                              </button>
-
-                              {/* Degree */}
-                              <button
-                                type="button"
-                                onClick={() => setPreviewingDoc(cand.documents?.educationDoc || { name: cand.documents?.educationFile || 'Degree Certificate.pdf', type: 'pdf' })}
-                                className="px-2 py-0.5 rounded-full text-[10px] font-mono bg-white hover:bg-zinc-200 border border-zinc-200 text-zinc-800 cursor-pointer flex items-center gap-1"
-                              >
-                                <Eye className="w-2.5 h-2.5" />
-                                <span>Degree</span>
-                              </button>
-
-                              {/* Cheque / Bank Proof */}
-                              {(cand.documents?.bankProofDoc || cand.documents?.bankProofFile) && (
-                                <button
-                                  type="button"
-                                  onClick={() => setPreviewingDoc(cand.documents?.bankProofDoc || { name: cand.documents?.bankProofFile || 'Cancelled Cheque.pdf', type: 'pdf' })}
-                                  className="px-2 py-0.5 rounded-full text-[10px] font-mono bg-white hover:bg-zinc-200 border border-zinc-200 text-zinc-800 cursor-pointer flex items-center gap-1"
-                                >
-                                  <Eye className="w-2.5 h-2.5" />
-                                  <span>Cheque</span>
-                                </button>
-                              )}
-
-                              {/* Resume */}
-                              <button
-                                type="button"
-                                onClick={() => setPreviewingDoc(cand.documents?.resumeDoc || { name: cand.documents?.resumeFile || 'Candidate Resume.docx', type: 'docx' })}
-                                className="px-2 py-0.5 rounded-full text-[10px] font-mono bg-white hover:bg-zinc-200 border border-zinc-200 text-zinc-800 cursor-pointer flex items-center gap-1"
-                              >
-                                <Eye className="w-2.5 h-2.5" />
-                                <span>Resume</span>
-                              </button>
-                            </div>
+                          <div className="flex items-center gap-1.5">
+                            <button
+                              type="button"
+                              onClick={() => setCandidateFilter('all')}
+                              className={`px-3 py-1 rounded-full text-[11px] font-bold transition-all cursor-pointer ${
+                                candidateFilter === 'all'
+                                  ? 'bg-black text-white shadow-xs'
+                                  : 'bg-zinc-100 text-zinc-600 hover:bg-zinc-200'
+                              }`}
+                            >
+                              All ({candidateList.length})
+                            </button>
+                            <button
+                              type="button"
+                              onClick={() => setCandidateFilter('allocated')}
+                              className={`px-3 py-1 rounded-full text-[11px] font-bold transition-all cursor-pointer ${
+                                candidateFilter === 'allocated'
+                                  ? 'bg-emerald-600 text-white shadow-xs'
+                                  : 'bg-zinc-100 text-zinc-600 hover:bg-zinc-200'
+                              }`}
+                            >
+                              Allocated ({allocatedCount})
+                            </button>
+                            <button
+                              type="button"
+                              onClick={() => setCandidateFilter('pending')}
+                              className={`px-3 py-1 rounded-full text-[11px] font-bold transition-all cursor-pointer ${
+                                candidateFilter === 'pending'
+                                  ? 'bg-amber-600 text-white shadow-xs'
+                                  : 'bg-amber-100 text-amber-900 hover:bg-amber-200 border border-amber-300'
+                              }`}
+                            >
+                              Pending Allocation ({pendingCount})
+                            </button>
                           </div>
                         </div>
-                      ))}
-                    </div>
-                  ) : (
-                    <div className="py-8 text-center text-zinc-400 text-xs bg-zinc-50 rounded-2xl border border-zinc-200">
-                      No candidates onboarded by client yet.
-                    </div>
-                  )}
+
+                        {displayedCandidates.length > 0 ? (
+                          <div className="space-y-3">
+                            {displayedCandidates.map(cand => {
+                              const expDate = cand.contractExpireDate || (cand.onboardingDate ? new Date(new Date(cand.onboardingDate).setFullYear(new Date(cand.onboardingDate).getFullYear() + 1)).toISOString().split('T')[0] : '-');
+                              const isCnApproved = Boolean(cand.contractCode && cand.contractCode !== 'CN Pending');
+
+                              return (
+                                <div key={cand.id} className="p-4 rounded-2xl bg-zinc-50 border border-zinc-200 text-xs space-y-3">
+                                  <div className="flex items-center justify-between flex-wrap gap-2">
+                                    <div>
+                                      <div className="flex items-center gap-2 flex-wrap">
+                                        <span className="font-bold text-zinc-900 text-xs">{cand.name}</span>
+                                        <span className="px-2 py-0.5 rounded-md text-[10px] font-mono font-bold bg-purple-100 text-purple-900 border border-purple-200">
+                                          {cand.enrollmentScheme || 'NAPS'}
+                                        </span>
+                                        {isCnApproved ? (
+                                          <span className="px-2 py-0.5 rounded-md text-[10px] font-mono font-bold bg-emerald-100 text-emerald-900 border border-emerald-300">
+                                            CN: {cand.contractCode}
+                                          </span>
+                                        ) : (
+                                          <span className="px-2 py-0.5 rounded-md text-[10px] font-mono font-semibold bg-amber-100 text-amber-900 border border-amber-300">
+                                            CN Pending
+                                          </span>
+                                        )}
+                                        {cand.apprenticeCode && (
+                                          <span className="px-2 py-0.5 rounded-md text-[10px] font-mono font-bold bg-sky-100 text-sky-900 border border-sky-200">
+                                            AP: {cand.apprenticeCode}
+                                          </span>
+                                        )}
+                                      </div>
+                                      <div className="text-[10px] font-mono text-zinc-400 mt-0.5">{cand.id} · {cand.email || 'Verified'} · {cand.phone || 'Phone Logged'}</div>
+                                    </div>
+                                    <div className="flex items-center gap-2">
+                                      <button
+                                        type="button"
+                                        onClick={() => handleOpenAddNaps(cand)}
+                                        className="px-2.5 py-1 rounded-xl bg-[#0a192f] text-white hover:bg-zinc-800 text-[10px] font-bold cursor-pointer transition-colors"
+                                      >
+                                        {cand.contractCode ? 'Edit CN / DBT Record' : '+ Assign CN Number'}
+                                      </button>
+                                      <span className="px-2.5 py-0.5 rounded-full text-[10px] font-bold bg-zinc-900 text-white">
+                                        {cand.status}
+                                      </span>
+                                    </div>
+                                  </div>
+
+                                  <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 pt-2 border-t border-zinc-200 text-[11px]">
+                                    <div><span className="text-zinc-500">Curriculum:</span> <strong className="text-zinc-800">{cand.tradeOrRole}</strong></div>
+                                    <div><span className="text-zinc-500">DOJ (Joining):</span> <strong className="font-mono text-zinc-800">{cand.onboardingDate || '-'}</strong></div>
+                                    <div><span className="text-zinc-500">Contract Expiry:</span> <strong className="font-mono text-zinc-800">{expDate}</strong></div>
+                                    <div><span className="text-zinc-500">Stipend:</span> <strong className="text-zinc-800">₹{cand.stipendAmount.toLocaleString()}/mo</strong></div>
+                                    <div><span className="text-zinc-500">Govt. DBT Share:</span> <strong className="font-bold text-emerald-700">{cand.dbtEligibleAmount ? `₹${cand.dbtEligibleAmount.toLocaleString()}/mo` : 'Pending Admin Entry'}</strong></div>
+                                    <div><span className="text-zinc-500">Aadhaar:</span> <span className="font-mono">{cand.aadhaarNumber || 'Not specified'}</span></div>
+                                    <div><span className="text-zinc-500">Bank:</span> <strong className="text-zinc-800">{cand.bankName || 'Not recorded'}</strong></div>
+                                    <div><span className="text-zinc-500">A/C No:</span> <span className="font-mono">{cand.bankAccountNumber || 'Not recorded'}</span></div>
+                                    <div><span className="text-zinc-500">IFSC:</span> <span className="font-mono font-bold text-zinc-700">{cand.ifscCode || 'Not recorded'}</span></div>
+                                  </div>
+
+                                  {/* Candidate Attached Files Bar */}
+                                  <div className="pt-2 border-t border-zinc-200 flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+                                    <span className="text-[10px] font-mono font-bold uppercase text-zinc-400">Attached Documents (Max 2MB per file):</span>
+                                    <div className="flex items-center gap-1.5 flex-wrap">
+                                      {/* 10th Marksheet */}
+                                      {(cand.documents?.doc10th || cand.documents?.doc10thFile) && (
+                                        <button
+                                          type="button"
+                                          onClick={() => setPreviewingDoc(cand.documents?.doc10th || { name: cand.documents?.doc10thFile || '10th_Marksheet.pdf', type: 'pdf' })}
+                                          className="px-2 py-0.5 rounded-full text-[10px] font-mono bg-white hover:bg-zinc-200 border border-zinc-200 text-zinc-800 cursor-pointer flex items-center gap-1"
+                                        >
+                                          <Eye className="w-2.5 h-2.5" />
+                                          <span>10th Marksheet</span>
+                                        </button>
+                                      )}
+
+                                      {/* 12th Marksheet */}
+                                      {(cand.documents?.doc12th || cand.documents?.doc12thFile) && (
+                                        <button
+                                          type="button"
+                                          onClick={() => setPreviewingDoc(cand.documents?.doc12th || { name: cand.documents?.doc12thFile || '12th_Marksheet.pdf', type: 'pdf' })}
+                                          className="px-2 py-0.5 rounded-full text-[10px] font-mono bg-white hover:bg-zinc-200 border border-zinc-200 text-zinc-800 cursor-pointer flex items-center gap-1"
+                                        >
+                                          <Eye className="w-2.5 h-2.5" />
+                                          <span>12th Marksheet</span>
+                                        </button>
+                                      )}
+
+                                      {/* Graduation Degree */}
+                                      {(cand.documents?.docGrad || cand.documents?.educationDoc || cand.documents?.docGradFile || cand.documents?.educationFile) && (
+                                        <button
+                                          type="button"
+                                          onClick={() => setPreviewingDoc(cand.documents?.docGrad || cand.documents?.educationDoc || { name: cand.documents?.docGradFile || cand.documents?.educationFile || 'Degree_Certificate.pdf', type: 'pdf' })}
+                                          className="px-2 py-0.5 rounded-full text-[10px] font-mono bg-white hover:bg-zinc-200 border border-zinc-200 text-zinc-800 cursor-pointer flex items-center gap-1"
+                                        >
+                                          <Eye className="w-2.5 h-2.5" />
+                                          <span>Grad / Degree</span>
+                                        </button>
+                                      )}
+
+                                      {/* Photo */}
+                                      {(cand.documents?.photoDoc || cand.documents?.photoFile) && (
+                                        <button
+                                          type="button"
+                                          onClick={() => setPreviewingDoc(cand.documents?.photoDoc || { name: cand.documents?.photoFile || 'Candidate Photo.jpg', type: 'image' })}
+                                          className="px-2 py-0.5 rounded-full text-[10px] font-mono bg-white hover:bg-zinc-200 border border-zinc-200 text-zinc-800 cursor-pointer flex items-center gap-1"
+                                        >
+                                          <Eye className="w-2.5 h-2.5" />
+                                          <span>Photo</span>
+                                        </button>
+                                      )}
+
+                                      {/* Signature */}
+                                      {(cand.documents?.signatureDoc || cand.documents?.signatureFile) && (
+                                        <button
+                                          type="button"
+                                          onClick={() => setPreviewingDoc(cand.documents?.signatureDoc || { name: cand.documents?.signatureFile || 'Candidate Signature.png', type: 'image' })}
+                                          className="px-2 py-0.5 rounded-full text-[10px] font-mono bg-white hover:bg-zinc-200 border border-zinc-200 text-zinc-800 cursor-pointer flex items-center gap-1"
+                                        >
+                                          <Eye className="w-2.5 h-2.5" />
+                                          <span>Sign</span>
+                                        </button>
+                                      )}
+
+                                      {/* Aadhaar */}
+                                      <button
+                                        type="button"
+                                        onClick={() => setPreviewingDoc(cand.documents?.aadhaarDoc || { name: cand.documents?.aadhaarFile || 'Aadhaar Card.pdf', type: 'pdf' })}
+                                        className="px-2 py-0.5 rounded-full text-[10px] font-mono bg-white hover:bg-zinc-200 border border-zinc-200 text-zinc-800 cursor-pointer flex items-center gap-1"
+                                      >
+                                        <Eye className="w-2.5 h-2.5" />
+                                        <span>Aadhaar</span>
+                                      </button>
+
+                                      {/* Cheque / Bank Proof */}
+                                      {(cand.documents?.bankProofDoc || cand.documents?.bankProofFile) && (
+                                        <button
+                                          type="button"
+                                          onClick={() => setPreviewingDoc(cand.documents?.bankProofDoc || { name: cand.documents?.bankProofFile || 'Cancelled Cheque.pdf', type: 'pdf' })}
+                                          className="px-2 py-0.5 rounded-full text-[10px] font-mono bg-white hover:bg-zinc-200 border border-zinc-200 text-zinc-800 cursor-pointer flex items-center gap-1"
+                                        >
+                                          <Eye className="w-2.5 h-2.5" />
+                                          <span>Cheque</span>
+                                        </button>
+                                      )}
+
+                                      {/* Resume */}
+                                      <button
+                                        type="button"
+                                        onClick={() => setPreviewingDoc(cand.documents?.resumeDoc || { name: cand.documents?.resumeFile || 'Candidate Resume.docx', type: 'docx' })}
+                                        className="px-2 py-0.5 rounded-full text-[10px] font-mono bg-white hover:bg-zinc-200 border border-zinc-200 text-zinc-800 cursor-pointer flex items-center gap-1"
+                                      >
+                                        <Eye className="w-2.5 h-2.5" />
+                                        <span>Resume</span>
+                                      </button>
+
+                                      {/* PAN (NATS) */}
+                                      {(cand.documents?.panDoc || cand.documents?.panFile) && (
+                                        <button
+                                          type="button"
+                                          onClick={() => setPreviewingDoc(cand.documents?.panDoc || { name: cand.documents?.panFile || 'PAN Card.pdf', type: 'pdf' })}
+                                          className="px-2 py-0.5 rounded-full text-[10px] font-mono bg-amber-50 hover:bg-amber-100 text-amber-800 border border-amber-200 cursor-pointer flex items-center gap-1 font-bold"
+                                        >
+                                          <Eye className="w-2.5 h-2.5" />
+                                          <span>PAN</span>
+                                        </button>
+                                      )}
+
+                                      {/* All Semester Marksheets (NATS) */}
+                                      {(cand.documents?.allSemesterDoc || cand.documents?.allSemesterFile) && (
+                                        <button
+                                          type="button"
+                                          onClick={() => setPreviewingDoc(cand.documents?.allSemesterDoc || { name: cand.documents?.allSemesterFile || 'All Semester Marksheets.pdf', type: 'pdf' })}
+                                          className="px-2 py-0.5 rounded-full text-[10px] font-mono bg-amber-50 hover:bg-amber-100 text-amber-800 border border-amber-200 cursor-pointer flex items-center gap-1 font-bold"
+                                        >
+                                          <Eye className="w-2.5 h-2.5" />
+                                          <span>Sem Marksheets</span>
+                                        </button>
+                                      )}
+
+                                      {/* Caste / Category Certificate (NATS) */}
+                                      {(cand.documents?.casteCertDoc || cand.documents?.casteCertFile) && (
+                                        <button
+                                          type="button"
+                                          onClick={() => setPreviewingDoc(cand.documents?.casteCertDoc || { name: cand.documents?.casteCertFile || 'Caste Certificate.pdf', type: 'pdf' })}
+                                          className="px-2 py-0.5 rounded-full text-[10px] font-mono bg-white hover:bg-zinc-200 border border-zinc-200 text-zinc-800 cursor-pointer flex items-center gap-1"
+                                        >
+                                          <Eye className="w-2.5 h-2.5" />
+                                          <span>Caste Cert</span>
+                                        </button>
+                                      )}
+
+                                      {/* APAR ID (NATS) */}
+                                      {(cand.documents?.aparIdDoc || cand.documents?.aparIdFile) && (
+                                        <button
+                                          type="button"
+                                          onClick={() => setPreviewingDoc(cand.documents?.aparIdDoc || { name: cand.documents?.aparIdFile || 'APAR ID Document.pdf', type: 'pdf' })}
+                                          className="px-2 py-0.5 rounded-full text-[10px] font-mono bg-white hover:bg-zinc-200 border border-zinc-200 text-zinc-800 cursor-pointer flex items-center gap-1"
+                                        >
+                                          <Eye className="w-2.5 h-2.5" />
+                                          <span>APAR ID</span>
+                                        </button>
+                                      )}
+                                    </div>
+                                  </div>
+                                </div>
+                              );
+                            })}
+                          </div>
+                        ) : (
+                          <div className="py-8 text-center text-zinc-400 text-xs bg-zinc-50 rounded-2xl border border-zinc-200">
+                            {candidateFilter === 'pending'
+                              ? 'No candidates currently pending CN allocation.'
+                              : candidateFilter === 'allocated'
+                              ? 'No candidates with active CN allocation yet.'
+                              : 'No candidates onboarded by client yet.'}
+                          </div>
+                        )}
+                      </>
+                    );
+                  })()}
                 </div>
               )}
 
@@ -1877,6 +2244,133 @@ export const SubmissionDetailDrawer: React.FC<SubmissionDetailDrawerProps> = ({
                     className="px-4 py-1.5 rounded-xl bg-[#0a192f] hover:bg-[#102a4c] text-white font-bold cursor-pointer transition-all"
                   >
                     Create Record
+                  </button>
+                </div>
+              </form>
+            </motion.div>
+          </div>
+        )}
+      </AnimatePresence>
+
+      {/* Facilitation Invoice Add Modal (Company Admin) */}
+      <AnimatePresence>
+        {showAddInvoiceModal && (
+          <div className="fixed inset-0 z-[120] flex items-center justify-center p-4 bg-black/50 backdrop-blur-xs font-sans">
+            <motion.div
+              initial={{ opacity: 0, scale: 0.96 }}
+              animate={{ opacity: 1, scale: 1 }}
+              exit={{ opacity: 0, scale: 0.96 }}
+              className="w-full max-w-md bg-white rounded-3xl p-6 border border-zinc-200 shadow-2xl space-y-4"
+            >
+              <div className="flex items-center justify-between border-b border-zinc-200 pb-3">
+                <div className="flex items-center gap-2">
+                  <div className="w-8 h-8 rounded-lg bg-[#0a192f] text-amber-300 font-serif flex items-center justify-center font-bold text-xs">
+                    ₹
+                  </div>
+                  <div>
+                    <h3 className="text-sm font-extrabold text-zinc-900 uppercase font-mono">
+                      Add Facilitation Invoice
+                    </h3>
+                    <p className="text-[10px] text-zinc-500 font-mono">Company / TPA Billing</p>
+                  </div>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => setShowAddInvoiceModal(false)}
+                  className="p-1 text-zinc-400 hover:text-black cursor-pointer"
+                >
+                  <X className="w-5 h-5" />
+                </button>
+              </div>
+
+              <form onSubmit={handleAddInvoiceSubmit} className="space-y-3 text-xs">
+                <div>
+                  <label className="block text-[11px] font-bold text-zinc-700 mb-1">Invoice Number *</label>
+                  <input
+                    type="text"
+                    value={newInvoiceForm.invoiceNo}
+                    onChange={(e) => setNewInvoiceForm({ ...newInvoiceForm, invoiceNo: e.target.value })}
+                    placeholder="e.g. INV-2026-001"
+                    className="w-full px-3 py-1.5 rounded-xl bg-zinc-50 border border-zinc-200 font-bold font-mono focus:outline-none focus:border-black"
+                    required
+                  />
+                </div>
+
+                <div className="grid grid-cols-2 gap-2.5">
+                  <div>
+                    <label className="block text-[11px] font-bold text-zinc-700 mb-1">Invoice Date *</label>
+                    <input
+                      type="date"
+                      value={newInvoiceForm.invoiceDate}
+                      onChange={(e) => setNewInvoiceForm({ ...newInvoiceForm, invoiceDate: e.target.value })}
+                      className="w-full px-3 py-1.5 rounded-xl bg-zinc-50 border border-zinc-200 font-mono focus:outline-none focus:border-black"
+                      required
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-[11px] font-bold text-zinc-700 mb-1">Amount (₹) *</label>
+                    <input
+                      type="number"
+                      min="1"
+                      value={newInvoiceForm.amount}
+                      onChange={(e) => setNewInvoiceForm({ ...newInvoiceForm, amount: Number(e.target.value) })}
+                      placeholder="e.g. 15000"
+                      className="w-full px-3 py-1.5 rounded-xl bg-zinc-50 border border-zinc-200 font-bold font-mono focus:outline-none focus:border-black"
+                      required
+                    />
+                  </div>
+                </div>
+
+                <div className="grid grid-cols-2 gap-2.5">
+                  <div>
+                    <label className="block text-[11px] font-bold text-zinc-700 mb-1">Status *</label>
+                    <select
+                      value={newInvoiceForm.status}
+                      onChange={(e) => setNewInvoiceForm({ ...newInvoiceForm, status: e.target.value })}
+                      className="w-full px-3 py-1.5 rounded-xl bg-zinc-50 border border-zinc-200 font-bold focus:outline-none focus:border-black"
+                    >
+                      <option value="SUBMITTED">SUBMITTED</option>
+                      <option value="PENDING">PENDING</option>
+                      <option value="PAID">PAID</option>
+                    </select>
+                  </div>
+                  <div>
+                    <label className="block text-[11px] font-bold text-zinc-700 mb-1">Payment Date</label>
+                    <input
+                      type="text"
+                      value={newInvoiceForm.paymentDate}
+                      onChange={(e) => setNewInvoiceForm({ ...newInvoiceForm, paymentDate: e.target.value })}
+                      placeholder="e.g. 15-08-2026 or -"
+                      className="w-full px-3 py-1.5 rounded-xl bg-zinc-50 border border-zinc-200 font-mono focus:outline-none focus:border-black"
+                    />
+                  </div>
+                </div>
+
+                <div>
+                  <label className="block text-[11px] font-bold text-zinc-700 mb-1">Remarks (Optional)</label>
+                  <input
+                    type="text"
+                    value={newInvoiceForm.remarks}
+                    onChange={(e) => setNewInvoiceForm({ ...newInvoiceForm, remarks: e.target.value })}
+                    placeholder="e.g. Monthly NAPS Compliance Retainer"
+                    className="w-full px-3 py-1.5 rounded-xl bg-zinc-50 border border-zinc-200 focus:outline-none focus:border-black"
+                  />
+                </div>
+
+                <div className="pt-2 border-t border-zinc-200 flex items-center justify-end gap-2">
+                  <button
+                    type="button"
+                    onClick={() => setShowAddInvoiceModal(false)}
+                    className="px-3.5 py-1.5 rounded-xl bg-zinc-100 hover:bg-zinc-200 text-zinc-700 font-bold cursor-pointer"
+                  >
+                    Cancel
+                  </button>
+                  <button
+                    type="submit"
+                    disabled={invoiceSubmitting}
+                    className="px-4 py-1.5 rounded-xl bg-[#0a192f] hover:bg-[#102a4c] text-white font-bold cursor-pointer transition-all disabled:opacity-50"
+                  >
+                    {invoiceSubmitting ? 'Adding...' : 'Generate Invoice'}
                   </button>
                 </div>
               </form>

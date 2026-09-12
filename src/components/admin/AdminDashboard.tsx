@@ -206,18 +206,21 @@ export const AdminDashboard: React.FC = () => {
     return acc + (claimsTotal > 0 ? claimsTotal : candidateDbt);
   }, 0);
 
-  // Dynamic Funnel data for Recharts based on real client intake progression
+  // Count total and pending candidates across submissions
+  const totalApprenticesAcrossClients = submissions.reduce((acc, s) => acc + (s.candidates?.length || 0), 0);
+  const pendingAllocatedCandidatesCount = submissions.reduce(
+    (acc, s) => acc + (s.candidates || []).filter(c => !c.contractCode || c.contractCode === 'CN Pending').length,
+    0
+  );
+
+  // Dynamic Funnel data for Recharts based on real client intake progression (2 sections)
   const step1Started = submissions.length;
   const step1Completed = submissions.filter(s => (s.current_step || 1) >= 1 || s.status !== 'draft').length;
   const step2Completed = submissions.filter(s => (s.current_step || 1) >= 2 || s.status === 'submitted' || s.status === 'under_review' || s.status === 'approved').length;
-  const step3Completed = submissions.filter(s => (s.current_step || 1) >= 3 || s.status === 'submitted' || s.status === 'under_review' || s.status === 'approved').length;
-  const step4Completed = submissions.filter(s => s.status === 'submitted' || s.status === 'under_review' || s.status === 'approved').length;
 
   const funnelChartData = [
-    { name: 'Step 1', fullName: 'Candidate & Quota Requirements', started: step1Started, completed: step1Completed, dropOff: Math.max(step1Started - step1Completed, 0) },
-    { name: 'Step 2', fullName: 'Payroll & Stipend Structure', started: step1Completed, completed: step2Completed, dropOff: Math.max(step1Completed - step2Completed, 0) },
-    { name: 'Step 3', fullName: 'Contract & Compliance Setup', started: step2Completed, completed: step3Completed, dropOff: Math.max(step2Completed - step3Completed, 0) },
-    { name: 'Step 4', fullName: 'Document Verification & Submit', started: step3Completed, completed: step4Completed, dropOff: Math.max(step3Completed - step4Completed, 0) }
+    { name: 'Section 1', fullName: 'Requirements & Quota Scope', started: step1Started, completed: step1Completed, dropOff: Math.max(step1Started - step1Completed, 0) },
+    { name: 'Section 2', fullName: 'Mandatory Compliance Documents & Submit', started: step1Completed, completed: step2Completed, dropOff: Math.max(step1Completed - step2Completed, 0) }
   ];
 
   // Filter Submissions
@@ -226,7 +229,14 @@ export const AdminDashboard: React.FC = () => {
       sub.client_name?.toLowerCase().includes(searchQuery.toLowerCase()) ||
       sub.client_email?.toLowerCase().includes(searchQuery.toLowerCase());
 
-    const matchesStatus = statusFilter === 'all' || sub.status === statusFilter;
+    let matchesStatus = false;
+    if (statusFilter === 'all') {
+      matchesStatus = true;
+    } else if (statusFilter === 'pending_cn') {
+      matchesStatus = (sub.candidates || []).some(c => !c.contractCode || c.contractCode === 'CN Pending');
+    } else {
+      matchesStatus = sub.status === statusFilter;
+    }
     return matchesSearch && matchesStatus;
   });
 
@@ -427,7 +437,7 @@ export const AdminDashboard: React.FC = () => {
               </div>
 
               {/* Executive Grid Stat Row */}
-              <div className="grid grid-cols-1 sm:grid-cols-4 border border-zinc-200 rounded-3xl bg-white overflow-hidden shadow-sm divide-y sm:divide-y-0 sm:divide-x divide-zinc-200">
+              <div className="grid grid-cols-1 sm:grid-cols-5 border border-zinc-200 rounded-3xl bg-white overflow-hidden shadow-sm divide-y sm:divide-y-0 sm:divide-x divide-zinc-200">
                 <div className="p-6">
                   <span className="font-mono text-xs font-bold uppercase tracking-wider text-zinc-400 block mb-1">
                     CLIENT INTAKES
@@ -451,6 +461,28 @@ export const AdminDashboard: React.FC = () => {
                   </div>
                   <div className="text-xs text-zinc-500 font-medium mt-1">
                     {totalDbtDisbursed > 0 ? 'Monthly cycle settled' : 'No settlements logged yet'}
+                  </div>
+                </div>
+
+                <div 
+                  onClick={() => {
+                    setStatusFilter('pending_cn');
+                    setActiveTab('intakes');
+                  }}
+                  className="p-6 cursor-pointer hover:bg-amber-50/50 transition-colors"
+                  title="Click to view clients with pending CN allocations"
+                >
+                  <div className="flex items-center justify-between mb-1">
+                    <span className="font-mono text-xs font-bold uppercase tracking-wider text-amber-600 block">
+                      PENDING CN
+                    </span>
+                    <span className="w-2 h-2 rounded-full bg-amber-500 animate-pulse"></span>
+                  </div>
+                  <div className="text-4xl font-extrabold text-amber-600 tracking-tight">
+                    {pendingAllocatedCandidatesCount}
+                  </div>
+                  <div className="text-xs text-amber-700 font-medium mt-1">
+                    Candidates awaiting CN ↗
                   </div>
                 </div>
 
@@ -559,6 +591,7 @@ export const AdminDashboard: React.FC = () => {
                       className="text-xs px-3 py-2 rounded-full bg-zinc-50 border border-zinc-200 text-zinc-700 font-bold focus:outline-none focus:border-black"
                     >
                       <option value="all">All ({submissions.length})</option>
+                      <option value="pending_cn">Pending CN Allocation ({submissions.filter(s => (s.candidates || []).some(c => !c.contractCode || c.contractCode === 'CN Pending')).length})</option>
                       <option value="submitted">Submitted</option>
                       <option value="under_review">Under Review</option>
                       <option value="approved">Approved</option>
@@ -592,6 +625,14 @@ export const AdminDashboard: React.FC = () => {
                               <div className="text-[10px] text-zinc-400">
                                 {sub.company_name ? `${sub.client_name} · ${sub.client_email}` : sub.client_email}
                               </div>
+                              {(() => {
+                                const pCount = (sub.candidates || []).filter(c => !c.contractCode || c.contractCode === 'CN Pending').length;
+                                return pCount > 0 ? (
+                                  <span className="inline-flex items-center gap-1 mt-1 px-2 py-0.5 rounded-full text-[9px] font-bold bg-amber-100 text-amber-900 border border-amber-300">
+                                    {pCount} CN Pending Allocation
+                                  </span>
+                                ) : null;
+                              })()}
                             </td>
 
                             <td className="py-3.5 px-4">

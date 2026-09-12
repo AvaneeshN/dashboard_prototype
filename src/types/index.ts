@@ -61,9 +61,13 @@ export interface ApprenticeRecord {
   email?: string;
   phone?: string;
   aadhaarNumber?: string;
+  panNumber?: string;
+  aparId?: string;
   tradeOrRole: string;
   qualification: string;
   onboardingDate: string;
+  contractExpireDate?: string;
+  enrollmentScheme?: 'NAPS' | 'NATS' | 'Others';
   stipendAmount: number;
   dbtEligibleAmount: number;
   contractStatus: 'Generated' | 'Signed' | 'Pending Verification';
@@ -81,16 +85,31 @@ export interface ApprenticeRecord {
   documents?: {
     aadhaarDoc?: UploadedDocument;
     educationDoc?: UploadedDocument;
+    doc10th?: UploadedDocument;
+    doc12th?: UploadedDocument;
+    docGrad?: UploadedDocument;
     bankProofDoc?: UploadedDocument;
     resumeDoc?: UploadedDocument;
     photoDoc?: UploadedDocument;
     signatureDoc?: UploadedDocument;
+    // NATS specific candidate documents
+    panDoc?: UploadedDocument;
+    allSemesterDoc?: UploadedDocument;
+    casteCertDoc?: UploadedDocument;
+    aparIdDoc?: UploadedDocument;
     aadhaarFile?: string;
     educationFile?: string;
+    doc10thFile?: string;
+    doc12thFile?: string;
+    docGradFile?: string;
     bankProofFile?: string;
     resumeFile?: string;
     photoFile?: string;
     signatureFile?: string;
+    panFile?: string;
+    allSemesterFile?: string;
+    casteCertFile?: string;
+    aparIdFile?: string;
   };
 }
 
@@ -220,6 +239,60 @@ export interface ClientApprenticeMetrics {
   invoices?: ComplianceInvoiceRecord[];
   actionItems?: ComplianceActionItem[];
   stipendPayments?: StipendPaymentRecord[];
+  establishmentDetails?: NAPSEstablishmentDetails;
+  natsEstablishmentDetails?: NATSEstablishmentDetails;
+}
+
+export interface NAPSEstablishmentDetails {
+  establishmentName: string;
+  establishmentType: string;
+  pan: string;
+  address: string;
+  contactPerson: string;
+  contactPhone: string;
+  contactEmail: string;
+  gstin: string;
+  headOfEstablishment: string;
+  designation: string;
+  workingDays: string;
+  operatingStatesCount: number;
+  bankName: string;
+  beneficiaryName: string;
+  accountNumber: string;
+  ifscCode: string;
+  documents?: {
+    panDoc?: UploadedDocument;
+    gstDoc?: UploadedDocument;
+    chequeDoc?: UploadedDocument;
+    signatoryDoc?: UploadedDocument;
+  };
+}
+
+export interface StructuredTrainingModuleConfig {
+  learningObjectives?: string;
+  trainingDuration?: string;
+  departmentWiseExposure?: string;
+  skillsToBeDeveloped?: string;
+  monthlyTrainingBreakup?: string;
+  supervisorOrOfficerDetails?: string;
+  moduleDocument?: UploadedDocument;
+}
+
+export interface NATSEstablishmentDetails {
+  nameAndDesignation: string;
+  mobileNumber: string;
+  officialEmailId: string;
+  documents?: {
+    panDoc?: UploadedDocument;
+    tanDoc?: UploadedDocument;
+    gstDoc?: UploadedDocument;
+    itrDoc?: UploadedDocument;
+    coiDoc?: UploadedDocument;
+    epfoEsicDoc?: UploadedDocument;
+    chequeDoc?: UploadedDocument;
+    trainingModuleDoc?: UploadedDocument;
+  };
+  structuredTrainingModule?: StructuredTrainingModuleConfig;
 }
 
 export interface UserProfile {
@@ -276,6 +349,7 @@ export interface IntakeFormData {
   specialRequirements?: string;
   proposedJoiningDate?: string;
   trainingLocations?: string;
+  operationalStates?: string;
 
   // Step 3: Contract & Compliance Details
   contractTemplateType?: string;
@@ -324,6 +398,8 @@ export interface FormSubmission {
   naps_portal_id?: string;
   sanctioned_quota?: number;
   dbt_allocation_not_utilized?: number;
+  establishment_details?: NAPSEstablishmentDetails;
+  nats_establishment_details?: NATSEstablishmentDetails;
 }
 
 export interface FunnelEvent {

@@ -101,6 +101,10 @@ interface AuthState {
 
   // Action Items (Both client and admin can add)
   addActionItem: (submissionId: string, item: Omit<ComplianceActionItem, 'id'>) => Promise<ComplianceActionItem>;
+
+  // Invoices (Company / Admin generates and manages invoices for client)
+  addInvoice: (submissionId: string, invoice: Omit<ComplianceInvoiceRecord, 'id'>) => Promise<ComplianceInvoiceRecord>;
+  deleteInvoice: (submissionId: string, invoiceId: string) => Promise<void>;
 }
 
 const StoreContext = createContext<AuthState | null>(null);
@@ -146,8 +150,8 @@ export const StoreProvider: React.FC<{ children: React.ReactNode }> = ({ childre
           company_name: 'Platform Organization',
           assigned_company_spoc: updated,
           status: 'approved',
-          current_step: 4,
-          total_steps: 4,
+          current_step: 2,
+          total_steps: 2,
           completion_percentage: 100,
           time_spent_seconds: 0,
           responses: {},
@@ -194,8 +198,8 @@ export const StoreProvider: React.FC<{ children: React.ReactNode }> = ({ childre
           client_email: 'admin@platform.com',
           company_name: 'Platform Settings',
           status: 'approved',
-          current_step: 4,
-          total_steps: 4,
+          current_step: 2,
+          total_steps: 2,
           completion_percentage: 100,
           time_spent_seconds: 0,
           responses: { requiredDocuments: docs as any },
@@ -687,10 +691,8 @@ export const StoreProvider: React.FC<{ children: React.ReactNode }> = ({ childre
   const recalculateUserMetrics = (userProfile: UserProfile, candidates: ApprenticeRecord[], totalQuota: number, dbtOptIn: boolean = true): ClientApprenticeMetrics => {
     const activeCount = candidates.filter(c => c.status === 'Active' || c.status === 'Under Training').length;
     const remaining = Math.max(totalQuota - activeCount, 0);
-    const dbtRate = dbtOptIn ? 4500 : 0;
-    
-    const grossDisbursed = candidates.reduce((sum, c) => sum + (c.stipendAmount || 18000), 0);
-    const dbtTotal = candidates.reduce((sum, c) => sum + (c.dbtEligibleAmount || dbtRate), 0);
+    const grossDisbursed = candidates.reduce((sum, c) => sum + (c.stipendAmount || 0), 0);
+    const dbtTotal = candidates.reduce((sum, c) => sum + (c.dbtEligibleAmount || 0), 0);
     const companyTotal = Math.max(grossDisbursed - dbtTotal, 0);
 
     const signedCount = candidates.filter(c => c.contractStatus === 'Signed').length;
@@ -770,7 +772,7 @@ export const StoreProvider: React.FC<{ children: React.ReactNode }> = ({ childre
     };
 
     const newStatus: SubmissionStatus = isFinalSubmit ? 'submitted' : 'in_progress';
-    const completionPercentage = isFinalSubmit ? 100 : Math.round((step / 4) * 100);
+    const completionPercentage = isFinalSubmit ? 100 : Math.round((step / 2) * 100);
 
     const quotaRequired = mergedResponses.requiredApprenticeCount || 15;
     const candidateList: ApprenticeRecord[] = existing?.candidates || [];
@@ -783,7 +785,7 @@ export const StoreProvider: React.FC<{ children: React.ReactNode }> = ({ childre
       company_name: mergedResponses.companyName || user?.company_name || '',
       status: newStatus,
       current_step: step,
-      total_steps: 4,
+      total_steps: 2,
       completion_percentage: completionPercentage,
       time_spent_seconds: currentTotalTime,
       started_at: existing?.started_at || new Date().toISOString(),
@@ -837,7 +839,7 @@ export const StoreProvider: React.FC<{ children: React.ReactNode }> = ({ childre
         assigned_company_spoc: updatedSpoc,
         status: 'draft',
         current_step: 1,
-        total_steps: 4,
+        total_steps: 2,
         completion_percentage: 0,
         time_spent_seconds: 0,
         responses: {},
@@ -1048,7 +1050,7 @@ export const StoreProvider: React.FC<{ children: React.ReactNode }> = ({ childre
   const processMonthlyPayrollBatch = async (payoutDate: string = new Date().toISOString().split('T')[0]): Promise<{ totalDisbursed: number; count: number }> => {
     const candidates = user?.apprenticeMetrics?.lastMonthOnboardedList || [];
     const totalDisbursed = candidates.reduce((acc, c) => acc + (c.stipendAmount || 18500), 0);
-    const dbtTotal = candidates.reduce((acc, c) => acc + (c.dbtEligibleAmount || 4500), 0);
+    const dbtTotal = candidates.reduce((acc, c) => acc + (c.dbtEligibleAmount || 0), 0);
 
     if (user && user.apprenticeMetrics) {
       const updatedMetrics: ClientApprenticeMetrics = {
@@ -1154,8 +1156,8 @@ export const StoreProvider: React.FC<{ children: React.ReactNode }> = ({ childre
       company_name: responses.companyName || user?.company_name || '',
       status: 'abandoned',
       current_step: step,
-      total_steps: 4,
-      completion_percentage: Math.round((step / 4) * 100),
+      total_steps: 2,
+      completion_percentage: Math.round((step / 2) * 100),
       time_spent_seconds: (existing?.time_spent_seconds || 0) + 5,
       started_at: existing?.started_at || new Date().toISOString(),
       last_active_at: new Date().toISOString(),
@@ -1429,6 +1431,72 @@ export const StoreProvider: React.FC<{ children: React.ReactNode }> = ({ childre
     return newItem;
   };
 
+  const addInvoice = async (
+    submissionId: string,
+    invoiceData: Omit<ComplianceInvoiceRecord, 'id'>
+  ): Promise<ComplianceInvoiceRecord> => {
+    const targetSub = submissions.find(s => s.id === submissionId);
+    if (!targetSub) throw new Error('Client submission record not found.');
+
+    const newInvoice: ComplianceInvoiceRecord = {
+      ...invoiceData,
+      id: 'inv-' + Date.now() + '-' + Math.random().toString(36).substring(2, 6)
+    };
+
+    const existingInvoices = targetSub.invoices || [];
+    const updatedInvoices = [newInvoice, ...existingInvoices];
+
+    const updatedSub: FormSubmission = {
+      ...targetSub,
+      invoices: updatedInvoices,
+      last_active_at: new Date().toISOString()
+    };
+
+    const updatedSubmissions = submissions.map(s => s.id === submissionId ? updatedSub : s);
+    setSubmissions(updatedSubmissions);
+
+    if (user && (user.id === targetSub.client_id || user.email.toLowerCase() === targetSub.client_email.toLowerCase())) {
+      const updatedMetrics: ClientApprenticeMetrics = {
+        ...(user.apprenticeMetrics || {} as any),
+        invoices: updatedInvoices
+      };
+      setUser({ ...user, apprenticeMetrics: updatedMetrics });
+    }
+
+    await persistSubmissionToSupabase(updatedSub);
+    return newInvoice;
+  };
+
+  const deleteInvoice = async (
+    submissionId: string,
+    invoiceId: string
+  ): Promise<void> => {
+    const targetSub = submissions.find(s => s.id === submissionId);
+    if (!targetSub) return;
+
+    const existingInvoices = targetSub.invoices || [];
+    const updatedInvoices = existingInvoices.filter(i => i.id !== invoiceId);
+
+    const updatedSub: FormSubmission = {
+      ...targetSub,
+      invoices: updatedInvoices,
+      last_active_at: new Date().toISOString()
+    };
+
+    const updatedSubmissions = submissions.map(s => s.id === submissionId ? updatedSub : s);
+    setSubmissions(updatedSubmissions);
+
+    if (user && (user.id === targetSub.client_id || user.email.toLowerCase() === targetSub.client_email.toLowerCase())) {
+      const updatedMetrics: ClientApprenticeMetrics = {
+        ...(user.apprenticeMetrics || {} as any),
+        invoices: updatedInvoices
+      };
+      setUser({ ...user, apprenticeMetrics: updatedMetrics });
+    }
+
+    await persistSubmissionToSupabase(updatedSub);
+  };
+
   const syncDataToSupabase = async (): Promise<{ success: boolean; message: string }> => {
     if (!isSupabaseConfigured()) {
       return {
@@ -1541,7 +1609,9 @@ export const StoreProvider: React.FC<{ children: React.ReactNode }> = ({ childre
         updateClientComplianceReport,
         addStipendPayment,
         updateStipendPayment,
-        addActionItem
+        addActionItem,
+        addInvoice,
+        deleteInvoice
       }}
     >
       {children}

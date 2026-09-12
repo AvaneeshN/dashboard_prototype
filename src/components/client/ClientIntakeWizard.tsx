@@ -34,99 +34,6 @@ import {
 import { motion, AnimatePresence } from 'framer-motion';
 import { processUploadedFile } from '@/lib/document-utils';
 
-interface RoleCategory {
-  category: string;
-  roles: string[];
-}
-
-const ROLE_CATALOG: RoleCategory[] = [
-  {
-    category: 'Technology & Engineering',
-    roles: [
-      'Full-Stack Developer Trainee',
-      'Frontend Engineer Trainee',
-      'Backend & API Developer Trainee',
-      'Cloud & DevOps Associate',
-      'Cybersecurity Analyst Trainee',
-      'Data Engineer Trainee',
-      'Machine Learning & AI Trainee',
-      'QA & Automation Tester Trainee',
-      'Mobile App Developer (iOS/Android)',
-      'Systems Administrator Trainee'
-    ]
-  },
-  {
-    category: 'Management & Operations',
-    roles: [
-      'Business Operations Associate',
-      'Associate Product Manager Trainee',
-      'Project Management Coordinator',
-      'Scrum & Agile Coordinator Trainee',
-      'Supply Chain & Logistics Trainee',
-      'Business Analyst Trainee',
-      'Operations & Process Associate',
-      'Executive Office Coordinator'
-    ]
-  },
-  {
-    category: 'Product, Design & Creative',
-    roles: [
-      'UI/UX Product Design Trainee',
-      'Visual & Graphic Design Associate',
-      'Motion Graphics & Video Editor',
-      'Technical & Product Writer',
-      '3D & Spatial Design Trainee'
-    ]
-  },
-  {
-    category: 'Finance, Accounts & Legal',
-    roles: [
-      'Financial Analyst Trainee',
-      'Junior Accountant & Bookkeeper',
-      'Legal Compliance & Audit Trainee',
-      'Tax & Payroll Analyst Trainee',
-      'Risk & Audit Associate'
-    ]
-  },
-  {
-    category: 'Sales, Marketing & Growth',
-    roles: [
-      'Digital Marketing & SEO Trainee',
-      'Growth Marketing Associate',
-      'B2B Sales & Lead Gen Trainee',
-      'Social Media & Community Trainee',
-      'Brand & Communications Associate'
-    ]
-  },
-  {
-    category: 'Human Resources & Talent',
-    roles: [
-      'HR Generalist Trainee',
-      'Technical Talent Acquisition Associate',
-      'Employee Engagement & Training Trainee',
-      'HR Operations & People Analytics'
-    ]
-  },
-  {
-    category: 'Manufacturing & Industrial',
-    roles: [
-      'Industrial Automation Trainee',
-      'Electrical & Electronics Trainee',
-      'Mechanical Quality Control Trainee',
-      'CNC Machine Operator Trainee',
-      'Plant Safety & Maintenance Trainee'
-    ]
-  },
-  {
-    category: 'Customer Success & Support',
-    roles: [
-      'Customer Success Specialist Trainee',
-      'Technical Support Engineer Trainee',
-      'Client Relationship Coordinator'
-    ]
-  }
-];
-
 const INITIAL_FORM_STATE: IntakeFormData = {
   companyName: '',
   contactName: '',
@@ -134,11 +41,7 @@ const INITIAL_FORM_STATE: IntakeFormData = {
   contactPhone: '',
   industry: 'Technology & Digital Services',
   requiredApprenticeCount: 15,
-  tradesRequired: ['Full-Stack Developer Trainee', 'Business Operations Associate'],
-  stipendPerApprentice: 18500,
-  dbtSchemeOptIn: true,
-  proposedJoiningDate: '2026-10-01',
-  trainingLocations: 'Hybrid / On-Premise',
+  tradesRequired: [],
   contractTemplateType: 'Standard National Apprenticeship Contract v3',
   complianceOfficerName: '',
   complianceOfficerEmail: '',
@@ -163,12 +66,6 @@ export const ClientIntakeWizard: React.FC = () => {
   const saveTimerRef = React.useRef<NodeJS.Timeout | null>(null);
   const [validationErrors, setValidationErrors] = useState<{ field: string; sectionNumber: number; sectionName: string }[]>([]);
 
-  // Role Search & Custom Role State
-  const [roleSearchQuery, setRoleSearchQuery] = useState('');
-  const [selectedCategory, setSelectedCategory] = useState<string>('All');
-  const [customRoleInput, setCustomRoleInput] = useState('');
-  const [showRoleSelectorModal, setShowRoleSelectorModal] = useState(false);
-
   // Initialize from active submission or current user ONCE on mount
   useEffect(() => {
     if (isInitializedRef.current) return;
@@ -178,7 +75,7 @@ export const ClientIntakeWizard: React.FC = () => {
       if (existing.status === 'submitted' || existing.status === 'approved' || existing.status === 'under_review') {
         setIsSubmitted(true);
       }
-      setCurrentSection(existing.current_step || 1);
+      setCurrentSection(existing.current_step && existing.current_step <= 2 ? existing.current_step : 1);
       setFormData(prev => ({
         ...prev,
         ...existing.responses,
@@ -205,7 +102,7 @@ export const ClientIntakeWizard: React.FC = () => {
   // Record abandonment on unload
   useEffect(() => {
     const handleBeforeUnload = () => {
-      if (!isSubmitted && currentSection < 4) {
+      if (!isSubmitted && currentSection < 2) {
         recordAbandonment(currentSection, formData);
       }
     };
@@ -236,58 +133,6 @@ export const ClientIntakeWizard: React.FC = () => {
     setValidationErrors(prev => prev.filter(e => e.field.toLowerCase() !== (field as string).toLowerCase()));
   };
 
-  // Toggle or add role
-  const toggleRole = (role: string) => {
-    const current = formData.tradesRequired || [];
-    const updated = current.includes(role)
-      ? current.filter((r: string) => r !== role)
-      : [...current, role];
-    updateField('tradesRequired', updated);
-  };
-
-  const removeRole = (roleToRemove: string) => {
-    const current = formData.tradesRequired || [];
-    updateField('tradesRequired', current.filter(r => r !== roleToRemove));
-  };
-
-  const handleAddCustomRole = (e?: React.FormEvent) => {
-    if (e) e.preventDefault();
-    const cleanRole = customRoleInput.trim();
-    if (!cleanRole) return;
-
-    const current = formData.tradesRequired || [];
-    if (!current.includes(cleanRole)) {
-      updateField('tradesRequired', [...current, cleanRole]);
-    }
-    setCustomRoleInput('');
-  };
-
-  // Filtered Roles List
-  const filteredRoleCategories = useMemo(() => {
-    const query = roleSearchQuery.toLowerCase().trim();
-
-    return ROLE_CATALOG.map(cat => {
-      if (selectedCategory !== 'All' && cat.category !== selectedCategory) {
-        return null;
-      }
-
-      const matchingRoles = cat.roles.filter(role => 
-        !query || role.toLowerCase().includes(query)
-      );
-
-      if (matchingRoles.length === 0) return null;
-
-      return {
-        category: cat.category,
-        roles: matchingRoles
-      };
-    }).filter(Boolean) as RoleCategory[];
-  }, [roleSearchQuery, selectedCategory]);
-
-  const allFilteredRolesCount = useMemo(() => {
-    return filteredRoleCategories.reduce((acc, cat) => acc + cat.roles.length, 0);
-  }, [filteredRoleCategories]);
-
   const handleFileUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
     if (e.target.files && e.target.files[0]) {
       const file = e.target.files[0];
@@ -296,11 +141,11 @@ export const ClientIntakeWizard: React.FC = () => {
     }
   };
 
-  // Validate Mandatory Fields across sections
+  // Validate Mandatory Fields across the 2 sections
   const validateMandatoryFields = (data: IntakeFormData, maxSectionToCheck?: number) => {
     const errors: { field: string; sectionNumber: number; sectionName: string }[] = [];
 
-    // Section 1 Mandatory Fields
+    // Section 1 Mandatory Fields: Requirements & Quota
     if (!data.companyName?.trim()) {
       errors.push({ field: 'Company Legal Name', sectionNumber: 1, sectionName: 'Requirements & Quota' });
     }
@@ -316,37 +161,11 @@ export const ClientIntakeWizard: React.FC = () => {
     if (!data.requiredApprenticeCount || Number(data.requiredApprenticeCount) < 1) {
       errors.push({ field: 'Total Apprentice Quota Required', sectionNumber: 1, sectionName: 'Requirements & Quota' });
     }
-    if (!data.tradesRequired || data.tradesRequired.length === 0) {
-      errors.push({ field: 'Apprentice Roles / Specializations (select at least 1)', sectionNumber: 1, sectionName: 'Requirements & Quota' });
-    }
 
-    // Section 2 Mandatory Fields
+    // Section 2 Mandatory Fields: Document Verification & Submit
     if (!maxSectionToCheck || maxSectionToCheck >= 2) {
-      if (!data.stipendPerApprentice || Number(data.stipendPerApprentice) < 1000) {
-        errors.push({ field: 'Monthly Stipend per Apprentice', sectionNumber: 2, sectionName: 'Payroll & Stipends' });
-      }
-      if (!data.trainingLocations?.trim()) {
-        errors.push({ field: 'Primary Training Locations', sectionNumber: 2, sectionName: 'Payroll & Stipends' });
-      }
-      if (!data.proposedJoiningDate?.trim()) {
-        errors.push({ field: 'Proposed Start Date', sectionNumber: 2, sectionName: 'Payroll & Stipends' });
-      }
-    }
-
-    // Section 3 Mandatory Fields
-    if (!maxSectionToCheck || maxSectionToCheck >= 3) {
-      if (!data.complianceOfficerName?.trim()) {
-        errors.push({ field: 'Authorized SPOC / Compliance Officer Name', sectionNumber: 3, sectionName: 'Contract & Compliance' });
-      }
-      if (!data.complianceOfficerEmail?.trim()) {
-        errors.push({ field: 'SPOC / Compliance Officer Email', sectionNumber: 3, sectionName: 'Contract & Compliance' });
-      }
-    }
-
-    // Section 4 Mandatory Fields
-    if (!maxSectionToCheck || maxSectionToCheck >= 4) {
       if (!data.gstinNumber?.trim()) {
-        errors.push({ field: 'Company GSTIN Number', sectionNumber: 4, sectionName: 'Verification & Submit' });
+        errors.push({ field: 'Company GSTIN Number', sectionNumber: 2, sectionName: 'Verification & Submit' });
       }
 
       // Dynamic validation for all configured mandatory compliance documents
@@ -359,13 +178,13 @@ export const ClientIntakeWizard: React.FC = () => {
             (docReq.id === 'signatory' && (data.companyDocs?.signatoryDoc || data.companyDocs?.signatoryLetterFileName));
 
           if (!uploaded) {
-            errors.push({ field: `${docReq.name} (Mandatory Document)`, sectionNumber: 4, sectionName: 'Verification & Submit' });
+            errors.push({ field: `${docReq.name} (Mandatory Document)`, sectionNumber: 2, sectionName: 'Verification & Submit' });
           }
         }
       });
 
       if (!data.agreedToTerms) {
-        errors.push({ field: 'Acceptance of Regulatory Declarations & Terms', sectionNumber: 4, sectionName: 'Verification & Submit' });
+        errors.push({ field: 'Acceptance of Regulatory Declarations & Terms', sectionNumber: 2, sectionName: 'Verification & Submit' });
       }
     }
 
@@ -381,7 +200,7 @@ export const ClientIntakeWizard: React.FC = () => {
     }
 
     setValidationErrors([]);
-    if (currentSection < 4) {
+    if (currentSection < 2) {
       const next = currentSection + 1;
       setCurrentSection(next);
       await saveSubmissionStep(formData, next, false);
@@ -399,7 +218,7 @@ export const ClientIntakeWizard: React.FC = () => {
 
   const handleFinalSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    const errors = validateMandatoryFields(formData, 4);
+    const errors = validateMandatoryFields(formData, 2);
     if (errors.length > 0) {
       setValidationErrors(errors);
       setCurrentSection(errors[0].sectionNumber);
@@ -409,16 +228,14 @@ export const ClientIntakeWizard: React.FC = () => {
 
     setValidationErrors([]);
     setIsSaving(true);
-    await saveSubmissionStep(formData, 4, true);
+    await saveSubmissionStep(formData, 2, true);
     setIsSaving(false);
     setIsSubmitted(true);
   };
 
   const sections = [
-    { number: 1, title: 'Requirements & Quota', desc: 'Company, candidates & roles' },
-    { number: 2, title: 'Payroll & Stipends', desc: 'Stipend rates & DBT subsidy' },
-    { number: 3, title: 'Contract & Compliance', desc: 'Legal template & officers' },
-    { number: 4, title: 'Verification & Submit', desc: 'Document upload & dispatch' }
+    { number: 1, title: 'Requirements & Quota', desc: 'Company details & headcount' },
+    { number: 2, title: 'Verification & Submit', desc: 'Compliance documents & GSTIN' }
   ];
 
   if (isSubmitted) {
@@ -486,11 +303,11 @@ export const ClientIntakeWizard: React.FC = () => {
           <div className="flex items-center gap-2 mb-1">
             <span className="text-base leading-none">✦</span>
             <span className="font-mono text-xs font-bold uppercase tracking-wider text-zinc-500">
-              Onboarding Wizard
+              Client Onboarding Form
             </span>
           </div>
           <h2 className="text-xl sm:text-2xl font-extrabold text-zinc-900">
-            Candidate Intake & Quota Application
+            Client Onboarding & Quota Registration
           </h2>
         </div>
 
@@ -502,7 +319,7 @@ export const ClientIntakeWizard: React.FC = () => {
 
       {/* Section Progress Bar */}
       <div className="mb-6 space-y-2">
-        <div className="grid grid-cols-4 gap-2">
+        <div className="grid grid-cols-2 gap-2">
           {sections.map((sec) => {
             const isCompleted = currentSection > sec.number;
             const isCurrent = currentSection === sec.number;
@@ -533,8 +350,8 @@ export const ClientIntakeWizard: React.FC = () => {
         <div className="w-full h-1 bg-zinc-200 rounded-full overflow-hidden">
           <motion.div
             className="h-full bg-black rounded-full"
-            initial={{ width: '25%' }}
-            animate={{ width: `${(currentSection / 4) * 100}%` }}
+            initial={{ width: '50%' }}
+            animate={{ width: `${(currentSection / 2) * 100}%` }}
             transition={{ duration: 0.2 }}
           />
         </div>
@@ -574,15 +391,15 @@ export const ClientIntakeWizard: React.FC = () => {
             transition={{ duration: 0.2 }}
             className="space-y-6"
           >
-            {/* SECTION 1: Candidate Requirements & Quota */}
+            {/* SECTION 1: Requirements & Quota */}
             {currentSection === 1 && (
               <div className="space-y-5">
                 <div className="border-b border-zinc-100 pb-3">
                   <h3 className="text-xs font-extrabold uppercase tracking-wider text-zinc-900 font-mono">
-                    SECTION 01: CANDIDATE REQUIREMENTS & QUOTA SCOPE
+                    SECTION 01: REQUIREMENTS & QUOTA SCOPE
                   </h3>
                   <p className="text-xs text-zinc-500 mt-1 font-medium">
-                    Define your company details, target apprentice roles, and candidate headcount.
+                    Define your organization details and apprentice quota headcount.
                   </p>
                 </div>
 
@@ -590,7 +407,7 @@ export const ClientIntakeWizard: React.FC = () => {
                   {/* Company Name Field */}
                   <div className="sm:col-span-2">
                     <label className="block text-xs font-bold text-zinc-700 mb-1">
-                      Company / Organization Name *
+                      Organization / Company Name / Legal Entity Name *
                     </label>
                     <div className="relative">
                       <Building className="w-4 h-4 text-zinc-400 absolute left-3.5 top-1/2 -translate-y-1/2" />
@@ -599,7 +416,7 @@ export const ClientIntakeWizard: React.FC = () => {
                         required
                         value={formData.companyName}
                         onChange={(e) => updateField('companyName', e.target.value)}
-                        placeholder="e.g. Acme Innovations Pvt Ltd"
+                        placeholder="e.g. Acme Innovations Pvt Ltd / Legal Entity"
                         className="w-full pl-10 pr-3 py-2.5 rounded-2xl bg-zinc-50 border border-zinc-200 text-zinc-900 text-xs placeholder-zinc-400 focus:outline-none focus:border-black focus:bg-white font-medium"
                       />
                     </div>
@@ -663,342 +480,37 @@ export const ClientIntakeWizard: React.FC = () => {
                       className="w-full px-3.5 py-2.5 rounded-2xl bg-zinc-50 border border-zinc-200 text-zinc-900 text-xs focus:outline-none focus:border-black focus:bg-white font-bold"
                     />
                   </div>
-                </div>
 
-                {/* Comprehensive Role Selector with Search, Categories & Custom Role Adder */}
-                <div className="pt-2 border-t border-zinc-100">
-                  <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 mb-3">
-                    <div>
-                      <label className="text-xs font-bold text-zinc-900 block">
-                        Select Apprentice Roles / Specializations *
+                  {/* Operational States Field */}
+                  <div className="sm:col-span-2">
+                    <div className="flex items-center justify-between mb-1">
+                      <label className="block text-xs font-bold text-zinc-700">
+                        Operational States *
                       </label>
-                      <p className="text-[11px] text-zinc-500">
-                        Search across Tech, Management, Design, Finance, HR, or add your own custom roles.
-                      </p>
+                      <span className="text-[10px] text-zinc-400 font-mono">States where your organization operates</span>
                     </div>
-
-                    <span className="text-[11px] font-mono font-bold px-2.5 py-0.5 rounded-full bg-zinc-100 text-zinc-700 border border-zinc-200 self-start sm:self-auto">
-                      {(formData.tradesRequired || []).length} Selected
-                    </span>
-                  </div>
-
-                  {/* Selected Roles Chips Tray */}
-                  {(formData.tradesRequired || []).length > 0 && (
-                    <div className="p-3.5 rounded-2xl bg-zinc-50 border border-zinc-200 mb-3.5">
-                      <div className="text-[10px] uppercase font-mono font-bold text-zinc-400 mb-2">
-                        Currently Selected:
-                      </div>
-                      <div className="flex flex-wrap gap-1.5">
-                        {(formData.tradesRequired || []).map((role) => (
-                          <span
-                            key={role}
-                            className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-black text-white text-xs font-semibold shadow-xs"
-                          >
-                            <span>{role}</span>
-                            <button
-                              type="button"
-                              onClick={() => removeRole(role)}
-                              className="w-3.5 h-3.5 rounded-full hover:bg-zinc-800 flex items-center justify-center cursor-pointer transition-colors"
-                            >
-                              <X className="w-2.5 h-2.5 stroke-[3]" />
-                            </button>
-                          </span>
-                        ))}
-                      </div>
-                    </div>
-                  )}
-
-                  {/* Role Search & Category Filter */}
-                  <div className="space-y-2.5 mb-3.5">
-                    <div className="relative">
-                      <Search className="w-3.5 h-3.5 text-zinc-400 absolute left-3.5 top-1/2 -translate-y-1/2" />
-                      <input
-                        type="text"
-                        placeholder="Search roles (e.g. Developer, Operations, Product, Analyst, Designer)..."
-                        value={roleSearchQuery}
-                        onChange={(e) => setRoleSearchQuery(e.target.value)}
-                        className="w-full pl-9 pr-8 py-2.5 rounded-2xl bg-zinc-50 border border-zinc-200 text-zinc-900 text-xs placeholder-zinc-400 focus:outline-none focus:border-black focus:bg-white font-medium"
-                      />
-                      {roleSearchQuery && (
-                        <button
-                          type="button"
-                          onClick={() => setRoleSearchQuery('')}
-                          className="absolute right-3 top-1/2 -translate-y-1/2 text-zinc-400 hover:text-black cursor-pointer"
-                        >
-                          <X className="w-3.5 h-3.5" />
-                        </button>
-                      )}
-                    </div>
-
-                    {/* Category Filter Pills */}
-                    <div className="flex items-center gap-1.5 overflow-x-auto pb-1">
-                      {['All', 'Technology & Engineering', 'Management & Operations', 'Product, Design & Creative', 'Finance, Accounts & Legal', 'Sales, Marketing & Growth', 'Human Resources & Talent', 'Manufacturing & Industrial', 'Customer Success & Support'].map((cat) => (
-                        <button
-                          type="button"
-                          key={cat}
-                          onClick={() => setSelectedCategory(cat)}
-                          className={`px-3 py-1 rounded-full text-[11px] font-semibold whitespace-nowrap transition-all cursor-pointer ${
-                            selectedCategory === cat
-                              ? 'bg-black text-white shadow-xs'
-                              : 'bg-zinc-100 text-zinc-600 hover:bg-zinc-200'
-                          }`}
-                        >
-                          {cat.split(' & ')[0]}
-                        </button>
-                      ))}
-                    </div>
-                  </div>
-
-                  {/* Categorized Role Grid List */}
-                  <div className="max-h-64 overflow-y-auto pr-1 space-y-4 rounded-2xl border border-zinc-200 p-3.5 bg-zinc-50/50">
-                    {filteredRoleCategories.length > 0 ? (
-                      filteredRoleCategories.map((group) => (
-                        <div key={group.category} className="space-y-1.5">
-                          <div className="text-[10px] font-mono font-bold uppercase tracking-wider text-zinc-400 px-1">
-                            {group.category}
-                          </div>
-                          <div className="grid grid-cols-1 sm:grid-cols-2 gap-1.5">
-                            {group.roles.map((role) => {
-                              const isSelected = (formData.tradesRequired || []).includes(role);
-                              return (
-                                <button
-                                  type="button"
-                                  key={role}
-                                  onClick={() => toggleRole(role)}
-                                  className={`px-3 py-2 rounded-xl text-left text-xs font-semibold flex items-center justify-between transition-all cursor-pointer ${
-                                    isSelected
-                                      ? 'bg-black text-white border border-black shadow-xs'
-                                      : 'bg-white border border-zinc-200 text-zinc-800 hover:border-zinc-300'
-                                  }`}
-                                >
-                                  <span className="truncate pr-2">{role}</span>
-                                  <div className={`w-4 h-4 rounded-full border shrink-0 flex items-center justify-center ${
-                                    isSelected ? 'bg-white border-white text-black' : 'border-zinc-300'
-                                  }`}>
-                                    {isSelected && <Check className="w-3 h-3 stroke-[3]" />}
-                                  </div>
-                                </button>
-                              );
-                            })}
-                          </div>
-                        </div>
-                      ))
-                    ) : (
-                      <div className="py-6 text-center text-zinc-500 text-xs">
-                        <p>No predefined roles found for &quot;{roleSearchQuery}&quot;.</p>
-                        {roleSearchQuery.trim() && (
-                          <button
-                            type="button"
-                            onClick={() => {
-                              const clean = roleSearchQuery.trim();
-                              if (clean && !(formData.tradesRequired || []).includes(clean)) {
-                                updateField('tradesRequired', [...(formData.tradesRequired || []), clean]);
-                                setRoleSearchQuery('');
-                              }
-                            }}
-                            className="mt-2.5 px-4 py-1.5 rounded-full bg-black text-white font-bold text-xs hover:bg-zinc-800 inline-flex items-center gap-1 cursor-pointer"
-                          >
-                            <span>Add &quot;{roleSearchQuery}&quot; as custom role</span>
-                            <Plus className="w-3.5 h-3.5" />
-                          </button>
-                        )}
-                      </div>
-                    )}
-                  </div>
-
-                  {/* "Others" Custom Role Form Adder */}
-                  <div className="mt-3.5 pt-3 border-t border-zinc-100 flex items-center gap-2">
-                    <div className="relative flex-1">
-                      <input
-                        type="text"
-                        placeholder="Can't find your role? Type custom role here (e.g. AI Prompt Specialist)..."
-                        value={customRoleInput}
-                        onChange={(e) => setCustomRoleInput(e.target.value)}
-                        onKeyDown={(e) => {
-                          if (e.key === 'Enter') {
-                            e.preventDefault();
-                            handleAddCustomRole();
-                          }
-                        }}
-                        className="w-full px-3.5 py-2 rounded-2xl bg-zinc-50 border border-zinc-200 text-zinc-900 text-xs placeholder-zinc-400 focus:outline-none focus:border-black focus:bg-white font-medium"
-                      />
-                    </div>
-                    <button
-                      type="button"
-                      onClick={handleAddCustomRole}
-                      disabled={!customRoleInput.trim()}
-                      className="px-4 py-2 rounded-full bg-black text-white text-xs font-bold hover:bg-zinc-800 disabled:opacity-40 transition-all cursor-pointer flex items-center gap-1 shrink-0"
-                    >
-                      <Plus className="w-3.5 h-3.5" />
-                      <span>Add Role</span>
-                    </button>
-                  </div>
-
-                </div>
-              </div>
-            )}
-
-            {/* SECTION 2: Payroll & Stipend Configuration */}
-            {currentSection === 2 && (
-              <div className="space-y-4">
-                <div className="border-b border-zinc-100 pb-3">
-                  <h3 className="text-xs font-extrabold uppercase tracking-wider text-zinc-900 font-mono">
-                    SECTION 02: PAYROLL, STIPEND & DBT STRUCTURE
-                  </h3>
-                  <p className="text-xs text-zinc-500 mt-1 font-medium">
-                    Configure monthly stipend amounts, DBT government subsidy, and locations.
-                  </p>
-                </div>
-
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                  <div>
-                    <label className="block text-xs font-bold text-zinc-700 mb-1">
-                      Monthly Stipend Rate per Apprentice (₹) *
-                    </label>
-                    <input
-                      type="number"
-                      step={500}
-                      value={formData.stipendPerApprentice ?? ''}
-                      onChange={(e) => {
-                        const val = e.target.value === '' ? '' : parseInt(e.target.value, 10) || 0;
-                        updateField('stipendPerApprentice', val);
-                      }}
-                      className="w-full px-3.5 py-2.5 rounded-2xl bg-zinc-50 border border-zinc-200 text-zinc-900 text-xs focus:outline-none focus:border-black focus:bg-white font-bold"
-                    />
-                  </div>
-
-                  <div>
-                    <label className="block text-xs font-bold text-zinc-700 mb-1">
-                      Target Joining Date *
-                    </label>
-                    <input
-                      type="date"
-                      required
-                      value={formData.proposedJoiningDate}
-                      onChange={(e) => updateField('proposedJoiningDate', e.target.value)}
-                      className="w-full px-3.5 py-2.5 rounded-2xl bg-zinc-50 border border-zinc-200 text-zinc-900 text-xs focus:outline-none focus:border-black focus:bg-white font-bold"
-                    />
-                  </div>
-
-                  <div className="sm:col-span-2">
-                    <label className="block text-xs font-bold text-zinc-700 mb-1">
-                      Training & Work Location Mode *
-                    </label>
-                    <select
-                      value={formData.trainingLocations || 'Hybrid (Office + Remote Work)'}
-                      onChange={(e) => updateField('trainingLocations', e.target.value)}
-                      className="w-full px-3.5 py-2.5 rounded-2xl bg-zinc-50 border border-zinc-200 text-zinc-900 text-xs focus:outline-none focus:border-black focus:bg-white font-semibold cursor-pointer"
-                    >
-                      <option value="Hybrid (Office + Remote Work)">Hybrid (Office + Remote Work)</option>
-                      <option value="On-Premise / Corporate Office (Full-Time In-Person)">On-Premise / Corporate Office (Full-Time In-Person)</option>
-                      <option value="Remote / Work From Home (100% Virtual)">Remote / Work From Home (100% Virtual)</option>
-                      <option value="Plant / Industrial Manufacturing Facility">Plant / Industrial Manufacturing Facility</option>
-                      <option value="Client Site / Field Deployment">Client Site / Field Deployment</option>
-                      <option value="Multi-Location / Regional Branch Rotational">Multi-Location / Regional Branch Rotational</option>
-                      <option value="Specialized Tech Park / Innovation Center">Specialized Tech Park / Innovation Center</option>
-                    </select>
-                  </div>
-                </div>
-
-                <label className="flex items-start gap-3 p-4 rounded-2xl bg-zinc-50 border border-zinc-200 cursor-pointer">
-                  <input
-                    type="checkbox"
-                    checked={formData.dbtSchemeOptIn}
-                    onChange={(e) => updateField('dbtSchemeOptIn', e.target.checked)}
-                    className="w-4 h-4 rounded text-black focus:ring-black border-zinc-300 mt-0.5"
-                  />
-                  <div>
-                    <span className="text-xs font-bold text-zinc-900 block">
-                      Opt-in for Direct Benefit Transfer (DBT) Government Subsidy (₹4,500/month per candidate)
-                    </span>
-                    <span className="text-[11px] text-zinc-500 font-medium">
-                      Enables automated portal reconciliation and direct govt subsidy disbursement.
-                    </span>
-                  </div>
-                </label>
-              </div>
-            )}
-
-            {/* SECTION 3: Contract & Compliance Details */}
-            {currentSection === 3 && (
-              <div className="space-y-4">
-                <div className="border-b border-zinc-100 pb-3">
-                  <h3 className="text-xs font-extrabold uppercase tracking-wider text-zinc-900 font-mono">
-                    SECTION 03: CONTRACT TEMPLATE & COMPLIANCE SETUP
-                  </h3>
-                  <p className="text-xs text-zinc-500 mt-1 font-medium">
-                    Legal framework parameters, compliance officer contact, and audit notes.
-                  </p>
-                </div>
-
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                  <div className="sm:col-span-2">
-                    <label className="block text-xs font-bold text-zinc-700 mb-1">
-                      Contract Letter Framework Template
-                    </label>
-                    <select
-                      value={formData.contractTemplateType}
-                      onChange={(e) => updateField('contractTemplateType', e.target.value)}
-                      className="w-full px-3.5 py-2.5 rounded-2xl bg-zinc-50 border border-zinc-200 text-zinc-900 text-xs focus:outline-none focus:border-black font-semibold"
-                    >
-                      <option value="Standard National Apprenticeship Contract v3">Standard National Apprenticeship Contract v3</option>
-                      <option value="Advanced Tech / Professional Services Contract">Advanced Tech / Professional Services Contract</option>
-                      <option value="Industrial Trainee Standard Contract">Industrial Trainee Standard Contract</option>
-                    </select>
-                  </div>
-
-                  <div>
-                    <label className="block text-xs font-bold text-zinc-700 mb-1">
-                      Compliance Officer Full Name *
-                    </label>
                     <input
                       type="text"
                       required
-                      value={formData.complianceOfficerName}
-                      onChange={(e) => updateField('complianceOfficerName', e.target.value)}
-                      placeholder="e.g. Vikas Malhotra"
-                      className="w-full px-3.5 py-2.5 rounded-2xl bg-zinc-50 border border-zinc-200 text-zinc-900 text-xs placeholder-zinc-400 focus:outline-none focus:border-black font-medium"
-                    />
-                  </div>
-
-                  <div>
-                    <label className="block text-xs font-bold text-zinc-700 mb-1">
-                      Compliance Officer Email *
-                    </label>
-                    <input
-                      type="email"
-                      value={formData.complianceOfficerEmail}
-                      onChange={(e) => updateField('complianceOfficerEmail', e.target.value)}
-                      placeholder="compliance@portal.com"
-                      className="w-full px-3.5 py-2.5 rounded-2xl bg-zinc-50 border border-zinc-200 text-zinc-900 text-xs placeholder-zinc-400 focus:outline-none focus:border-black font-medium"
-                    />
-                  </div>
-
-                  <div className="sm:col-span-2">
-                    <label className="block text-xs font-bold text-zinc-700 mb-1">
-                      Special Compliance Instructions / Audit Notes
-                    </label>
-                    <textarea
-                      rows={2}
-                      value={formData.cnIssueNotes}
-                      onChange={(e) => updateField('cnIssueNotes', e.target.value)}
-                      placeholder="Any specific attendance logging requirements, shift patterns, or compliance prerequisites..."
-                      className="w-full px-3.5 py-2.5 rounded-2xl bg-zinc-50 border border-zinc-200 text-zinc-900 text-xs placeholder-zinc-400 focus:outline-none focus:border-black font-medium resize-none"
+                      value={formData.operationalStates || ''}
+                      onChange={(e) => updateField('operationalStates', e.target.value)}
+                      placeholder="e.g. Karnataka, Maharashtra, Tamil Nadu, Delhi NCR"
+                      className="w-full px-3.5 py-2.5 rounded-2xl bg-zinc-50 border border-zinc-200 text-zinc-900 text-xs placeholder-zinc-400 focus:outline-none focus:border-black focus:bg-white font-medium"
                     />
                   </div>
                 </div>
               </div>
             )}
 
-            {/* SECTION 4: Document Verification & Submit */}
-            {currentSection === 4 && (
+            {/* SECTION 2: Document Verification & Submit */}
+            {currentSection === 2 && (
               <div className="space-y-5">
                 <div className="border-b border-zinc-100 pb-3">
                   <h3 className="text-xs font-extrabold uppercase tracking-wider text-zinc-900 font-mono">
-                    SECTION 04: MANDATORY COMPLIANCE DOCUMENTS & SUBMIT
+                    SECTION 02: MANDATORY COMPLIANCE DOCUMENTS & SUBMIT
                   </h3>
                   <p className="text-xs text-zinc-500 mt-1 font-medium">
-                    Upload official corporate compliance files to establish legal apprenticeship quota and enable direct DBT claims.
+                    Upload official corporate compliance files to establish legal apprenticeship quota and enable portal verification.
                   </p>
                 </div>
 
@@ -1121,17 +633,9 @@ export const ClientIntakeWizard: React.FC = () => {
                     <span className="text-zinc-500">Contact:</span>
                     <span className="font-bold text-zinc-900">{formData.contactName} ({formData.contactEmail})</span>
                   </div>
-                  <div className="flex justify-between border-b border-zinc-200 pb-2">
+                  <div className="flex justify-between">
                     <span className="text-zinc-500">Total Quota:</span>
                     <span className="font-extrabold text-zinc-900">{formData.requiredApprenticeCount} Candidates</span>
-                  </div>
-                  <div className="flex justify-between border-b border-zinc-200 pb-2">
-                    <span className="text-zinc-500">Stipend Rate:</span>
-                    <span className="font-bold text-zinc-900">₹{Number(formData.stipendPerApprentice).toLocaleString()}/mo</span>
-                  </div>
-                  <div className="flex justify-between">
-                    <span className="text-zinc-500">Location Mode:</span>
-                    <span className="text-zinc-800 font-medium">{formData.trainingLocations || 'Hybrid'}</span>
                   </div>
                 </div>
 
@@ -1167,7 +671,7 @@ export const ClientIntakeWizard: React.FC = () => {
             <span>Previous</span>
           </button>
 
-          {currentSection < 4 ? (
+          {currentSection < 2 ? (
             <button
               type="button"
               onClick={handleNextSection}
@@ -1183,7 +687,7 @@ export const ClientIntakeWizard: React.FC = () => {
               className="px-7 py-2.5 rounded-full text-xs font-bold bg-black text-white hover:bg-zinc-800 flex items-center gap-1.5 cursor-pointer transition-all shadow-md"
             >
               <Send className="w-3.5 h-3.5" />
-              <span>SUBMIT INTAKE APPLICATION ↗</span>
+              <span>SUBMIT ONBOARDING APPLICATION ↗</span>
             </button>
           )}
         </div>

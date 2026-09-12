@@ -26,8 +26,6 @@ export const INITIAL_LOGIN_LOGS: LoginActivityLog[] = [
 ];
 
 export const INITIAL_FUNNEL_STEPS = [
-  { step: 1, name: 'Candidate & Quota Requirements', started: 0, completed: 0, dropOff: 0, dropOffRate: '0.0%' },
-  { step: 2, name: 'Payroll & Stipend Structure', started: 0, completed: 0, dropOff: 0, dropOffRate: '0.0%' },
-  { step: 3, name: 'Contract & Compliance Setup', started: 0, completed: 0, dropOff: 0, dropOffRate: '0.0%' },
-  { step: 4, name: 'Document Verification & Submit', started: 0, completed: 0, dropOff: 0, dropOffRate: '0.0%' }
+  { step: 1, name: 'Requirements & Quota Scope', started: 0, completed: 0, dropOff: 0, dropOffRate: '0.0%' },
+  { step: 2, name: 'Mandatory Compliance Documents & Submit', started: 0, completed: 0, dropOff: 0, dropOffRate: '0.0%' }
 ];

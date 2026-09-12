@@ -112,6 +112,11 @@ export const ClientDashboard: React.FC = () => {
   const [selectedReportYear, setSelectedReportYear] = useState<string>('all');
   const [filterCandidatesByMonth, setFilterCandidatesByMonth] = useState<boolean>(false);
 
+  // Dedicated Section 3 CN Month, Year & Allocation Status Filters
+  const [cnMonthFilter, setCnMonthFilter] = useState<string>('all');
+  const [cnYearFilter, setCnYearFilter] = useState<string>('all');
+  const [cnAllocationFilter, setCnAllocationFilter] = useState<'all' | 'allocated' | 'pending'>('all');
+
   const [napsPayoutMonthFilter, setNapsPayoutMonthFilter] = useState<string>('all');
   const [napsClientSearch, setNapsClientSearch] = useState('');
   const [claimSuccessAlert, setClaimSuccessAlert] = useState<string | null>(null);
@@ -159,11 +164,15 @@ export const ClientDashboard: React.FC = () => {
     email: '',
     phone: '',
     aadhaarNumber: '',
-    tradeOrRole: '',
+    tradeOrRole: '', // Curriculum
     qualification: '',
     stipendAmount: 18500,
-    dbtEligibleAmount: 4500,
+    dbtEligibleAmount: 0,
     joiningDate: new Date().toISOString().split('T')[0],
+    contractExpireDate: new Date(new Date().setFullYear(new Date().getFullYear() + 1)).toISOString().split('T')[0],
+    enrollmentScheme: 'NAPS' as 'NAPS' | 'NATS' | 'Others',
+    panNumber: '',
+    aparId: '',
     bankName: '',
     bankAccountNumber: '',
     ifscCode: '',
@@ -176,9 +185,17 @@ export const ClientDashboard: React.FC = () => {
     photoDoc?: UploadedDocument;
     signatureDoc?: UploadedDocument;
     aadhaarDoc?: UploadedDocument;
+    doc10th?: UploadedDocument;
+    doc12th?: UploadedDocument;
+    docGrad?: UploadedDocument;
     educationDoc?: UploadedDocument;
     bankProofDoc?: UploadedDocument;
     resumeDoc?: UploadedDocument;
+    // NATS Specific Documents
+    panDoc?: UploadedDocument;
+    allSemesterDoc?: UploadedDocument;
+    casteCertDoc?: UploadedDocument;
+    aparIdDoc?: UploadedDocument;
   }>({});
 
   // Role Selection State (from client's intake selections)
@@ -436,26 +453,52 @@ export const ClientDashboard: React.FC = () => {
   }, [effectiveNapsRecords, selectedReportMonth, selectedReportYear, activeSubmission?.responses?.stipendPerApprentice]);
 
   const displayedCandidatesList = useMemo(() => {
-    if (!filterCandidatesByMonth || (selectedReportMonth === 'all' && selectedReportYear === 'all')) {
-      return effectiveCandidatesList;
-    }
     return effectiveCandidatesList.filter(c => {
-      if (!c.onboardingDate) return false;
-      if (selectedReportYear !== 'all' && !c.onboardingDate.includes(selectedReportYear)) return false;
-      if (selectedReportMonth !== 'all') {
-        const mNum = currentMonthObj?.num;
-        if (mNum && !c.onboardingDate.includes(`-${mNum}-`) && !c.onboardingDate.includes(`/${mNum}/`)) return false;
+      // Month and Year filter for Section 3 Contract Numbers
+      if (cnYearFilter !== 'all' && c.onboardingDate && !c.onboardingDate.includes(cnYearFilter)) {
+        return false;
       }
+      if (cnMonthFilter !== 'all') {
+        const monthObj = ALL_REPORT_MONTHS.find(m => m.value === cnMonthFilter);
+        const mNum = monthObj?.num;
+        if (mNum && c.onboardingDate && !c.onboardingDate.includes(`-${mNum}-`) && !c.onboardingDate.includes(`/${mNum}/`)) {
+          return false;
+        }
+      }
+
+      // Match CN from candidate record, or from NAPS registry
+      const matchedNaps = effectiveNapsRecords.find(
+        r => (r.candidateId && r.candidateId === c.id) ||
+             (r.candidateName && r.candidateName.toLowerCase() === c.name.toLowerCase()) ||
+             (r.contractCode && r.contractCode === c.contractCode)
+      );
+      const resolvedCN = c.contractCode || matchedNaps?.contractCode;
+      const isApproved = Boolean(resolvedCN && resolvedCN !== 'CN Pending');
+
+      if (cnAllocationFilter === 'allocated' && !isApproved) return false;
+      if (cnAllocationFilter === 'pending' && isApproved) return false;
+
       return true;
     });
-  }, [effectiveCandidatesList, filterCandidatesByMonth, selectedReportMonth, selectedReportYear, currentMonthObj]);
+  }, [effectiveCandidatesList, cnMonthFilter, cnYearFilter, cnAllocationFilter, effectiveNapsRecords]);
 
   const filteredApprentices = candidateList.filter(app => {
     const matchesSearch = 
       app.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
       app.tradeOrRole.toLowerCase().includes(searchQuery.toLowerCase()) ||
       app.id.toLowerCase().includes(searchQuery.toLowerCase());
-    const matchesStatus = statusFilter === 'all' || app.status.toLowerCase() === statusFilter.toLowerCase();
+    
+    let matchesStatus = true;
+    if (statusFilter === 'all') {
+      matchesStatus = true;
+    } else if (statusFilter === 'pending_allocation') {
+      matchesStatus = !app.contractCode || app.contractCode === 'CN Pending';
+    } else if (statusFilter === 'allocated') {
+      matchesStatus = Boolean(app.contractCode && app.contractCode !== 'CN Pending');
+    } else {
+      matchesStatus = app.status.toLowerCase() === statusFilter.toLowerCase();
+    }
+
     return matchesSearch && matchesStatus;
   });
 
@@ -542,20 +585,35 @@ export const ClientDashboard: React.FC = () => {
     document.body.removeChild(link);
   };
 
-  // Handle Document File Change
+  // Handle Document File Change with 2MB limit enforcement
   const handleDocFileSelect = async (
     file: File | null,
-    category: 'Aadhaar' | 'Education' | 'Bank Proof' | 'Resume' | 'Photo' | 'Signature'
+    category: '10th' | '12th' | 'Graduation' | 'Aadhaar' | 'Education' | 'Bank Proof' | 'Resume' | 'Photo' | 'Signature' | 'PAN' | 'All Semester' | 'Caste Certificate' | 'APAR ID'
   ) => {
     if (!file) return;
+
+    // Enforce 2 MB maximum size limit per file
+    const MAX_FILE_SIZE = 2 * 1024 * 1024; // 2 MB
+    if (file.size > MAX_FILE_SIZE) {
+      alert(`File "${file.name}" exceeds the maximum allowed size of 2 MB (${(file.size / (1024 * 1024)).toFixed(2)} MB). Please select a file under 2 MB.`);
+      return;
+    }
+
     const clientId = user?.id || activeSubmission?.id || 'client';
-    const doc = await processUploadedFile(file, category, clientId);
-    if (category === 'Aadhaar') setCandidateDocs(prev => ({ ...prev, aadhaarDoc: doc }));
+    const doc = await processUploadedFile(file, category as any, clientId);
+    if (category === '10th') setCandidateDocs(prev => ({ ...prev, doc10th: doc }));
+    if (category === '12th') setCandidateDocs(prev => ({ ...prev, doc12th: doc }));
+    if (category === 'Graduation') setCandidateDocs(prev => ({ ...prev, docGrad: doc, educationDoc: doc }));
     if (category === 'Education') setCandidateDocs(prev => ({ ...prev, educationDoc: doc }));
+    if (category === 'Aadhaar') setCandidateDocs(prev => ({ ...prev, aadhaarDoc: doc }));
     if (category === 'Bank Proof') setCandidateDocs(prev => ({ ...prev, bankProofDoc: doc }));
     if (category === 'Resume') setCandidateDocs(prev => ({ ...prev, resumeDoc: doc }));
     if (category === 'Photo') setCandidateDocs(prev => ({ ...prev, photoDoc: doc }));
     if (category === 'Signature') setCandidateDocs(prev => ({ ...prev, signatureDoc: doc }));
+    if (category === 'PAN') setCandidateDocs(prev => ({ ...prev, panDoc: doc }));
+    if (category === 'All Semester') setCandidateDocs(prev => ({ ...prev, allSemesterDoc: doc }));
+    if (category === 'Caste Certificate') setCandidateDocs(prev => ({ ...prev, casteCertDoc: doc }));
+    if (category === 'APAR ID') setCandidateDocs(prev => ({ ...prev, aparIdDoc: doc }));
   };
 
   // Handle Adding New Candidate & Triggering SPOC Email
@@ -563,16 +621,22 @@ export const ClientDashboard: React.FC = () => {
     e.preventDefault();
     if (!candidateForm.name || !candidateForm.tradeOrRole || !candidateForm.phone) return;
 
+    const expiryDate = candidateForm.contractExpireDate || (candidateForm.joiningDate ? new Date(new Date(candidateForm.joiningDate).setFullYear(new Date(candidateForm.joiningDate).getFullYear() + 1)).toISOString().split('T')[0] : '');
+
     const newCandidate = await addApprentice({
       name: candidateForm.name,
       email: candidateForm.email || `${candidateForm.name.toLowerCase().replace(/\s+/g, '.')}@portal.edu`,
       phone: candidateForm.phone,
       aadhaarNumber: candidateForm.aadhaarNumber || '4523-XXXX-9901',
+      panNumber: candidateForm.panNumber,
+      aparId: candidateForm.aparId,
       tradeOrRole: candidateForm.tradeOrRole,
       qualification: candidateForm.qualification,
       onboardingDate: candidateForm.joiningDate,
+      contractExpireDate: expiryDate,
+      enrollmentScheme: candidateForm.enrollmentScheme || 'NAPS',
       stipendAmount: Number(candidateForm.stipendAmount) || 18500,
-      dbtEligibleAmount: Number(candidateForm.dbtEligibleAmount) || 4500,
+      dbtEligibleAmount: Number(candidateForm.dbtEligibleAmount) || 0,
       contractStatus: 'Generated',
       attendanceRate: '100%',
       daysPresent: 26,
@@ -587,20 +651,34 @@ export const ClientDashboard: React.FC = () => {
         photoDoc: candidateDocs.photoDoc,
         signatureDoc: candidateDocs.signatureDoc,
         aadhaarDoc: candidateDocs.aadhaarDoc,
-        educationDoc: candidateDocs.educationDoc,
+        doc10th: candidateDocs.doc10th,
+        doc12th: candidateDocs.doc12th,
+        docGrad: candidateDocs.docGrad || candidateDocs.educationDoc,
+        educationDoc: candidateDocs.docGrad || candidateDocs.doc12th || candidateDocs.doc10th || candidateDocs.educationDoc,
         bankProofDoc: candidateDocs.bankProofDoc,
         resumeDoc: candidateDocs.resumeDoc,
+        panDoc: candidateDocs.panDoc,
+        allSemesterDoc: candidateDocs.allSemesterDoc,
+        casteCertDoc: candidateDocs.casteCertDoc,
+        aparIdDoc: candidateDocs.aparIdDoc,
         photoFile: candidateDocs.photoDoc?.name || 'candidate_photo.jpg',
         signatureFile: candidateDocs.signatureDoc?.name || 'candidate_signature.png',
         aadhaarFile: candidateDocs.aadhaarDoc?.name || 'aadhaar_card_doc.pdf',
-        educationFile: candidateDocs.educationDoc?.name || 'degree_marksheet.pdf',
+        doc10thFile: candidateDocs.doc10th?.name,
+        doc12thFile: candidateDocs.doc12th?.name,
+        docGradFile: candidateDocs.docGrad?.name || candidateDocs.educationDoc?.name,
+        educationFile: candidateDocs.docGrad?.name || candidateDocs.educationDoc?.name || 'degree_marksheet.pdf',
         bankProofFile: candidateDocs.bankProofDoc?.name || 'bank_passbook_doc.pdf',
-        resumeFile: candidateDocs.resumeDoc?.name || 'candidate_resume.docx'
+        resumeFile: candidateDocs.resumeDoc?.name || 'candidate_resume.docx',
+        panFile: candidateDocs.panDoc?.name,
+        allSemesterFile: candidateDocs.allSemesterDoc?.name,
+        casteCertFile: candidateDocs.casteCertDoc?.name,
+        aparIdFile: candidateDocs.aparIdDoc?.name
       }
     });
 
     const spocTarget = candidateForm.spocEmail || 'SPOC';
-    setClaimSuccessAlert(`Candidate ${candidateForm.name} onboarded. SPOC notification email dispatched to ${spocTarget}.`);
+    setClaimSuccessAlert(`Candidate ${candidateForm.name} onboarded under ${candidateForm.enrollmentScheme || 'NAPS'}. SPOC notification email dispatched to ${spocTarget}.`);
     setTimeout(() => setClaimSuccessAlert(null), 6000);
 
     setShowAddModal(false);
@@ -613,8 +691,12 @@ export const ClientDashboard: React.FC = () => {
       tradeOrRole: '',
       qualification: '',
       stipendAmount: 18500,
-      dbtEligibleAmount: 4500,
+      dbtEligibleAmount: 0,
       joiningDate: new Date().toISOString().split('T')[0],
+      contractExpireDate: new Date(new Date().setFullYear(new Date().getFullYear() + 1)).toISOString().split('T')[0],
+      enrollmentScheme: 'NAPS',
+      panNumber: '',
+      aparId: '',
       bankName: '',
       bankAccountNumber: '',
       ifscCode: '',
@@ -646,6 +728,9 @@ export const ClientDashboard: React.FC = () => {
     const designatedName = currentSpoc?.name || activeSubmission?.assigned_company_spoc?.name || user?.apprenticeMetrics?.assignedCompanySpoc?.name || activeSubmission?.responses?.complianceOfficerName || user?.full_name || 'Designated SPOC';
     const defaultRole = clientChosenRoles[0] || '';
 
+    const defaultJoiningDate = activeSubmission?.responses?.proposedJoiningDate || new Date().toISOString().split('T')[0];
+    const defaultExpire = new Date(new Date(defaultJoiningDate).setFullYear(new Date(defaultJoiningDate).getFullYear() + 1)).toISOString().split('T')[0];
+
     setCandidateDocs({});
     setIsCustomRole(false);
     setCustomRoleText('');
@@ -657,8 +742,12 @@ export const ClientDashboard: React.FC = () => {
       tradeOrRole: defaultRole,
       qualification: '',
       stipendAmount: Number(activeSubmission?.responses?.stipendPerApprentice) || 18500,
-      dbtEligibleAmount: 4500,
-      joiningDate: activeSubmission?.responses?.proposedJoiningDate || new Date().toISOString().split('T')[0],
+      dbtEligibleAmount: 0,
+      joiningDate: defaultJoiningDate,
+      contractExpireDate: defaultExpire,
+      enrollmentScheme: 'NAPS',
+      panNumber: '',
+      aparId: '',
       bankName: '',
       bankAccountNumber: '',
       ifscCode: '',
@@ -952,17 +1041,6 @@ export const ClientDashboard: React.FC = () => {
                           </h2>
                         </div>
                       </div>
-
-                      <div className="flex items-center gap-2 self-start sm:self-auto">
-                        <button
-                          type="button"
-                          onClick={() => window.print()}
-                          className="px-3.5 py-2 rounded-xl bg-white/10 hover:bg-white/20 text-white text-xs font-bold flex items-center gap-1.5 transition-colors cursor-pointer border border-white/15"
-                        >
-                          <Printer className="w-3.5 h-3.5" />
-                          <span>Print Report</span>
-                        </button>
-                      </div>
                     </div>
 
                     {/* Sub-bar with Metadata & Month/Year Selector */}
@@ -1193,20 +1271,48 @@ export const ClientDashboard: React.FC = () => {
                         <span className="text-[11px] font-mono text-zinc-400">({displayedCandidatesList.length} shown)</span>
                       </div>
 
-                      <div className="flex items-center gap-2 self-start sm:self-auto">
-                        {(selectedReportMonth !== 'all' || selectedReportYear !== 'all') && (
-                          <button
-                            type="button"
-                            onClick={() => setFilterCandidatesByMonth(!filterCandidatesByMonth)}
-                            className={`px-3 py-1 rounded-full text-xs font-bold border transition-all cursor-pointer ${
-                              filterCandidatesByMonth
-                                ? 'bg-amber-100 text-amber-900 border-amber-300'
-                                : 'bg-zinc-100 text-zinc-700 border-zinc-300 hover:bg-zinc-200'
-                            }`}
+                      <div className="flex flex-wrap items-center gap-2 self-start sm:self-auto">
+                        {/* Month Filter */}
+                        <div className="flex items-center gap-1">
+                          <label className="text-[11px] text-zinc-500 font-bold">Month:</label>
+                          <select
+                            value={cnMonthFilter}
+                            onChange={(e) => setCnMonthFilter(e.target.value)}
+                            className="px-2.5 py-1.5 rounded-xl bg-zinc-50 border border-zinc-200 text-zinc-800 text-xs font-bold focus:outline-none focus:border-black cursor-pointer"
                           >
-                            {filterCandidatesByMonth ? `Filtered: ${reportingMonthStr}` : 'Filter by Active Period'}
-                          </button>
-                        )}
+                            {ALL_REPORT_MONTHS.map(m => (
+                              <option key={m.value} value={m.value}>{m.label}</option>
+                            ))}
+                          </select>
+                        </div>
+
+                        {/* Year Filter */}
+                        <div className="flex items-center gap-1">
+                          <label className="text-[11px] text-zinc-500 font-bold">Year:</label>
+                          <select
+                            value={cnYearFilter}
+                            onChange={(e) => setCnYearFilter(e.target.value)}
+                            className="px-2.5 py-1.5 rounded-xl bg-zinc-50 border border-zinc-200 text-zinc-800 text-xs font-bold font-mono focus:outline-none focus:border-black cursor-pointer"
+                          >
+                            {ALL_REPORT_YEARS.map(y => (
+                              <option key={y.value} value={y.value}>{y.label}</option>
+                            ))}
+                          </select>
+                        </div>
+
+                        {/* Allocation Status Toggle */}
+                        <button
+                          type="button"
+                          onClick={() => setCnAllocationFilter(prev => prev === 'pending' ? 'all' : 'pending')}
+                          className={`px-3 py-1.5 rounded-xl text-xs font-bold border transition-all cursor-pointer ${
+                            cnAllocationFilter === 'pending'
+                              ? 'bg-amber-100 text-amber-900 border-amber-300 shadow-2xs'
+                              : 'bg-zinc-100 text-zinc-700 border-zinc-300 hover:bg-zinc-200'
+                          }`}
+                        >
+                          {cnAllocationFilter === 'pending' ? 'Showing Pending Allocation Only' : 'Pending Allocation'}
+                        </button>
+
                         <button
                           onClick={handleOpenAddModal}
                           className="px-3.5 py-1.5 rounded-full bg-[#0a192f] text-white text-xs font-bold flex items-center gap-1.5 hover:bg-zinc-800 transition-colors cursor-pointer"
@@ -1222,10 +1328,12 @@ export const ClientDashboard: React.FC = () => {
                         <thead className="bg-zinc-50 border-b border-zinc-200 font-bold text-[11px] uppercase tracking-wider text-zinc-500">
                           <tr>
                             <th className="px-4 py-3">S.No</th>
-                            <th className="px-4 py-3">Candidate Name</th>
-                            <th className="px-4 py-3">CN Number</th>
-                            <th className="px-4 py-3">Trade / Role</th>
-                            <th className="px-4 py-3">Onboarding Date</th>
+                            <th className="px-4 py-3">Candidate Name & Scheme</th>
+                            <th className="px-4 py-3">CN Number & AP Code</th>
+                            <th className="px-4 py-3">Curriculum</th>
+                            <th className="px-4 py-3">Onboarding (DOJ)</th>
+                            <th className="px-4 py-3">Contract Expiry</th>
+                            <th className="px-4 py-3">Qualification Files</th>
                             <th className="px-4 py-3">Govt Status / Remarks</th>
                             <th className="px-4 py-3 text-right">Actions</th>
                           </tr>
@@ -1233,13 +1341,15 @@ export const ClientDashboard: React.FC = () => {
                         <tbody className="divide-y divide-zinc-200">
                           {displayedCandidatesList.length === 0 ? (
                             <tr>
-                              <td colSpan={7} className="px-4 py-8 text-center text-zinc-400 font-medium">
-                                No candidates onboarded for this reporting period ({reportingMonthStr}) yet. Click &ldquo;+ Onboard Candidate&rdquo; to begin.
+                              <td colSpan={9} className="px-4 py-8 text-center text-zinc-400 font-medium">
+                                {cnAllocationFilter === 'pending'
+                                  ? 'No candidates currently pending CN allocation for the selected period.'
+                                  : `No candidates onboarded for this reporting period (${reportingMonthStr}) yet. Click "+ Onboard Candidate" to begin.`}
                               </td>
                             </tr>
                           ) : (
                             displayedCandidatesList.map((app, idx) => {
-                              // Match CN from candidate record, or from NAPS registry
+                              // Match CN and AP code from candidate record, or from NAPS registry
                               const matchedNaps = effectiveNapsRecords.find(
                                 r => (r.candidateId && r.candidateId === app.id) ||
                                      (r.candidateName && r.candidateName.toLowerCase() === app.name.toLowerCase()) ||
@@ -1247,28 +1357,76 @@ export const ClientDashboard: React.FC = () => {
                               ) || (effectiveNapsRecords.length === 1 && displayedCandidatesList.length === 1 ? effectiveNapsRecords[0] : undefined);
 
                               const resolvedCN = app.contractCode || matchedNaps?.contractCode;
+                              const resolvedAP = app.apprenticeCode || matchedNaps?.apprenticeCode;
                               const isApproved = Boolean(resolvedCN && resolvedCN !== 'CN Pending');
+                              const expDate = app.contractExpireDate || (app.onboardingDate ? new Date(new Date(app.onboardingDate).setFullYear(new Date(app.onboardingDate).getFullYear() + 1)).toISOString().split('T')[0] : '-');
 
                               return (
                                 <tr key={app.id || idx} className="hover:bg-zinc-50/80 transition-colors">
                                   <td className="px-4 py-3 font-mono text-zinc-400 font-bold">{idx + 1}</td>
                                   <td className="px-4 py-3">
                                     <div className="font-bold text-zinc-900">{app.name}</div>
-                                    <div className="font-mono text-[10px] text-zinc-400">{app.tradeOrRole}</div>
+                                    <div className="flex items-center gap-1.5 mt-0.5">
+                                      <span className="px-1.5 py-0.5 rounded text-[9px] font-mono font-bold bg-purple-100 text-purple-900 border border-purple-200">
+                                        {app.enrollmentScheme || 'NAPS'}
+                                      </span>
+                                    </div>
                                   </td>
-                                  <td className="px-4 py-3 font-mono font-semibold text-zinc-800">
-                                    {isApproved ? (
-                                      <span className="px-2.5 py-1 rounded-md bg-emerald-50 border border-emerald-300 text-emerald-900 font-bold text-[11px] shadow-2xs">
-                                        {resolvedCN}
-                                      </span>
-                                    ) : (
-                                      <span className="px-2 py-0.5 rounded bg-amber-50 border border-amber-200 text-amber-800 text-[11px]">
-                                        CN Pending
-                                      </span>
+                                  <td className="px-4 py-3 font-mono">
+                                    <div>
+                                      {isApproved ? (
+                                        <span className="px-2 py-0.5 rounded-md bg-emerald-50 border border-emerald-300 text-emerald-900 font-bold text-[11px] shadow-2xs">
+                                          {resolvedCN}
+                                        </span>
+                                      ) : (
+                                        <span className="px-2 py-0.5 rounded bg-amber-50 border border-amber-200 text-amber-800 text-[11px] font-semibold">
+                                          CN Pending
+                                        </span>
+                                      )}
+                                    </div>
+                                    {resolvedAP && (
+                                      <div className="text-[10px] text-zinc-500 font-semibold mt-1">
+                                        AP: <span className="text-zinc-800 font-bold">{resolvedAP}</span>
+                                      </div>
                                     )}
                                   </td>
-                                  <td className="px-4 py-3 text-zinc-600">{app.tradeOrRole}</td>
-                                  <td className="px-4 py-3 font-mono text-zinc-500">{app.onboardingDate || '-'}</td>
+                                  <td className="px-4 py-3 text-zinc-700 font-medium">{app.tradeOrRole}</td>
+                                  <td className="px-4 py-3 font-mono text-zinc-600">{app.onboardingDate || '-'}</td>
+                                  <td className="px-4 py-3 font-mono text-zinc-600 font-medium">{expDate}</td>
+                                  <td className="px-4 py-3">
+                                    <div className="flex items-center gap-1 flex-wrap">
+                                      {(app.documents?.doc10th || app.documents?.doc10thFile) && (
+                                        <button
+                                          type="button"
+                                          onClick={() => setPreviewingDoc(app.documents?.doc10th || { name: app.documents?.doc10thFile || '10th_Marksheet.pdf', type: 'pdf' })}
+                                          className="px-1.5 py-0.5 rounded text-[10px] font-mono bg-zinc-100 hover:bg-zinc-200 text-zinc-800 border border-zinc-200 cursor-pointer"
+                                          title="View 10th Marksheet"
+                                        >
+                                          10th ↗
+                                        </button>
+                                      )}
+                                      {(app.documents?.doc12th || app.documents?.doc12thFile) && (
+                                        <button
+                                          type="button"
+                                          onClick={() => setPreviewingDoc(app.documents?.doc12th || { name: app.documents?.doc12thFile || '12th_Marksheet.pdf', type: 'pdf' })}
+                                          className="px-1.5 py-0.5 rounded text-[10px] font-mono bg-zinc-100 hover:bg-zinc-200 text-zinc-800 border border-zinc-200 cursor-pointer"
+                                          title="View 12th Marksheet"
+                                        >
+                                          12th ↗
+                                        </button>
+                                      )}
+                                      {(app.documents?.docGrad || app.documents?.educationDoc || app.documents?.docGradFile || app.documents?.educationFile) && (
+                                        <button
+                                          type="button"
+                                          onClick={() => setPreviewingDoc(app.documents?.docGrad || app.documents?.educationDoc || { name: app.documents?.docGradFile || app.documents?.educationFile || 'Degree_Certificate.pdf', type: 'pdf' })}
+                                          className="px-1.5 py-0.5 rounded text-[10px] font-mono bg-zinc-100 hover:bg-zinc-200 text-zinc-800 border border-zinc-200 cursor-pointer"
+                                          title="View Degree / Marksheet"
+                                        >
+                                          Grad ↗
+                                        </button>
+                                      )}
+                                    </div>
+                                  </td>
                                   <td className="px-4 py-3">
                                     <span className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[10px] font-bold ${
                                       isApproved
@@ -1363,6 +1521,9 @@ export const ClientDashboard: React.FC = () => {
                               <tr key={p.id || mIdx} className="hover:bg-zinc-50/80 transition-colors">
                                 <td className="px-4 py-3 font-bold text-zinc-900 font-sans uppercase">
                                   {p.month} {p.year && p.year !== 'all' ? p.year : ''}
+                                  {p.submittedByClient && (
+                                    <span className="ml-2 px-1.5 py-0.5 rounded text-[9px] bg-rose-100 text-rose-800 border border-rose-300 font-bold">Client</span>
+                                  )}
                                 </td>
                                 <td className="px-4 py-3 font-bold text-zinc-800">
                                   {p.stipendPaidByEmployer ? p.stipendPaidByEmployer.toLocaleString('en-IN') : '-'}
@@ -1384,8 +1545,16 @@ export const ClientDashboard: React.FC = () => {
                                     <span>{p.status || 'SUBMITTED'}</span>
                                   </span>
                                 </td>
-                                <td className="px-4 py-3 font-sans text-xs text-zinc-600">
-                                  {p.remarks || ''}
+                                <td className="px-4 py-3 font-sans text-xs">
+                                  {p.remarks ? (
+                                    p.submittedByClient ? (
+                                      <span className="px-2 py-1 rounded-lg bg-rose-50 border border-rose-300 text-rose-700 font-bold text-[11px] inline-block">
+                                        [Client Remark] {p.remarks}
+                                      </span>
+                                    ) : (
+                                      <span className="text-zinc-600">{p.remarks}</span>
+                                    )
+                                  ) : '-'}
                                 </td>
                               </tr>
                             ))
@@ -1496,7 +1665,17 @@ export const ClientDashboard: React.FC = () => {
                             effectiveActionItems.map((act, idx) => (
                               <tr key={act.id || idx} className="hover:bg-zinc-50/80 transition-colors">
                                 <td className="px-4 py-3 font-mono text-zinc-400 font-bold">{idx + 1}</td>
-                                <td className="px-4 py-3 font-medium text-zinc-900 max-w-xs">{act.observation}</td>
+                                <td className="px-4 py-3 font-medium max-w-xs">
+                                  <div className="flex items-center gap-1.5 flex-wrap">
+                                    {act.addedBy === 'client' ? (
+                                      <span className="px-2 py-0.5 rounded-md bg-rose-50 border border-rose-300 text-rose-700 font-bold text-[11px]">
+                                        [Client Remark] {act.observation}
+                                      </span>
+                                    ) : (
+                                      <span className="text-zinc-900">{act.observation}</span>
+                                    )}
+                                  </div>
+                                </td>
                                 <td className="px-4 py-3 text-zinc-700 max-w-xs">{act.actionRequired}</td>
                                 <td className="px-4 py-3 font-semibold text-zinc-800">{act.owner}</td>
                                 <td className="px-4 py-3 font-mono text-zinc-500">{act.targetDate}</td>
@@ -1847,9 +2026,11 @@ export const ClientDashboard: React.FC = () => {
                         <select
                           value={statusFilter}
                           onChange={(e) => setStatusFilter(e.target.value)}
-                          className="text-xs px-3 py-2 rounded-full bg-zinc-50 border border-zinc-200 text-zinc-700 font-bold focus:outline-none focus:border-black"
+                          className="text-xs px-3 py-2 rounded-full bg-zinc-50 border border-zinc-200 text-zinc-700 font-bold focus:outline-none focus:border-black cursor-pointer"
                         >
                           <option value="all">All ({candidateList.length})</option>
+                          <option value="pending_allocation">Pending Allocation ({candidateList.filter(c => !c.contractCode || c.contractCode === 'CN Pending').length})</option>
+                          <option value="allocated">Allocated ({candidateList.filter(c => c.contractCode && c.contractCode !== 'CN Pending').length})</option>
                           <option value="active">Active</option>
                           <option value="under training">Under Training</option>
                         </select>
@@ -1868,141 +2049,250 @@ export const ClientDashboard: React.FC = () => {
                       <table className="w-full text-left text-xs">
                         <thead className="bg-zinc-50 text-zinc-500 uppercase tracking-wider text-[10px] border-b border-zinc-200 font-mono">
                           <tr>
-                            <th className="py-3 px-4">Candidate ID & Name</th>
-                            <th className="py-3 px-4">Trade / Role</th>
+                            <th className="py-3 px-4">Candidate Profile & Scheme</th>
+                            <th className="py-3 px-4">CN & AP Code</th>
+                            <th className="py-3 px-4">Curriculum</th>
                             <th className="py-3 px-4">Aadhaar & Bank</th>
                             <th className="py-3 px-4">Monthly Stipend</th>
-                            <th className="py-3 px-4">DBT Govt Share</th>
-                            <th className="py-3 px-4">Compliance Files</th>
+                            <th className="py-3 px-4">DOJ & Expiry</th>
+                            <th className="py-3 px-4">Qualification Files</th>
                             <th className="py-3 px-4">Contract</th>
                             <th className="py-3 px-4 text-right">Actions</th>
                           </tr>
                         </thead>
                         <tbody className="divide-y divide-zinc-100 bg-white font-medium">
                           {filteredApprentices.length > 0 ? (
-                            filteredApprentices.map((app) => (
-                              <tr key={app.id} className="hover:bg-zinc-50 transition-colors">
-                                <td className="py-3.5 px-4">
-                                  <div className="font-bold text-zinc-900 text-xs">{app.name}</div>
-                                  <div className="text-[10px] font-mono text-zinc-400">{app.id} · {app.phone || 'Phone Verified'}</div>
-                                </td>
+                            filteredApprentices.map((app) => {
+                              const expDate = app.contractExpireDate || (app.onboardingDate ? new Date(new Date(app.onboardingDate).setFullYear(new Date(app.onboardingDate).getFullYear() + 1)).toISOString().split('T')[0] : '-');
+                              const isCnApproved = Boolean(app.contractCode && app.contractCode !== 'CN Pending');
 
-                                <td className="py-3.5 px-4">
-                                  <div className="text-zinc-800 font-semibold">{app.tradeOrRole}</div>
-                                </td>
-
-                                <td className="py-3.5 px-4 font-mono text-[11px] text-zinc-600">
-                                  <div>{app.aadhaarNumber || '4523-XXXX-9912'}</div>
-                                  <div className="text-[10px] text-zinc-400">
-                                    {app.bankName ? `${app.bankName} · ` : ''}{app.ifscCode || 'HDFC0001824'}
-                                  </div>
-                                  {app.bankAccountNumber && (
-                                    <div className="text-[9px] text-zinc-400">
-                                      A/C {app.bankAccountNumber}
+                              return (
+                                <tr key={app.id} className="hover:bg-zinc-50 transition-colors">
+                                  <td className="py-3.5 px-4">
+                                    <div className="font-bold text-zinc-900 text-xs">{app.name}</div>
+                                    <div className="flex items-center gap-1.5 mt-0.5">
+                                      <span className="px-1.5 py-0.5 rounded text-[9px] font-mono font-bold bg-purple-100 text-purple-900 border border-purple-200">
+                                        {app.enrollmentScheme || 'NAPS'}
+                                      </span>
+                                      <span className="text-[10px] font-mono text-zinc-400">{app.id} · {app.phone || 'Phone Verified'}</span>
                                     </div>
-                                  )}
-                                </td>
+                                  </td>
 
-                                <td className="py-3.5 px-4 font-bold text-zinc-900">
-                                  ₹{app.stipendAmount.toLocaleString()}
-                                </td>
+                                  <td className="py-3.5 px-4 font-mono">
+                                    <div>
+                                      {isCnApproved ? (
+                                        <span className="px-2 py-0.5 rounded-md bg-emerald-50 border border-emerald-300 text-emerald-900 font-bold text-[10px]">
+                                          {app.contractCode}
+                                        </span>
+                                      ) : (
+                                        <span className="px-2 py-0.5 rounded bg-amber-50 border border-amber-200 text-amber-800 text-[10px] font-semibold">
+                                          CN Pending
+                                        </span>
+                                      )}
+                                    </div>
+                                    {app.apprenticeCode && (
+                                      <div className="text-[10px] text-zinc-500 font-semibold mt-1">
+                                        AP: <span className="text-zinc-800 font-bold">{app.apprenticeCode}</span>
+                                      </div>
+                                    )}
+                                  </td>
 
-                                <td className="py-3.5 px-4 font-bold text-emerald-600">
-                                  ₹{app.dbtEligibleAmount.toLocaleString()}
-                                </td>
+                                  <td className="py-3.5 px-4">
+                                    <div className="text-zinc-800 font-semibold">{app.tradeOrRole}</div>
+                                  </td>
 
-                                {/* Compliance Files Slot */}
-                                <td className="py-3.5 px-4">
-                                  <div className="flex items-center gap-1 flex-wrap">
-                                    {app.documents?.photoDoc || app.documents?.photoFile ? (
-                                      <button
-                                        type="button"
-                                        onClick={() => setPreviewingDoc(app.documents?.photoDoc || { name: app.documents?.photoFile || 'Candidate Photo.jpg', type: 'image' })}
-                                        className="px-2 py-0.5 rounded-full text-[10px] font-mono bg-zinc-100 hover:bg-zinc-200 text-zinc-800 border border-zinc-200 cursor-pointer"
-                                        title="View Candidate Photo"
-                                      >
-                                        Photo ↗
-                                      </button>
-                                    ) : null}
+                                  <td className="py-3.5 px-4 font-mono text-[11px] text-zinc-600">
+                                    <div>{app.aadhaarNumber || '4523-XXXX-9912'}</div>
+                                    <div className="text-[10px] text-zinc-400">
+                                      {app.bankName ? `${app.bankName} · ` : ''}{app.ifscCode || 'HDFC0001824'}
+                                    </div>
+                                    {app.bankAccountNumber && (
+                                      <div className="text-[9px] text-zinc-400">
+                                        A/C {app.bankAccountNumber}
+                                      </div>
+                                    )}
+                                  </td>
 
-                                    {app.documents?.signatureDoc || app.documents?.signatureFile ? (
-                                      <button
-                                        type="button"
-                                        onClick={() => setPreviewingDoc(app.documents?.signatureDoc || { name: app.documents?.signatureFile || 'Signature.jpg', type: 'image' })}
-                                        className="px-2 py-0.5 rounded-full text-[10px] font-mono bg-zinc-100 hover:bg-zinc-200 text-zinc-800 border border-zinc-200 cursor-pointer"
-                                        title="View Signature"
-                                      >
-                                        Sign ↗
-                                      </button>
-                                    ) : null}
+                                  <td className="py-3.5 px-4 font-bold text-zinc-900">
+                                    ₹{app.stipendAmount.toLocaleString()}
+                                  </td>
 
-                                    {app.documents?.aadhaarDoc || app.documents?.aadhaarFile ? (
-                                      <button
-                                        type="button"
-                                        onClick={() => setPreviewingDoc(app.documents?.aadhaarDoc || { name: app.documents?.aadhaarFile || 'Aadhaar Card.pdf', type: 'pdf' })}
-                                        className="px-2 py-0.5 rounded-full text-[10px] font-mono bg-zinc-100 hover:bg-zinc-200 text-zinc-800 border border-zinc-200 cursor-pointer"
-                                        title="View Aadhaar"
-                                      >
-                                        Aadhaar ↗
-                                      </button>
-                                    ) : null}
+                                  <td className="py-3.5 px-4 font-mono text-[11px] text-zinc-600">
+                                    <div><span className="text-zinc-400">DOJ:</span> {app.onboardingDate || '-'}</div>
+                                    <div className="text-[10px] text-zinc-500 mt-0.5"><span className="text-zinc-400">Exp:</span> {expDate}</div>
+                                  </td>
 
-                                    {app.documents?.educationDoc || app.documents?.educationFile ? (
-                                      <button
-                                        type="button"
-                                        onClick={() => setPreviewingDoc(app.documents?.educationDoc || { name: app.documents?.educationFile || 'Degree.pdf', type: 'pdf' })}
-                                        className="px-2 py-0.5 rounded-full text-[10px] font-mono bg-zinc-100 hover:bg-zinc-200 text-zinc-800 border border-zinc-200 cursor-pointer"
-                                        title="View Degree"
-                                      >
-                                        Degree ↗
-                                      </button>
-                                    ) : null}
+                                  {/* Compliance Files Slot */}
+                                  <td className="py-3.5 px-4">
+                                    <div className="flex items-center gap-1 flex-wrap">
+                                      {/* 10th */}
+                                      {(app.documents?.doc10th || app.documents?.doc10thFile) && (
+                                        <button
+                                          type="button"
+                                          onClick={() => setPreviewingDoc(app.documents?.doc10th || { name: app.documents?.doc10thFile || '10th_Marksheet.pdf', type: 'pdf' })}
+                                          className="px-2 py-0.5 rounded-full text-[10px] font-mono bg-zinc-100 hover:bg-zinc-200 text-zinc-800 border border-zinc-200 cursor-pointer"
+                                          title="View 10th Marksheet"
+                                        >
+                                          10th ↗
+                                        </button>
+                                      )}
 
-                                    {app.documents?.bankProofDoc || app.documents?.bankProofFile ? (
-                                      <button
-                                        type="button"
-                                        onClick={() => setPreviewingDoc(app.documents?.bankProofDoc || { name: app.documents?.bankProofFile || 'Bank Proof.pdf', type: 'pdf' })}
-                                        className="px-2 py-0.5 rounded-full text-[10px] font-mono bg-zinc-100 hover:bg-zinc-200 text-zinc-800 border border-zinc-200 cursor-pointer"
-                                        title="View Bank Proof / Cheque"
-                                      >
-                                        Cheque ↗
-                                      </button>
-                                    ) : null}
+                                      {/* 12th */}
+                                      {(app.documents?.doc12th || app.documents?.doc12thFile) && (
+                                        <button
+                                          type="button"
+                                          onClick={() => setPreviewingDoc(app.documents?.doc12th || { name: app.documents?.doc12thFile || '12th_Marksheet.pdf', type: 'pdf' })}
+                                          className="px-2 py-0.5 rounded-full text-[10px] font-mono bg-zinc-100 hover:bg-zinc-200 text-zinc-800 border border-zinc-200 cursor-pointer"
+                                          title="View 12th Marksheet"
+                                        >
+                                          12th ↗
+                                        </button>
+                                      )}
 
-                                    {app.documents?.resumeDoc || app.documents?.resumeFile ? (
-                                      <button
-                                        type="button"
-                                        onClick={() => setPreviewingDoc(app.documents?.resumeDoc || { name: app.documents?.resumeFile || 'Resume.docx', type: 'docx' })}
-                                        className="px-2 py-0.5 rounded-full text-[10px] font-mono bg-zinc-100 hover:bg-zinc-200 text-zinc-800 border border-zinc-200 cursor-pointer"
-                                        title="View Resume"
-                                      >
-                                        Resume ↗
-                                      </button>
-                                    ) : null}
-                                  </div>
-                                </td>
+                                      {/* Graduation */}
+                                      {(app.documents?.docGrad || app.documents?.educationDoc || app.documents?.docGradFile || app.documents?.educationFile) && (
+                                        <button
+                                          type="button"
+                                          onClick={() => setPreviewingDoc(app.documents?.docGrad || app.documents?.educationDoc || { name: app.documents?.docGradFile || app.documents?.educationFile || 'Degree.pdf', type: 'pdf' })}
+                                          className="px-2 py-0.5 rounded-full text-[10px] font-mono bg-zinc-100 hover:bg-zinc-200 text-zinc-800 border border-zinc-200 cursor-pointer"
+                                          title="View Degree / Marksheet"
+                                        >
+                                          Grad ↗
+                                        </button>
+                                      )}
 
-                                <td className="py-3.5 px-4">
-                                  <button
-                                    onClick={() => setSelectedContractCandidate(app)}
-                                    className="px-2.5 py-1 rounded-full text-[10px] font-semibold bg-zinc-100 hover:bg-zinc-200 text-zinc-800 border border-zinc-200 transition-all cursor-pointer flex items-center gap-1"
-                                  >
-                                    <FileSignature className="w-3 h-3" />
-                                    <span>{app.contractStatus} ↗</span>
-                                  </button>
-                                </td>
+                                      {/* Photo */}
+                                      {(app.documents?.photoDoc || app.documents?.photoFile) && (
+                                        <button
+                                          type="button"
+                                          onClick={() => setPreviewingDoc(app.documents?.photoDoc || { name: app.documents?.photoFile || 'Candidate Photo.jpg', type: 'image' })}
+                                          className="px-2 py-0.5 rounded-full text-[10px] font-mono bg-zinc-100 hover:bg-zinc-200 text-zinc-800 border border-zinc-200 cursor-pointer"
+                                          title="View Candidate Photo"
+                                        >
+                                          Photo ↗
+                                        </button>
+                                      )}
 
-                                <td className="py-3.5 px-4 text-right">
-                                  <button
-                                    onClick={() => removeApprentice(app.id)}
-                                    className="p-1.5 rounded-full hover:bg-rose-50 text-zinc-400 hover:text-rose-600 transition-colors cursor-pointer"
-                                    title="Remove Candidate"
-                                  >
-                                    <Trash2 className="w-3.5 h-3.5" />
-                                  </button>
-                                </td>
-                              </tr>
-                            ))
+                                      {/* Signature */}
+                                      {(app.documents?.signatureDoc || app.documents?.signatureFile) && (
+                                        <button
+                                          type="button"
+                                          onClick={() => setPreviewingDoc(app.documents?.signatureDoc || { name: app.documents?.signatureFile || 'Signature.jpg', type: 'image' })}
+                                          className="px-2 py-0.5 rounded-full text-[10px] font-mono bg-zinc-100 hover:bg-zinc-200 text-zinc-800 border border-zinc-200 cursor-pointer"
+                                          title="View Signature"
+                                        >
+                                          Sign ↗
+                                        </button>
+                                      )}
+
+                                      {/* Aadhaar */}
+                                      {(app.documents?.aadhaarDoc || app.documents?.aadhaarFile) && (
+                                        <button
+                                          type="button"
+                                          onClick={() => setPreviewingDoc(app.documents?.aadhaarDoc || { name: app.documents?.aadhaarFile || 'Aadhaar Card.pdf', type: 'pdf' })}
+                                          className="px-2 py-0.5 rounded-full text-[10px] font-mono bg-zinc-100 hover:bg-zinc-200 text-zinc-800 border border-zinc-200 cursor-pointer"
+                                          title="View Aadhaar"
+                                        >
+                                          Aadhaar ↗
+                                        </button>
+                                      )}
+
+                                      {/* Bank Proof / Cheque */}
+                                      {(app.documents?.bankProofDoc || app.documents?.bankProofFile) && (
+                                        <button
+                                          type="button"
+                                          onClick={() => setPreviewingDoc(app.documents?.bankProofDoc || { name: app.documents?.bankProofFile || 'Bank Proof.pdf', type: 'pdf' })}
+                                          className="px-2 py-0.5 rounded-full text-[10px] font-mono bg-zinc-100 hover:bg-zinc-200 text-zinc-800 border border-zinc-200 cursor-pointer"
+                                          title="View Bank Proof / Cheque"
+                                        >
+                                          Cheque ↗
+                                        </button>
+                                      )}
+
+                                      {/* Resume */}
+                                      {(app.documents?.resumeDoc || app.documents?.resumeFile) && (
+                                        <button
+                                          type="button"
+                                          onClick={() => setPreviewingDoc(app.documents?.resumeDoc || { name: app.documents?.resumeFile || 'Resume.docx', type: 'docx' })}
+                                          className="px-2 py-0.5 rounded-full text-[10px] font-mono bg-zinc-100 hover:bg-zinc-200 text-zinc-800 border border-zinc-200 cursor-pointer"
+                                          title="View Resume"
+                                        >
+                                          Resume ↗
+                                        </button>
+                                      )}
+
+                                      {/* PAN (NATS) */}
+                                      {(app.documents?.panDoc || app.documents?.panFile) && (
+                                        <button
+                                          type="button"
+                                          onClick={() => setPreviewingDoc(app.documents?.panDoc || { name: app.documents?.panFile || 'PAN Card.pdf', type: 'pdf' })}
+                                          className="px-2 py-0.5 rounded-full text-[10px] font-mono bg-amber-50 hover:bg-amber-100 text-amber-800 border border-amber-200 cursor-pointer font-bold"
+                                          title="View PAN Card"
+                                        >
+                                          PAN ↗
+                                        </button>
+                                      )}
+
+                                      {/* All Semester Marksheets (NATS) */}
+                                      {(app.documents?.allSemesterDoc || app.documents?.allSemesterFile) && (
+                                        <button
+                                          type="button"
+                                          onClick={() => setPreviewingDoc(app.documents?.allSemesterDoc || { name: app.documents?.allSemesterFile || 'All Semester Marksheets.pdf', type: 'pdf' })}
+                                          className="px-2 py-0.5 rounded-full text-[10px] font-mono bg-amber-50 hover:bg-amber-100 text-amber-800 border border-amber-200 cursor-pointer font-bold"
+                                          title="View All Semester Marksheets"
+                                        >
+                                          Sem Marksheets ↗
+                                        </button>
+                                      )}
+
+                                      {/* Caste / Category Certificate (NATS) */}
+                                      {(app.documents?.casteCertDoc || app.documents?.casteCertFile) && (
+                                        <button
+                                          type="button"
+                                          onClick={() => setPreviewingDoc(app.documents?.casteCertDoc || { name: app.documents?.casteCertFile || 'Caste Certificate.pdf', type: 'pdf' })}
+                                          className="px-2 py-0.5 rounded-full text-[10px] font-mono bg-zinc-100 hover:bg-zinc-200 text-zinc-800 border border-zinc-200 cursor-pointer"
+                                          title="View Caste / Category Certificate"
+                                        >
+                                          Caste Cert ↗
+                                        </button>
+                                      )}
+
+                                      {/* APAR ID (NATS) */}
+                                      {(app.documents?.aparIdDoc || app.documents?.aparIdFile) && (
+                                        <button
+                                          type="button"
+                                          onClick={() => setPreviewingDoc(app.documents?.aparIdDoc || { name: app.documents?.aparIdFile || 'APAR ID Document.pdf', type: 'pdf' })}
+                                          className="px-2 py-0.5 rounded-full text-[10px] font-mono bg-zinc-100 hover:bg-zinc-200 text-zinc-800 border border-zinc-200 cursor-pointer"
+                                          title="View APAR ID"
+                                        >
+                                          APAR ↗
+                                        </button>
+                                      )}
+                                    </div>
+                                  </td>
+
+                                  <td className="py-3.5 px-4">
+                                    <button
+                                      onClick={() => setSelectedContractCandidate(app)}
+                                      className="px-2.5 py-1 rounded-full text-[10px] font-semibold bg-zinc-100 hover:bg-zinc-200 text-zinc-800 border border-zinc-200 transition-all cursor-pointer flex items-center gap-1"
+                                    >
+                                      <FileSignature className="w-3 h-3" />
+                                      <span>{app.contractStatus} ↗</span>
+                                    </button>
+                                  </td>
+
+                                  <td className="py-3.5 px-4 text-right">
+                                    <button
+                                      onClick={() => removeApprentice(app.id)}
+                                      className="p-1.5 rounded-full hover:bg-rose-50 text-zinc-400 hover:text-rose-600 transition-colors cursor-pointer"
+                                      title="Remove Candidate"
+                                    >
+                                      <Trash2 className="w-3.5 h-3.5" />
+                                    </button>
+                                  </td>
+                                </tr>
+                              );
+                            })
                           ) : (
                             <tr>
                               <td colSpan={8} className="py-10 text-center text-zinc-400 text-xs">
@@ -2165,61 +2455,61 @@ export const ClientDashboard: React.FC = () => {
                       />
                     </div>
 
-                    <div className="sm:col-span-2 space-y-1.5">
-                      <div className="flex items-center justify-between">
-                        <label className="block font-bold text-zinc-700 text-xs">Target Role / Specialization *</label>
-                        <span className="text-[10px] text-zinc-400 font-mono">From your intake selections</span>
-                      </div>
-
-                      <select
-                        value={isCustomRole ? '__other__' : candidateForm.tradeOrRole}
-                        onChange={(e) => {
-                          const val = e.target.value;
-                          if (val === '__other__') {
-                            setIsCustomRole(true);
-                            setCandidateForm({ ...candidateForm, tradeOrRole: customRoleText });
-                          } else {
-                            setIsCustomRole(false);
-                            setCandidateForm({ ...candidateForm, tradeOrRole: val });
-                          }
-                        }}
-                        className="w-full px-3 py-2.5 rounded-2xl bg-zinc-50 border border-zinc-200 text-zinc-900 text-xs focus:outline-none focus:border-black font-semibold cursor-pointer"
-                      >
-                        {clientChosenRoles.map((role) => (
-                          <option key={role} value={role}>
-                            {role}
-                          </option>
-                        ))}
-                        <option value="__other__">+ Other (Type Custom Role)</option>
-                      </select>
-
-                      {isCustomRole && (
-                        <div className="pt-1">
+                    {candidateForm.enrollmentScheme === 'NATS' && (
+                      <>
+                        <div>
+                          <label className="block font-bold text-zinc-700 mb-1">PAN Card Number *</label>
                           <input
                             type="text"
                             required
-                            placeholder="Enter custom role title (e.g. AI Prompt Engineer / QA Analyst)"
-                            value={customRoleText}
-                            onChange={(e) => {
-                              const val = e.target.value;
-                              setCustomRoleText(val);
-                              setCandidateForm({ ...candidateForm, tradeOrRole: val });
-                            }}
-                            className="w-full px-3.5 py-2.5 rounded-2xl bg-white border border-zinc-300 text-zinc-900 text-xs focus:outline-none focus:border-black font-medium"
-                            autoFocus
+                            placeholder="ABCDE1234F"
+                            value={candidateForm.panNumber || ''}
+                            onChange={(e) => setCandidateForm({ ...candidateForm, panNumber: e.target.value.toUpperCase() })}
+                            className="w-full px-3 py-2 rounded-2xl bg-zinc-50 border border-zinc-200 text-zinc-900 text-xs font-mono uppercase focus:outline-none focus:border-black font-bold"
                           />
                         </div>
-                      )}
+
+                        <div>
+                          <label className="block font-bold text-zinc-700 mb-1">APAR ID (APAAR ID)</label>
+                          <input
+                            type="text"
+                            placeholder="e.g. 12-digit APAAR ID"
+                            value={candidateForm.aparId || ''}
+                            onChange={(e) => setCandidateForm({ ...candidateForm, aparId: e.target.value })}
+                            className="w-full px-3 py-2 rounded-2xl bg-zinc-50 border border-zinc-200 text-zinc-900 text-xs font-mono focus:outline-none focus:border-black"
+                          />
+                        </div>
+                      </>
+                    )}
+
+                    <div>
+                      <label className="block font-bold text-zinc-700 mb-1">Curriculum *</label>
+                      <input
+                        type="text"
+                        required
+                        placeholder="e.g. Mechanical Engineering / Retail Sales Associate"
+                        value={candidateForm.tradeOrRole}
+                        onChange={(e) => setCandidateForm({ ...candidateForm, tradeOrRole: e.target.value })}
+                        className="w-full px-3 py-2 rounded-2xl bg-zinc-50 border border-zinc-200 text-zinc-900 text-xs focus:outline-none focus:border-black font-medium"
+                      />
                     </div>
 
-                    {/* Monthly Stipend & Joining Date (Pre-filled from Intake with edit option) */}
                     <div>
-                      <div className="flex items-center justify-between mb-1">
-                        <label className="block font-bold text-zinc-700 text-xs">Monthly Stipend (₹) *</label>
-                        {activeSubmission?.responses?.stipendPerApprentice && (
-                          <span className="text-[10px] text-zinc-400 font-mono">Intake default</span>
-                        )}
-                      </div>
+                      <label className="block font-bold text-zinc-700 mb-1">Enrollment Scheme *</label>
+                      <select
+                        value={candidateForm.enrollmentScheme || 'NAPS'}
+                        onChange={(e) => setCandidateForm({ ...candidateForm, enrollmentScheme: e.target.value as 'NAPS' | 'NATS' | 'Others' })}
+                        className="w-full px-3 py-2 rounded-2xl bg-zinc-50 border border-zinc-200 text-zinc-900 text-xs focus:outline-none focus:border-black font-semibold cursor-pointer"
+                      >
+                        <option value="NAPS">NAPS (National Apprenticeship Promotion Scheme)</option>
+                        <option value="NATS">NATS (National Apprenticeship Training Scheme)</option>
+                        <option value="Others">Others / Non-Scheme Apprenticeship</option>
+                      </select>
+                    </div>
+
+                    {/* Monthly Stipend */}
+                    <div>
+                      <label className="block font-bold text-zinc-700 text-xs mb-1">Monthly Stipend (₹) *</label>
                       <input
                         type="number"
                         required
@@ -2234,18 +2524,33 @@ export const ClientDashboard: React.FC = () => {
                       />
                     </div>
 
+                    {/* Joining Date */}
                     <div>
-                      <div className="flex items-center justify-between mb-1">
-                        <label className="block font-bold text-zinc-700 text-xs">Joining Date *</label>
-                        {activeSubmission?.responses?.proposedJoiningDate && (
-                          <span className="text-[10px] text-zinc-400 font-mono">Intake default</span>
-                        )}
-                      </div>
+                      <label className="block font-bold text-zinc-700 text-xs mb-1">Date of Joining (DOJ) *</label>
                       <input
                         type="date"
                         required
                         value={candidateForm.joiningDate}
-                        onChange={(e) => setCandidateForm({ ...candidateForm, joiningDate: e.target.value })}
+                        onChange={(e) => {
+                          const newDoj = e.target.value;
+                          const nextYear = newDoj ? new Date(new Date(newDoj).setFullYear(new Date(newDoj).getFullYear() + 1)).toISOString().split('T')[0] : '';
+                          setCandidateForm({ ...candidateForm, joiningDate: newDoj, contractExpireDate: nextYear });
+                        }}
+                        className="w-full px-3 py-2 rounded-2xl bg-zinc-50 border border-zinc-200 text-zinc-900 text-xs focus:outline-none focus:border-black font-bold"
+                      />
+                    </div>
+
+                    {/* Contract Expiry Date */}
+                    <div className="sm:col-span-2">
+                      <div className="flex items-center justify-between mb-1">
+                        <label className="block font-bold text-zinc-700 text-xs">Contract Expiry Date *</label>
+                        <span className="text-[10px] text-zinc-400 font-mono">Defaults to 1 year from joining</span>
+                      </div>
+                      <input
+                        type="date"
+                        required
+                        value={candidateForm.contractExpireDate}
+                        onChange={(e) => setCandidateForm({ ...candidateForm, contractExpireDate: e.target.value })}
                         className="w-full px-3 py-2 rounded-2xl bg-zinc-50 border border-zinc-200 text-zinc-900 text-xs focus:outline-none focus:border-black font-bold"
                       />
                     </div>
@@ -2305,131 +2610,344 @@ export const ClientDashboard: React.FC = () => {
 
                 {/* 3. Candidate Compliance & Verification Documents */}
                 <div className="space-y-2 pt-2 border-t border-zinc-100">
-                  <span className="text-[11px] font-mono font-bold uppercase tracking-wider text-zinc-400 block">
-                    3. Candidate Proofs & Verification Files (Photos, KYC & Certificates)
-                  </span>
-
-                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
-                    {/* Candidate Passport Photo */}
-                    <div className="p-3 rounded-2xl bg-zinc-50 border border-zinc-200 flex flex-col justify-between">
-                      <div className="flex items-center justify-between mb-1.5">
-                        <span className="font-bold text-zinc-800 text-xs">Candidate Passport Photo *</span>
-                        <span className="text-[9px] font-mono px-1.5 py-0.5 rounded-full bg-zinc-200 text-zinc-700 font-bold">JPG / PNG</span>
-                      </div>
-                      <label className="p-2 rounded-xl bg-white border border-zinc-200 hover:border-black flex items-center gap-2 cursor-pointer transition-colors text-[11px]">
-                        <UploadCloud className="w-3.5 h-3.5 text-zinc-400 shrink-0" />
-                        <span className="truncate font-mono text-zinc-700">
-                          {candidateDocs.photoDoc?.name || 'Attach Candidate Photo (.jpg/.png)'}
-                        </span>
-                        <input
-                          type="file"
-                          accept="image/*,.jpg,.jpeg,.png,.webp"
-                          className="hidden"
-                          onChange={(e) => handleDocFileSelect(e.target.files?.[0] || null, 'Photo')}
-                        />
-                      </label>
-                    </div>
-
-                    {/* Candidate Signature Photo */}
-                    <div className="p-3 rounded-2xl bg-zinc-50 border border-zinc-200 flex flex-col justify-between">
-                      <div className="flex items-center justify-between mb-1.5">
-                        <span className="font-bold text-zinc-800 text-xs">Candidate Signature Photo *</span>
-                        <span className="text-[9px] font-mono px-1.5 py-0.5 rounded-full bg-zinc-200 text-zinc-700 font-bold">JPG / PNG / PDF</span>
-                      </div>
-                      <label className="p-2 rounded-xl bg-white border border-zinc-200 hover:border-black flex items-center gap-2 cursor-pointer transition-colors text-[11px]">
-                        <UploadCloud className="w-3.5 h-3.5 text-zinc-400 shrink-0" />
-                        <span className="truncate font-mono text-zinc-700">
-                          {candidateDocs.signatureDoc?.name || 'Attach Signature (.jpg/.png/.pdf)'}
-                        </span>
-                        <input
-                          type="file"
-                          accept="image/*,.jpg,.jpeg,.png,.webp,.pdf"
-                          className="hidden"
-                          onChange={(e) => handleDocFileSelect(e.target.files?.[0] || null, 'Signature')}
-                        />
-                      </label>
-                    </div>
-
-                    {/* Aadhaar Card */}
-                    <div className="p-3 rounded-2xl bg-zinc-50 border border-zinc-200 flex flex-col justify-between">
-                      <div className="flex items-center justify-between mb-1.5">
-                        <span className="font-bold text-zinc-800 text-xs">Aadhaar Card Document *</span>
-                        <span className="text-[9px] font-mono px-1.5 py-0.5 rounded-full bg-zinc-200 text-zinc-700 font-bold">PDF / DOCX</span>
-                      </div>
-                      <label className="p-2 rounded-xl bg-white border border-zinc-200 hover:border-black flex items-center gap-2 cursor-pointer transition-colors text-[11px]">
-                        <UploadCloud className="w-3.5 h-3.5 text-zinc-400 shrink-0" />
-                        <span className="truncate font-mono text-zinc-700">
-                          {candidateDocs.aadhaarDoc?.name || 'Attach Aadhaar (.pdf/.docx/.jpg)'}
-                        </span>
-                        <input
-                          type="file"
-                          accept=".pdf,.docx,.doc,.txt,.png,.jpg,.jpeg"
-                          className="hidden"
-                          onChange={(e) => handleDocFileSelect(e.target.files?.[0] || null, 'Aadhaar')}
-                        />
-                      </label>
-                    </div>
-
-                    {/* Educational Degree */}
-                    <div className="p-3 rounded-2xl bg-zinc-50 border border-zinc-200 flex flex-col justify-between">
-                      <div className="flex items-center justify-between mb-1.5">
-                        <span className="font-bold text-zinc-800 text-xs">Degree / Marksheet *</span>
-                        <span className="text-[9px] font-mono px-1.5 py-0.5 rounded-full bg-zinc-200 text-zinc-700 font-bold">PDF / DOCX</span>
-                      </div>
-                      <label className="p-2 rounded-xl bg-white border border-zinc-200 hover:border-black flex items-center gap-2 cursor-pointer transition-colors text-[11px]">
-                        <UploadCloud className="w-3.5 h-3.5 text-zinc-400 shrink-0" />
-                        <span className="truncate font-mono text-zinc-700">
-                          {candidateDocs.educationDoc?.name || 'Attach Degree (.pdf/.docx/.jpg)'}
-                        </span>
-                        <input
-                          type="file"
-                          accept=".pdf,.docx,.doc,.txt,.png,.jpg,.jpeg"
-                          className="hidden"
-                          onChange={(e) => handleDocFileSelect(e.target.files?.[0] || null, 'Education')}
-                        />
-                      </label>
-                    </div>
-
-                    {/* Bank Passbook / Cancelled Cheque */}
-                    <div className="p-3 rounded-2xl bg-zinc-50 border border-zinc-200 flex flex-col justify-between">
-                      <div className="flex items-center justify-between mb-1.5">
-                        <span className="font-bold text-zinc-800 text-xs">Cancelled Cheque / Bank Proof *</span>
-                        <span className="text-[9px] font-mono px-1.5 py-0.5 rounded-full bg-zinc-200 text-zinc-700 font-bold">PDF / JPG / PNG</span>
-                      </div>
-                      <label className="p-2 rounded-xl bg-white border border-zinc-200 hover:border-black flex items-center gap-2 cursor-pointer transition-colors text-[11px]">
-                        <UploadCloud className="w-3.5 h-3.5 text-zinc-400 shrink-0" />
-                        <span className="truncate font-mono text-zinc-700">
-                          {candidateDocs.bankProofDoc?.name || 'Attach Cancelled Cheque (.pdf/.jpg)'}
-                        </span>
-                        <input
-                          type="file"
-                          accept=".pdf,.docx,.doc,.txt,.png,.jpg,.jpeg"
-                          className="hidden"
-                          onChange={(e) => handleDocFileSelect(e.target.files?.[0] || null, 'Bank Proof')}
-                        />
-                      </label>
-                    </div>
-
-                    {/* Resume / CV */}
-                    <div className="p-3 rounded-2xl bg-zinc-50 border border-zinc-200 flex flex-col justify-between">
-                      <div className="flex items-center justify-between mb-1.5">
-                        <span className="font-bold text-zinc-800 text-xs">Candidate Resume / CV</span>
-                        <span className="text-[9px] font-mono px-1.5 py-0.5 rounded-full bg-zinc-200 text-zinc-700">DOCX / PDF / TXT</span>
-                      </div>
-                      <label className="p-2 rounded-xl bg-white border border-zinc-200 hover:border-black flex items-center gap-2 cursor-pointer transition-colors text-[11px]">
-                        <UploadCloud className="w-3.5 h-3.5 text-zinc-400 shrink-0" />
-                        <span className="truncate font-mono text-zinc-700">
-                          {candidateDocs.resumeDoc?.name || 'Attach Resume (.docx/.pdf/.txt)'}
-                        </span>
-                        <input
-                          type="file"
-                          accept=".pdf,.docx,.doc,.txt,.png,.jpg,.jpeg"
-                          className="hidden"
-                          onChange={(e) => handleDocFileSelect(e.target.files?.[0] || null, 'Resume')}
-                        />
-                      </label>
-                    </div>
+                  <div className="flex items-center justify-between">
+                    <span className="text-[11px] font-mono font-bold uppercase tracking-wider text-zinc-400 block">
+                      3. Candidate Proofs & Verification Files ({candidateForm.enrollmentScheme === 'NATS' ? 'NATS Specific' : 'NAPS Specific'})
+                    </span>
+                    <span className={`px-2 py-0.5 rounded-full text-[10px] font-bold font-mono ${
+                      candidateForm.enrollmentScheme === 'NATS' ? 'bg-amber-100 text-amber-900 border border-amber-300' : 'bg-blue-100 text-blue-900 border border-blue-300'
+                    }`}>
+                      {candidateForm.enrollmentScheme} Checklist
+                    </span>
                   </div>
+
+                  {/* NATS Documents Upload Group */}
+                  {candidateForm.enrollmentScheme === 'NATS' ? (
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
+                      {/* 1. Aadhaar Card */}
+                      <div className="p-3 rounded-2xl bg-zinc-50 border border-zinc-200 flex flex-col justify-between">
+                        <div className="flex items-center justify-between mb-1.5">
+                          <span className="font-bold text-zinc-800 text-xs">1. Aadhaar Card *</span>
+                          <span className="text-[9px] font-mono px-1.5 py-0.5 rounded-full bg-zinc-200 text-zinc-700 font-bold">PDF / JPG</span>
+                        </div>
+                        <label className="p-2 rounded-xl bg-white border border-zinc-200 hover:border-black flex items-center gap-2 cursor-pointer transition-colors text-[11px]">
+                          <UploadCloud className="w-3.5 h-3.5 text-zinc-400 shrink-0" />
+                          <span className="truncate font-mono text-zinc-700">
+                            {candidateDocs.aadhaarDoc?.name || 'Attach Aadhaar Card (.pdf/.jpg)'}
+                          </span>
+                          <input
+                            type="file"
+                            accept=".pdf,.docx,.doc,.txt,.png,.jpg,.jpeg"
+                            className="hidden"
+                            onChange={(e) => handleDocFileSelect(e.target.files?.[0] || null, 'Aadhaar')}
+                          />
+                        </label>
+                      </div>
+
+                      {/* 2. PAN Card */}
+                      <div className="p-3 rounded-2xl bg-zinc-50 border border-zinc-200 flex flex-col justify-between">
+                        <div className="flex items-center justify-between mb-1.5">
+                          <span className="font-bold text-zinc-800 text-xs">2. PAN Card *</span>
+                          <span className="text-[9px] font-mono px-1.5 py-0.5 rounded-full bg-zinc-200 text-zinc-700 font-bold">PDF / JPG</span>
+                        </div>
+                        <label className="p-2 rounded-xl bg-white border border-zinc-200 hover:border-black flex items-center gap-2 cursor-pointer transition-colors text-[11px]">
+                          <UploadCloud className="w-3.5 h-3.5 text-zinc-400 shrink-0" />
+                          <span className="truncate font-mono text-zinc-700">
+                            {candidateDocs.panDoc?.name || 'Attach PAN Card (.pdf/.jpg)'}
+                          </span>
+                          <input
+                            type="file"
+                            accept=".pdf,.docx,.doc,.txt,.png,.jpg,.jpeg"
+                            className="hidden"
+                            onChange={(e) => handleDocFileSelect(e.target.files?.[0] || null, 'PAN')}
+                          />
+                        </label>
+                      </div>
+
+                      {/* 3. Photograph */}
+                      <div className="p-3 rounded-2xl bg-zinc-50 border border-zinc-200 flex flex-col justify-between">
+                        <div className="flex items-center justify-between mb-1.5">
+                          <span className="font-bold text-zinc-800 text-xs">3. Photograph *</span>
+                          <span className="text-[9px] font-mono px-1.5 py-0.5 rounded-full bg-zinc-200 text-zinc-700 font-bold">JPG / PNG</span>
+                        </div>
+                        <label className="p-2 rounded-xl bg-white border border-zinc-200 hover:border-black flex items-center gap-2 cursor-pointer transition-colors text-[11px]">
+                          <UploadCloud className="w-3.5 h-3.5 text-zinc-400 shrink-0" />
+                          <span className="truncate font-mono text-zinc-700">
+                            {candidateDocs.photoDoc?.name || 'Attach Candidate Photo (.jpg/.png)'}
+                          </span>
+                          <input
+                            type="file"
+                            accept="image/*,.jpg,.jpeg,.png,.webp"
+                            className="hidden"
+                            onChange={(e) => handleDocFileSelect(e.target.files?.[0] || null, 'Photo')}
+                          />
+                        </label>
+                      </div>
+
+                      {/* 4. Signature */}
+                      <div className="p-3 rounded-2xl bg-zinc-50 border border-zinc-200 flex flex-col justify-between">
+                        <div className="flex items-center justify-between mb-1.5">
+                          <span className="font-bold text-zinc-800 text-xs">4. Signature *</span>
+                          <span className="text-[9px] font-mono px-1.5 py-0.5 rounded-full bg-zinc-200 text-zinc-700 font-bold">JPG / PNG / PDF</span>
+                        </div>
+                        <label className="p-2 rounded-xl bg-white border border-zinc-200 hover:border-black flex items-center gap-2 cursor-pointer transition-colors text-[11px]">
+                          <UploadCloud className="w-3.5 h-3.5 text-zinc-400 shrink-0" />
+                          <span className="truncate font-mono text-zinc-700">
+                            {candidateDocs.signatureDoc?.name || 'Attach Signature (.jpg/.png/.pdf)'}
+                          </span>
+                          <input
+                            type="file"
+                            accept="image/*,.jpg,.jpeg,.png,.webp,.pdf"
+                            className="hidden"
+                            onChange={(e) => handleDocFileSelect(e.target.files?.[0] || null, 'Signature')}
+                          />
+                        </label>
+                      </div>
+
+                      {/* 5. All Semester Marksheets */}
+                      <div className="p-3 rounded-2xl bg-zinc-50 border border-zinc-200 flex flex-col justify-between">
+                        <div className="flex items-center justify-between mb-1.5">
+                          <span className="font-bold text-zinc-800 text-xs">5. All Semester Marksheets *</span>
+                          <span className="text-[9px] font-mono px-1.5 py-0.5 rounded-full bg-amber-100 text-amber-800 font-bold">Combined PDF</span>
+                        </div>
+                        <label className="p-2 rounded-xl bg-white border border-zinc-200 hover:border-black flex items-center gap-2 cursor-pointer transition-colors text-[11px]">
+                          <UploadCloud className="w-3.5 h-3.5 text-zinc-400 shrink-0" />
+                          <span className="truncate font-mono text-zinc-700">
+                            {candidateDocs.allSemesterDoc?.name || 'Attach All Semester Marksheets (.pdf)'}
+                          </span>
+                          <input
+                            type="file"
+                            accept=".pdf,.docx,.doc,.txt"
+                            className="hidden"
+                            onChange={(e) => handleDocFileSelect(e.target.files?.[0] || null, 'All Semester')}
+                          />
+                        </label>
+                      </div>
+
+                      {/* 6. Degree / Provisional Certificate */}
+                      <div className="p-3 rounded-2xl bg-zinc-50 border border-zinc-200 flex flex-col justify-between">
+                        <div className="flex items-center justify-between mb-1.5">
+                          <span className="font-bold text-zinc-800 text-xs">6. Degree / Provisional Certificate *</span>
+                          <span className="text-[9px] font-mono px-1.5 py-0.5 rounded-full bg-zinc-200 text-zinc-700 font-bold">PDF / JPG</span>
+                        </div>
+                        <label className="p-2 rounded-xl bg-white border border-zinc-200 hover:border-black flex items-center gap-2 cursor-pointer transition-colors text-[11px]">
+                          <UploadCloud className="w-3.5 h-3.5 text-zinc-400 shrink-0" />
+                          <span className="truncate font-mono text-zinc-700">
+                            {candidateDocs.docGrad?.name || candidateDocs.educationDoc?.name || 'Attach Degree / Provisional (.pdf/.jpg)'}
+                          </span>
+                          <input
+                            type="file"
+                            accept=".pdf,.docx,.doc,.txt,.png,.jpg,.jpeg"
+                            className="hidden"
+                            onChange={(e) => handleDocFileSelect(e.target.files?.[0] || null, 'Graduation')}
+                          />
+                        </label>
+                      </div>
+
+                      {/* 7. Category / Caste Certificate (if applicable) */}
+                      <div className="p-3 rounded-2xl bg-zinc-50 border border-zinc-200 flex flex-col justify-between">
+                        <div className="flex items-center justify-between mb-1.5">
+                          <span className="font-bold text-zinc-800 text-xs">7. Category / Caste Certificate</span>
+                          <span className="text-[9px] font-mono px-1.5 py-0.5 rounded-full bg-zinc-100 text-zinc-600">Optional</span>
+                        </div>
+                        <label className="p-2 rounded-xl bg-white border border-zinc-200 hover:border-black flex items-center gap-2 cursor-pointer transition-colors text-[11px]">
+                          <UploadCloud className="w-3.5 h-3.5 text-zinc-400 shrink-0" />
+                          <span className="truncate font-mono text-zinc-700">
+                            {candidateDocs.casteCertDoc?.name || 'Attach Caste / Category Certificate'}
+                          </span>
+                          <input
+                            type="file"
+                            accept=".pdf,.docx,.doc,.txt,.png,.jpg,.jpeg"
+                            className="hidden"
+                            onChange={(e) => handleDocFileSelect(e.target.files?.[0] || null, 'Caste Certificate')}
+                          />
+                        </label>
+                      </div>
+
+                      {/* 8. APAR ID Document */}
+                      <div className="p-3 rounded-2xl bg-zinc-50 border border-zinc-200 flex flex-col justify-between">
+                        <div className="flex items-center justify-between mb-1.5">
+                          <span className="font-bold text-zinc-800 text-xs">8. APAR ID Proof</span>
+                          <span className="text-[9px] font-mono px-1.5 py-0.5 rounded-full bg-zinc-100 text-zinc-600">APAAR ID</span>
+                        </div>
+                        <label className="p-2 rounded-xl bg-white border border-zinc-200 hover:border-black flex items-center gap-2 cursor-pointer transition-colors text-[11px]">
+                          <UploadCloud className="w-3.5 h-3.5 text-zinc-400 shrink-0" />
+                          <span className="truncate font-mono text-zinc-700">
+                            {candidateDocs.aparIdDoc?.name || 'Attach APAAR ID Document / Card'}
+                          </span>
+                          <input
+                            type="file"
+                            accept=".pdf,.docx,.doc,.txt,.png,.jpg,.jpeg"
+                            className="hidden"
+                            onChange={(e) => handleDocFileSelect(e.target.files?.[0] || null, 'APAR ID')}
+                          />
+                        </label>
+                      </div>
+                    </div>
+                  ) : (
+                    /* NAPS / Standard Documents Upload Group */
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
+                      {/* Candidate Passport Photo */}
+                      <div className="p-3 rounded-2xl bg-zinc-50 border border-zinc-200 flex flex-col justify-between">
+                        <div className="flex items-center justify-between mb-1.5">
+                          <span className="font-bold text-zinc-800 text-xs">Candidate Passport Photo *</span>
+                          <span className="text-[9px] font-mono px-1.5 py-0.5 rounded-full bg-zinc-200 text-zinc-700 font-bold">JPG / PNG</span>
+                        </div>
+                        <label className="p-2 rounded-xl bg-white border border-zinc-200 hover:border-black flex items-center gap-2 cursor-pointer transition-colors text-[11px]">
+                          <UploadCloud className="w-3.5 h-3.5 text-zinc-400 shrink-0" />
+                          <span className="truncate font-mono text-zinc-700">
+                            {candidateDocs.photoDoc?.name || 'Attach Candidate Photo (.jpg/.png)'}
+                          </span>
+                          <input
+                            type="file"
+                            accept="image/*,.jpg,.jpeg,.png,.webp"
+                            className="hidden"
+                            onChange={(e) => handleDocFileSelect(e.target.files?.[0] || null, 'Photo')}
+                          />
+                        </label>
+                      </div>
+
+                      {/* Candidate Signature Photo */}
+                      <div className="p-3 rounded-2xl bg-zinc-50 border border-zinc-200 flex flex-col justify-between">
+                        <div className="flex items-center justify-between mb-1.5">
+                          <span className="font-bold text-zinc-800 text-xs">Candidate Signature Photo *</span>
+                          <span className="text-[9px] font-mono px-1.5 py-0.5 rounded-full bg-zinc-200 text-zinc-700 font-bold">JPG / PNG / PDF</span>
+                        </div>
+                        <label className="p-2 rounded-xl bg-white border border-zinc-200 hover:border-black flex items-center gap-2 cursor-pointer transition-colors text-[11px]">
+                          <UploadCloud className="w-3.5 h-3.5 text-zinc-400 shrink-0" />
+                          <span className="truncate font-mono text-zinc-700">
+                            {candidateDocs.signatureDoc?.name || 'Attach Signature (.jpg/.png/.pdf)'}
+                          </span>
+                          <input
+                            type="file"
+                            accept="image/*,.jpg,.jpeg,.png,.webp,.pdf"
+                            className="hidden"
+                            onChange={(e) => handleDocFileSelect(e.target.files?.[0] || null, 'Signature')}
+                          />
+                        </label>
+                      </div>
+
+                      {/* Aadhaar Card */}
+                      <div className="p-3 rounded-2xl bg-zinc-50 border border-zinc-200 flex flex-col justify-between">
+                        <div className="flex items-center justify-between mb-1.5">
+                          <span className="font-bold text-zinc-800 text-xs">Aadhaar Card Document *</span>
+                          <span className="text-[9px] font-mono px-1.5 py-0.5 rounded-full bg-zinc-200 text-zinc-700 font-bold">PDF / DOCX</span>
+                        </div>
+                        <label className="p-2 rounded-xl bg-white border border-zinc-200 hover:border-black flex items-center gap-2 cursor-pointer transition-colors text-[11px]">
+                          <UploadCloud className="w-3.5 h-3.5 text-zinc-400 shrink-0" />
+                          <span className="truncate font-mono text-zinc-700">
+                            {candidateDocs.aadhaarDoc?.name || 'Attach Aadhaar (.pdf/.docx/.jpg)'}
+                          </span>
+                          <input
+                            type="file"
+                            accept=".pdf,.docx,.doc,.txt,.png,.jpg,.jpeg"
+                            className="hidden"
+                            onChange={(e) => handleDocFileSelect(e.target.files?.[0] || null, 'Aadhaar')}
+                          />
+                        </label>
+                      </div>
+
+                      {/* 10th Marksheet / Certificate */}
+                      <div className="p-3 rounded-2xl bg-zinc-50 border border-zinc-200 flex flex-col justify-between">
+                        <div className="flex items-center justify-between mb-1.5">
+                          <span className="font-bold text-zinc-800 text-xs">10th Marksheet / Certificate *</span>
+                          <span className="text-[9px] font-mono px-1.5 py-0.5 rounded-full bg-zinc-200 text-zinc-700 font-bold">Max 2 MB</span>
+                        </div>
+                        <label className="p-2 rounded-xl bg-white border border-zinc-200 hover:border-black flex items-center gap-2 cursor-pointer transition-colors text-[11px]">
+                          <UploadCloud className="w-3.5 h-3.5 text-zinc-400 shrink-0" />
+                          <span className="truncate font-mono text-zinc-700">
+                            {candidateDocs.doc10th?.name || 'Attach 10th Marksheet (.pdf/.docx/.jpg)'}
+                          </span>
+                          <input
+                            type="file"
+                            accept=".pdf,.docx,.doc,.txt,.png,.jpg,.jpeg"
+                            className="hidden"
+                            onChange={(e) => handleDocFileSelect(e.target.files?.[0] || null, '10th')}
+                          />
+                        </label>
+                      </div>
+
+                      {/* 12th Marksheet / Diploma */}
+                      <div className="p-3 rounded-2xl bg-zinc-50 border border-zinc-200 flex flex-col justify-between">
+                        <div className="flex items-center justify-between mb-1.5">
+                          <span className="font-bold text-zinc-800 text-xs">12th Marksheet / Diploma *</span>
+                          <span className="text-[9px] font-mono px-1.5 py-0.5 rounded-full bg-zinc-200 text-zinc-700 font-bold">Max 2 MB</span>
+                        </div>
+                        <label className="p-2 rounded-xl bg-white border border-zinc-200 hover:border-black flex items-center gap-2 cursor-pointer transition-colors text-[11px]">
+                          <UploadCloud className="w-3.5 h-3.5 text-zinc-400 shrink-0" />
+                          <span className="truncate font-mono text-zinc-700">
+                            {candidateDocs.doc12th?.name || 'Attach 12th Marksheet (.pdf/.docx/.jpg)'}
+                          </span>
+                          <input
+                            type="file"
+                            accept=".pdf,.docx,.doc,.txt,.png,.jpg,.jpeg"
+                            className="hidden"
+                            onChange={(e) => handleDocFileSelect(e.target.files?.[0] || null, '12th')}
+                          />
+                        </label>
+                      </div>
+
+                      {/* Graduation Degree / Certificate */}
+                      <div className="p-3 rounded-2xl bg-zinc-50 border border-zinc-200 flex flex-col justify-between">
+                        <div className="flex items-center justify-between mb-1.5">
+                          <span className="font-bold text-zinc-800 text-xs">Graduation Degree / Certificate *</span>
+                          <span className="text-[9px] font-mono px-1.5 py-0.5 rounded-full bg-zinc-200 text-zinc-700 font-bold">Max 2 MB</span>
+                        </div>
+                        <label className="p-2 rounded-xl bg-white border border-zinc-200 hover:border-black flex items-center gap-2 cursor-pointer transition-colors text-[11px]">
+                          <UploadCloud className="w-3.5 h-3.5 text-zinc-400 shrink-0" />
+                          <span className="truncate font-mono text-zinc-700">
+                            {candidateDocs.docGrad?.name || candidateDocs.educationDoc?.name || 'Attach Graduation Certificate (.pdf/.docx/.jpg)'}
+                          </span>
+                          <input
+                            type="file"
+                            accept=".pdf,.docx,.doc,.txt,.png,.jpg,.jpeg"
+                            className="hidden"
+                            onChange={(e) => handleDocFileSelect(e.target.files?.[0] || null, 'Graduation')}
+                          />
+                        </label>
+                      </div>
+
+                      {/* Bank Passbook / Cancelled Cheque */}
+                      <div className="p-3 rounded-2xl bg-zinc-50 border border-zinc-200 flex flex-col justify-between">
+                        <div className="flex items-center justify-between mb-1.5">
+                          <span className="font-bold text-zinc-800 text-xs">Cancelled Cheque / Bank Proof *</span>
+                          <span className="text-[9px] font-mono px-1.5 py-0.5 rounded-full bg-zinc-200 text-zinc-700 font-bold">PDF / JPG / PNG</span>
+                        </div>
+                        <label className="p-2 rounded-xl bg-white border border-zinc-200 hover:border-black flex items-center gap-2 cursor-pointer transition-colors text-[11px]">
+                          <UploadCloud className="w-3.5 h-3.5 text-zinc-400 shrink-0" />
+                          <span className="truncate font-mono text-zinc-700">
+                            {candidateDocs.bankProofDoc?.name || 'Attach Cancelled Cheque (.pdf/.jpg)'}
+                          </span>
+                          <input
+                            type="file"
+                            accept=".pdf,.docx,.doc,.txt,.png,.jpg,.jpeg"
+                            className="hidden"
+                            onChange={(e) => handleDocFileSelect(e.target.files?.[0] || null, 'Bank Proof')}
+                          />
+                        </label>
+                      </div>
+
+                      {/* Resume / CV */}
+                      <div className="p-3 rounded-2xl bg-zinc-50 border border-zinc-200 flex flex-col justify-between">
+                        <div className="flex items-center justify-between mb-1.5">
+                          <span className="font-bold text-zinc-800 text-xs">Candidate Resume / CV</span>
+                          <span className="text-[9px] font-mono px-1.5 py-0.5 rounded-full bg-zinc-200 text-zinc-700">DOCX / PDF / TXT</span>
+                        </div>
+                        <label className="p-2 rounded-xl bg-white border border-zinc-200 hover:border-black flex items-center gap-2 cursor-pointer transition-colors text-[11px]">
+                          <UploadCloud className="w-3.5 h-3.5 text-zinc-400 shrink-0" />
+                          <span className="truncate font-mono text-zinc-700">
+                            {candidateDocs.resumeDoc?.name || 'Attach Resume (.docx/.pdf/.txt)'}
+                          </span>
+                          <input
+                            type="file"
+                            accept=".pdf,.docx,.doc,.txt,.png,.jpg,.jpeg"
+                            className="hidden"
+                            onChange={(e) => handleDocFileSelect(e.target.files?.[0] || null, 'Resume')}
+                          />
+                        </label>
+                      </div>
+                    </div>
+                  )}
                 </div>
 
                 {/* 4. Automated SPOC Email Notification Setup */}
