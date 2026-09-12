@@ -1136,7 +1136,7 @@ export const StoreProvider: React.FC<{ children: React.ReactNode }> = ({ childre
   // Process Monthly Payroll
   const processMonthlyPayrollBatch = async (payoutDate: string = new Date().toISOString().split('T')[0]): Promise<{ totalDisbursed: number; count: number }> => {
     const candidates = user?.apprenticeMetrics?.lastMonthOnboardedList || [];
-    const totalDisbursed = candidates.reduce((acc, c) => acc + (c.stipendAmount || 18500), 0);
+    const totalDisbursed = candidates.reduce((acc, c) => acc + (c.stipendAmount || 0), 0);
     const dbtTotal = candidates.reduce((acc, c) => acc + (c.dbtEligibleAmount || 0), 0);
 
     if (user && user.apprenticeMetrics) {

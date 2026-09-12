@@ -52,8 +52,8 @@ export async function POST(request: Request) {
         tradeOrRole: 'Full-Stack Developer Trainee',
         qualification: 'B.Tech / Diploma',
         onboardingDate: new Date().toISOString().split('T')[0],
-        stipendAmount: 18500,
-        dbtEligibleAmount: 4500,
+        stipendAmount: 0,
+        dbtEligibleAmount: 0,
         contractStatus: 'Generated',
         attendanceRate: '100%',
         status: 'Active'

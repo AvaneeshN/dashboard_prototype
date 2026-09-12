@@ -422,11 +422,8 @@ export const ClientDashboard: React.FC = () => {
     if (activeSubmission?.dbt_allocation_not_utilized !== undefined) {
       return activeSubmission.dbt_allocation_not_utilized;
     }
-    if (openQuota > 0) {
-      return openQuota * 1500;
-    }
     return 0;
-  }, [activeSubmission?.dbt_allocation_not_utilized, openQuota]);
+  }, [activeSubmission?.dbt_allocation_not_utilized]);
 
   const totalApprovedGovt = candidateList.filter(c => c.contractStatus === 'Signed' || c.status === 'Active').length;
   const approvedThisMonthGovt = onboardedThisMonth;
@@ -2668,6 +2665,27 @@ export const ClientDashboard: React.FC = () => {
                       />
                     </div>
 
+                    {/* Government DBT Subsidy Share */}
+                    <div>
+                      <div className="flex items-center justify-between mb-1">
+                        <label className="block font-bold text-zinc-700 text-xs">Govt DBT Subsidy Share (₹) *</label>
+                        <span className="text-[10px] font-mono text-zinc-400">Input by company</span>
+                      </div>
+                      <input
+                        type="number"
+                        required
+                        min={0}
+                        step={100}
+                        placeholder="e.g. 1500, 4500, etc."
+                        value={candidateForm.dbtEligibleAmount === 0 ? '' : candidateForm.dbtEligibleAmount}
+                        onChange={(e) => {
+                          const val = e.target.value === '' ? 0 : parseInt(e.target.value, 10) || 0;
+                          setCandidateForm({ ...candidateForm, dbtEligibleAmount: val });
+                        }}
+                        className="w-full px-3 py-2 rounded-2xl bg-zinc-50 border border-zinc-200 text-zinc-900 text-xs focus:outline-none focus:border-black font-bold"
+                      />
+                    </div>
+
                     {/* Joining Date */}
                     <div>
                       <label className="block font-bold text-zinc-700 text-xs mb-1">Date of Joining (DOJ) *</label>
@@ -3168,9 +3186,18 @@ export const ClientDashboard: React.FC = () => {
               </p>
 
               <div className="p-4 rounded-2xl bg-zinc-50 border border-zinc-200 space-y-2 text-xs">
-                <div className="flex justify-between"><span className="text-zinc-500">Gross Stipend Volume:</span> <span className="font-extrabold text-zinc-900">₹{(candidateList.length * 18500).toLocaleString()}</span></div>
-                <div className="flex justify-between"><span className="text-zinc-500">Company Payout Share:</span> <span className="font-bold text-zinc-900">₹{(candidateList.length * 14000).toLocaleString()}</span></div>
-                <div className="flex justify-between"><span className="text-zinc-500">DBT Govt Subsidy Share:</span> <span className="font-extrabold text-emerald-700">₹{(candidateList.length * 4500).toLocaleString()}</span></div>
+                {(() => {
+                  const grossTotal = candidateList.reduce((sum, c) => sum + (c.stipendAmount || 0), 0);
+                  const dbtTotal = candidateList.reduce((sum, c) => sum + (c.dbtEligibleAmount || 0), 0);
+                  const companyShare = Math.max(grossTotal - dbtTotal, 0);
+                  return (
+                    <>
+                      <div className="flex justify-between"><span className="text-zinc-500">Gross Stipend Volume:</span> <span className="font-extrabold text-zinc-900">₹{grossTotal.toLocaleString()}</span></div>
+                      <div className="flex justify-between"><span className="text-zinc-500">Company Payout Share:</span> <span className="font-bold text-zinc-900">₹{companyShare.toLocaleString()}</span></div>
+                      <div className="flex justify-between"><span className="text-zinc-500">DBT Govt Subsidy Share:</span> <span className="font-extrabold text-emerald-700">₹{dbtTotal.toLocaleString()}</span></div>
+                    </>
+                  );
+                })()}
               </div>
 
               <div className="flex items-center justify-end gap-2 pt-2">

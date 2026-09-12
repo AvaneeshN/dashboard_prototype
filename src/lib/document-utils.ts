@@ -289,11 +289,11 @@ export const generateSPOCEmailHtml = (params: {
           </tr>` : ''}
           <tr>
             <td style="padding: 5px 0; color: #71717a;">Monthly Stipend:</td>
-            <td style="padding: 5px 0; font-weight: 600; color: #18181b;">₹${(candidate.stipendAmount || 18500).toLocaleString()} / month</td>
+            <td style="padding: 5px 0; font-weight: 600; color: #18181b;">₹${(candidate.stipendAmount || 0).toLocaleString()} / month</td>
           </tr>
           <tr>
             <td style="padding: 5px 0; color: #71717a;">DBT Subsidy Share:</td>
-            <td style="padding: 5px 0; font-weight: 600; color: #18181b;">₹${(candidate.dbtEligibleAmount || 4500).toLocaleString()} / month</td>
+            <td style="padding: 5px 0; font-weight: 600; color: #18181b;">₹${(candidate.dbtEligibleAmount || 0).toLocaleString()} / month</td>
           </tr>
           <tr>
             <td style="padding: 5px 0; color: #71717a;">Joining Date:</td>

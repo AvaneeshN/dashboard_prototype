@@ -103,7 +103,7 @@ export const SubmissionDetailDrawer: React.FC<SubmissionDetailDrawerProps> = ({
   // Stipend Payment Management States (Admin DBT Entry & Review)
   const [editingStipendRecord, setEditingStipendRecord] = useState<StipendPaymentRecord | null>(null);
   const [stipendAdminForm, setStipendAdminForm] = useState({
-    dbtByGovt: 10500,
+    dbtByGovt: 0,
     dbtReleaseDate: 'UNDER PROCESS',
     status: 'UNDER PROCESS',
     remarks: ''
@@ -382,7 +382,7 @@ export const SubmissionDetailDrawer: React.FC<SubmissionDetailDrawerProps> = ({
       gender: cand?.gender || 'Male',
       mobileNumber: cand?.phone || '',
       emailId: cand?.email || '',
-      stipend: cand?.stipendAmount || 18500,
+      stipend: cand?.stipendAmount || 0,
       qualification: cand?.qualification || 'Graduate / Diploma',
       curriculum: cand?.tradeOrRole || 'Apprenticeship Trainee',
       apprenticeCode: cand?.apprenticeCode || '',
@@ -400,7 +400,7 @@ export const SubmissionDetailDrawer: React.FC<SubmissionDetailDrawerProps> = ({
       candidateDbtConsent: 'Yes',
       eKycStatus: 'Yes',
       establishmentSharedStatus: 'pending',
-      amount: cand?.dbtEligibleAmount || 1500,
+      amount: cand?.dbtEligibleAmount || 0,
       paymentStatus: 'PENDING',
       paymentFailureReason: ''
     });
@@ -2425,7 +2425,7 @@ export const SubmissionDetailDrawer: React.FC<SubmissionDetailDrawerProps> = ({
                       step={100}
                       value={napsForm.amount === 0 ? '' : napsForm.amount}
                       onChange={(e) => setNapsForm({ ...napsForm, amount: e.target.value === '' ? 0 : Number(e.target.value) })}
-                      placeholder="1500.00"
+                      placeholder="0.00"
                       className="w-full px-3 py-2 rounded-xl bg-zinc-50 border border-zinc-200 text-zinc-900 font-mono font-bold text-xs focus:outline-none focus:border-black"
                     />
                   </div>
@@ -2486,9 +2486,9 @@ export const SubmissionDetailDrawer: React.FC<SubmissionDetailDrawerProps> = ({
                   <input
                     type="number"
                     min="0"
-                    value={stipendAdminForm.dbtByGovt}
-                    onChange={(e) => setStipendAdminForm({ ...stipendAdminForm, dbtByGovt: Number(e.target.value) })}
-                    placeholder="e.g. 10500"
+                    value={stipendAdminForm.dbtByGovt === 0 ? '' : stipendAdminForm.dbtByGovt}
+                    onChange={(e) => setStipendAdminForm({ ...stipendAdminForm, dbtByGovt: e.target.value === '' ? 0 : Number(e.target.value) })}
+                    placeholder="Enter approved DBT amount"
                     className="w-full px-3 py-2 rounded-xl bg-zinc-50 border border-zinc-200 text-zinc-900 font-bold font-mono text-sm focus:outline-none focus:border-black"
                     required
                   />
@@ -2634,9 +2634,9 @@ export const SubmissionDetailDrawer: React.FC<SubmissionDetailDrawerProps> = ({
                     <input
                       type="number"
                       min="0"
-                      value={adminNewStipend.dbtByGovt}
-                      onChange={(e) => setAdminNewStipend({ ...adminNewStipend, dbtByGovt: Number(e.target.value) })}
-                      placeholder="10500"
+                      value={adminNewStipend.dbtByGovt === 0 ? '' : adminNewStipend.dbtByGovt}
+                      onChange={(e) => setAdminNewStipend({ ...adminNewStipend, dbtByGovt: e.target.value === '' ? 0 : Number(e.target.value) })}
+                      placeholder="0.00"
                       className="w-full px-3 py-1.5 rounded-xl bg-zinc-50 border border-zinc-200 font-bold font-mono focus:outline-none focus:border-black"
                     />
                   </div>

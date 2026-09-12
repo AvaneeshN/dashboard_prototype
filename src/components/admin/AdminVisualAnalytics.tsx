@@ -123,7 +123,7 @@ export const AdminVisualAnalytics: React.FC = () => {
       // Process NAPS records
       (sub.naps_records || []).forEach(naps => {
         if (naps.dbtStatus === 'PAID' || naps.paymentStatus === 'PAID') {
-          totalDbtDisbursed += (naps.stipend || naps.amount || 1500);
+          totalDbtDisbursed += (Number(naps.amount) || 0);
         }
 
         const isDesig = naps.contractType === 'designated';
