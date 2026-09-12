@@ -222,7 +222,12 @@ export const ClientDashboard: React.FC = () => {
     ];
   }, [activeSubmission?.responses?.tradesRequired]);
 
-  const hasSubmittedIntake = Boolean(activeSubmission && activeSubmission.status === 'submitted');
+  const hasSubmittedIntake = Boolean(
+    activeSubmission && 
+    (activeSubmission.status === 'submitted' || 
+     activeSubmission.status === 'under_review' || 
+     activeSubmission.status === 'approved')
+  );
 
   useEffect(() => {
     if (!hasSubmittedIntake) {
@@ -244,7 +249,7 @@ export const ClientDashboard: React.FC = () => {
         spocName: designatedName
       }));
     }
-  }, [currentSpoc?.email, currentSpoc?.name, activeSubmission?.assigned_company_spoc?.email, user?.apprenticeMetrics?.assignedCompanySpoc?.email, activeSubmission?.responses?.complianceOfficerEmail, user?.email]);
+  }, [currentSpoc?.email, currentSpoc?.name, activeSubmission?.assigned_company_spoc?.email, activeSubmission?.assigned_company_spoc?.name, user?.apprenticeMetrics?.assignedCompanySpoc?.email, user?.apprenticeMetrics?.assignedCompanySpoc?.name, activeSubmission?.responses?.complianceOfficerEmail, activeSubmission?.responses?.complianceOfficerName, user?.email, user?.full_name]);
 
   const defaultEmptyMetrics: ClientApprenticeMetrics = {
     clientName: user?.full_name || 'Client Workspace',

@@ -5,7 +5,7 @@ import { AdminDashboard } from '@/components/admin/AdminDashboard';
 import { ParticleField } from '@/components/ui/ParticleField';
 import { useStore } from '@/lib/store';
 import { useRouter } from 'next/navigation';
-import { ShieldAlert, ArrowRight, Lock } from 'lucide-react';
+import { ArrowRight, Lock } from 'lucide-react';
 
 export default function AdminPage() {
   const { user, isLoading } = useStore();

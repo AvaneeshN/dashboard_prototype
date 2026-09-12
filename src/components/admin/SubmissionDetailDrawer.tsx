@@ -188,7 +188,7 @@ export const SubmissionDetailDrawer: React.FC<SubmissionDetailDrawerProps> = ({
         roleTitle: submission.assigned_company_spoc?.roleTitle || 'Dedicated Operations SPOC'
       });
     }
-  }, [submission?.id, submission?.assigned_company_spoc?.email, submission?.assigned_company_spoc?.name]);
+  }, [submission?.id, submission?.assigned_company_spoc?.email, submission?.assigned_company_spoc?.name, submission?.assigned_company_spoc?.phone, submission?.assigned_company_spoc?.roleTitle]);
 
   const handleSaveSpoc = async (e: React.FormEvent) => {
     e.preventDefault();

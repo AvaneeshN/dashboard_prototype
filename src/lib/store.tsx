@@ -1158,6 +1158,18 @@ export const StoreProvider: React.FC<{ children: React.ReactNode }> = ({ childre
 
       const updatedUser = { ...user, apprenticeMetrics: updatedMetrics };
       setUser(updatedUser);
+
+      // Persist payroll update to Supabase
+      const currentSub = getActiveClientSubmission();
+      if (currentSub) {
+        const updatedSub: FormSubmission = {
+          ...currentSub,
+          last_active_at: new Date().toISOString()
+        };
+        const updatedSubmissions = submissions.map(s => s.id === currentSub.id ? updatedSub : s);
+        setSubmissions(updatedSubmissions);
+        await persistSubmissionToSupabase(updatedSub);
+      }
     }
 
     return { totalDisbursed, count: candidates.length };
@@ -1228,6 +1240,19 @@ export const StoreProvider: React.FC<{ children: React.ReactNode }> = ({ childre
       };
       const updatedUser = { ...user, apprenticeMetrics: updatedMetrics };
       setUser(updatedUser);
+
+      // Persist to Supabase if client submission exists
+      const currentSub = getActiveClientSubmission();
+      if (currentSub) {
+        const updatedSub: FormSubmission = {
+          ...currentSub,
+          notes: `${remarkCode}: ${summary} [${status}]`,
+          last_active_at: new Date().toISOString()
+        };
+        const updatedSubmissions = submissions.map(s => s.id === currentSub.id ? updatedSub : s);
+        setSubmissions(updatedSubmissions);
+        await persistSubmissionToSupabase(updatedSub);
+      }
     }
   };
 

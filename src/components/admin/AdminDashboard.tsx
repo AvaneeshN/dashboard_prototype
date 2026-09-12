@@ -42,7 +42,7 @@ import {
   Tooltip 
 } from 'recharts';
 import { motion, AnimatePresence } from 'framer-motion';
-import { RequiredDocumentConfig, getAdminPermissions, isSeniorAdmin, isJuniorAdmin } from '@/types';
+import { RequiredDocumentConfig, getAdminPermissions, isSeniorAdmin } from '@/types';
 import { AdminVisualAnalytics } from './AdminVisualAnalytics';
 
 type AdminTab = 'analytics' | 'telemetry' | 'intakes' | 'requirements' | 'security';
