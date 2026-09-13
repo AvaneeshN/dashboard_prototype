@@ -18,190 +18,330 @@ export const RotatingVault: React.FC<RotatingVaultProps> = ({
 }) => {
   const [isHovered, setIsHovered] = useState(false);
 
-  // Dimension scaling
+  // Responsive scaling
   const dimensions = {
-    sm: { wheel: 38, svg: 80, badge: 'py-1 px-2.5 text-[10px]' },
-    md: { wheel: 46, svg: 90, badge: 'py-1.5 px-3 text-xs' },
-    lg: { wheel: 56, svg: 100, badge: 'py-2 px-3.5 text-xs' }
+    sm: { width: 56, height: 44, badge: 'py-1 px-2 text-[9.5px]' },
+    md: { width: 68, height: 54, badge: 'py-1.5 px-2.5 text-xs' },
+    lg: { width: 84, height: 66, badge: 'py-2 px-3 text-xs' }
   }[size];
+
+  // 17 perimeter bolts (3 slots hidden behind the left hinge bracket)
+  const boltAngles = [0, 18, 36, 54, 72, 90, 108, 126, 144, 216, 234, 252, 270, 288, 306, 324, 342];
+
+  // 8 radial sectors for faceted metallic face reflection matching reference
+  const sectorColors = [
+    '#3b4a5b', // 0-45 deg: medium slate
+    '#202c3a', // 45-90 deg: dark slate
+    '#506377', // 90-135 deg: specular wedge
+    '#2c3947', // 135-180 deg: medium-dark slate
+    '#19232f', // 180-225 deg: shadow wedge
+    '#495b6d', // 225-270 deg: specular wedge
+    '#23303d', // 270-315 deg: medium-dark slate
+    '#314150', // 315-360 deg: medium slate
+  ];
 
   return (
     <div
       className={`relative inline-flex items-center gap-2.5 transition-all duration-300 select-none ${
         variant === 'floating'
-          ? 'p-2 rounded-2xl bg-[#0a192f]/90 backdrop-blur-md border border-[#1e3a5f] shadow-lg shadow-black/10 hover:border-amber-400/50 hover:bg-[#0d213f]/95'
+          ? 'p-2 rounded-2xl bg-[#0a192f]/90 backdrop-blur-md border border-[#1e3a5f] shadow-lg shadow-black/20 hover:border-amber-400/50 hover:bg-[#0d213f]/95'
           : 'bg-transparent'
       } ${className}`}
       onMouseEnter={() => setIsHovered(true)}
       onMouseLeave={() => setIsHovered(false)}
       title="WF47 ZYNG Cryptographic Compliance Vault"
     >
-      {/* 1. Multi-Layered Rotating Vault Mechanism */}
+      {/* 1. Bank Vault Door Structure */}
       <div 
         className="relative shrink-0 flex items-center justify-center"
-        style={{ width: dimensions.wheel, height: dimensions.wheel }}
+        style={{ width: dimensions.width, height: dimensions.height }}
       >
         {/* Ambient background glow */}
         <div className="absolute inset-0 rounded-full bg-amber-400/10 blur-sm pointer-events-none animate-vault-glow" />
 
         <svg
-          viewBox="0 0 100 100"
-          className="w-full h-full drop-shadow-md"
+          viewBox="0 0 120 100"
+          className="w-full h-full drop-shadow-md overflow-visible"
           fill="none"
           xmlns="http://www.w3.org/2000/svg"
         >
           <defs>
-            {/* Gradients */}
-            <linearGradient id="vaultOuterRim" x1="0%" y1="0%" x2="100%" y2="100%">
-              <stop offset="0%" stopColor="#1e3a5f" />
-              <stop offset="50%" stopColor="#0a192f" />
-              <stop offset="100%" stopColor="#112240" />
+            {/* Outer Ring Steel Gradient */}
+            <linearGradient id="vaultOuterFlangeGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+              <stop offset="0%" stopColor="#334155" />
+              <stop offset="35%" stopColor="#1e293b" />
+              <stop offset="70%" stopColor="#0f172a" />
+              <stop offset="100%" stopColor="#1e293b" />
             </linearGradient>
 
-            <linearGradient id="vaultGoldAccent" x1="0%" y1="0%" x2="100%" y2="100%">
-              <stop offset="0%" stopColor="#fde047" />
-              <stop offset="40%" stopColor="#f59e0b" />
-              <stop offset="100%" stopColor="#b45309" />
+            {/* Hinge Bracket Gradient */}
+            <linearGradient id="vaultHingeGrad" x1="0%" y1="0%" x2="100%" y2="0%">
+              <stop offset="0%" stopColor="#1e293b" />
+              <stop offset="40%" stopColor="#334155" />
+              <stop offset="70%" stopColor="#475569" />
+              <stop offset="100%" stopColor="#1e293b" />
             </linearGradient>
 
-            <linearGradient id="vaultSteelHub" x1="0%" y1="0%" x2="100%" y2="100%">
-              <stop offset="0%" stopColor="#0a192f" />
-              <stop offset="100%" stopColor="#040b15" />
+            {/* Hinge Pin Cylinder Gradient */}
+            <linearGradient id="vaultPinGrad" x1="0%" y1="0%" x2="100%" y2="0%">
+              <stop offset="0%" stopColor="#0f172a" />
+              <stop offset="35%" stopColor="#64748b" />
+              <stop offset="65%" stopColor="#cbd5e1" />
+              <stop offset="100%" stopColor="#1e293b" />
             </linearGradient>
 
-            <filter id="vaultSoftGlow" x="-20%" y="-20%" width="140%" height="140%">
-              <feGaussianBlur stdDeviation="1.5" result="blur" />
-              <feComposite in="SourceGraphic" in2="blur" operator="over" />
-            </filter>
+            {/* Perimeter Bolt Metallic Gradient */}
+            <radialGradient id="vaultBoltGrad" cx="35%" cy="35%" r="65%">
+              <stop offset="0%" stopColor="#ffffff" />
+              <stop offset="40%" stopColor="#cbd5e1" />
+              <stop offset="80%" stopColor="#64748b" />
+              <stop offset="100%" stopColor="#334155" />
+            </radialGradient>
+
+            {/* 6-Spoke Wheel Rim Gradient */}
+            <linearGradient id="vaultWheelRimGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+              <stop offset="0%" stopColor="#ffffff" />
+              <stop offset="40%" stopColor="#cbd5e1" />
+              <stop offset="80%" stopColor="#94a3b8" />
+              <stop offset="100%" stopColor="#e2e8f0" />
+            </linearGradient>
+
+            {/* 6 Spokes Gradient */}
+            <linearGradient id="vaultSpokeGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+              <stop offset="0%" stopColor="#f8fafc" />
+              <stop offset="50%" stopColor="#cbd5e1" />
+              <stop offset="100%" stopColor="#94a3b8" />
+            </linearGradient>
+
+            {/* Wheel Central Hub Gradient */}
+            <radialGradient id="vaultHubGrad" cx="40%" cy="40%" r="60%">
+              <stop offset="0%" stopColor="#f8fafc" />
+              <stop offset="50%" stopColor="#94a3b8" />
+              <stop offset="100%" stopColor="#334155" />
+            </radialGradient>
           </defs>
 
-          {/* BASE: Armored Outer Flange with Perimeter Rivets */}
-          <circle cx="50" cy="50" r="48" fill="url(#vaultOuterRim)" stroke="#1e3a5f" strokeWidth="2" />
-          <circle cx="50" cy="50" r="44" stroke="#0a192f" strokeWidth="1" strokeDasharray="3 3" opacity="0.6" />
+          {/* LAYER 1: Circular Outer Flange / Bezel */}
+          <circle
+            cx="68"
+            cy="50"
+            r="42"
+            fill="url(#vaultOuterFlangeGrad)"
+            stroke="#1e3a5f"
+            strokeWidth="1.5"
+          />
+          {/* Subtle Outer Golden Rim Accent for Brand Cohesion */}
+          <circle
+            cx="68"
+            cy="50"
+            r="41.2"
+            fill="none"
+            stroke="#f59e0b"
+            strokeWidth="0.6"
+            opacity="0.4"
+          />
 
-          {/* Perimeter Heavy Locking Bolts / Rivets (8 Cardinal & Ordinal) */}
-          {[0, 45, 90, 135, 180, 225, 270, 315].map((angle, i) => {
-            const rad = (angle * Math.PI) / 180;
-            const cx = 50 + 44 * Math.cos(rad);
-            const cy = 50 + 44 * Math.sin(rad);
+          {/* LAYER 2: Faceted Inner Door Face (8 Specular Metallic Radial Wedges) */}
+          {[0, 1, 2, 3, 4, 5, 6, 7].map((idx) => {
+            const a1 = (idx * 45 * Math.PI) / 180;
+            const a2 = ((idx + 1) * 45 * Math.PI) / 180;
+            const x1 = +(68 + 30.5 * Math.cos(a1)).toFixed(2);
+            const y1 = +(50 + 30.5 * Math.sin(a1)).toFixed(2);
+            const x2 = +(68 + 30.5 * Math.cos(a2)).toFixed(2);
+            const y2 = +(50 + 30.5 * Math.sin(a2)).toFixed(2);
+            const d = `M 68 50 L ${x1} ${y1} A 30.5 30.5 0 0 1 ${x2} ${y2} Z`;
             return (
-              <circle
-                key={i}
-                cx={cx}
-                cy={cy}
-                r="2.2"
-                fill="#f59e0b"
-                stroke="#0a192f"
-                strokeWidth="0.8"
-                opacity="0.9"
+              <path
+                key={idx}
+                d={d}
+                fill={sectorColors[idx]}
+                opacity="0.95"
               />
             );
           })}
 
-          {/* LAYER 1: Clockwise Outer Cog Ring / Gear Teeth */}
-          <g className="animate-vault-slow" style={{ transformOrigin: '50px 50px' }}>
-            {/* Circular Track */}
-            <circle cx="50" cy="50" r="37" stroke="url(#vaultGoldAccent)" strokeWidth="1.2" opacity="0.55" />
-            {/* 12 Notches / Gear Teeth */}
-            {[0, 30, 60, 90, 120, 150, 180, 210, 240, 270, 300, 330].map((angle, i) => {
+          {/* Inner Inset Border / Recessed Lip */}
+          <circle
+            cx="68"
+            cy="50"
+            r="30.5"
+            fill="none"
+            stroke="#0a192f"
+            strokeWidth="1.4"
+          />
+          <circle
+            cx="68"
+            cy="50"
+            r="29.8"
+            fill="none"
+            stroke="#475569"
+            strokeWidth="0.5"
+            opacity="0.6"
+          />
+
+          {/* LAYER 3: Perimeter Heavy Locking Bolts / Studs */}
+          {boltAngles.map((angle) => {
+            const rad = (angle * Math.PI) / 180;
+            const bx = +(68 + 36.5 * Math.cos(rad)).toFixed(2);
+            const by = +(50 + 36.5 * Math.sin(rad)).toFixed(2);
+            return (
+              <g key={angle}>
+                <circle
+                  cx={bx}
+                  cy={by}
+                  r="2.2"
+                  fill="url(#vaultBoltGrad)"
+                  stroke="#0a192f"
+                  strokeWidth="0.7"
+                />
+                {/* 3D Specular Highlight Dot */}
+                <circle
+                  cx={+bx - 0.5}
+                  cy={+by - 0.5}
+                  r="0.65"
+                  fill="#ffffff"
+                  opacity="0.75"
+                />
+              </g>
+            );
+          })}
+
+          {/* LAYER 4: Left Heavy Hinge Assembly */}
+          {/* Hinge Plate / Arm Bracket */}
+          <rect
+            x="9.5"
+            y="36"
+            width="24.5"
+            height="28"
+            rx="4"
+            fill="url(#vaultHingeGrad)"
+            stroke="#0f172a"
+            strokeWidth="1.2"
+          />
+          {/* Upper Bevel Highlight */}
+          <line
+            x1="12"
+            y1="37"
+            x2="32"
+            y2="37"
+            stroke="#64748b"
+            strokeWidth="0.9"
+            opacity="0.8"
+          />
+          {/* Lower Shadow Groove */}
+          <line
+            x1="12"
+            y1="63"
+            x2="32"
+            y2="63"
+            stroke="#0a192f"
+            strokeWidth="1"
+          />
+
+          {/* Vertical Hinge Pin (Center Pillar) */}
+          <rect
+            x="6.5"
+            y="29"
+            width="7"
+            height="42"
+            rx="2"
+            fill="url(#vaultPinGrad)"
+            stroke="#0a192f"
+            strokeWidth="0.8"
+          />
+          {/* Top Pin Cap */}
+          <rect
+            x="5.5"
+            y="25.5"
+            width="9"
+            height="5"
+            rx="2.5"
+            fill="url(#vaultPinGrad)"
+            stroke="#0a192f"
+            strokeWidth="0.8"
+          />
+          {/* Bottom Pin Cap */}
+          <rect
+            x="5.5"
+            y="69.5"
+            width="9"
+            height="5"
+            rx="2.5"
+            fill="url(#vaultPinGrad)"
+            stroke="#0a192f"
+            strokeWidth="0.8"
+          />
+
+          {/* Hinge Rivets (2 Vertical Anchor Bolts on Bracket) */}
+          <circle cx="16" cy="43" r="1.5" fill="url(#vaultBoltGrad)" stroke="#0a192f" strokeWidth="0.5" />
+          <circle cx="16" cy="57" r="1.5" fill="url(#vaultBoltGrad)" stroke="#0a192f" strokeWidth="0.5" />
+
+          {/* LAYER 5: Central Rotating 6-Spoke Wheel Handle */}
+          <g
+            className="animate-vault-wheel"
+            style={{
+              transformOrigin: '68px 50px',
+              animationDuration: isHovered ? '8s' : '16s'
+            }}
+          >
+            {/* Outer Rim of Vault Wheel */}
+            <circle
+              cx="68"
+              cy="50"
+              r="13.5"
+              fill="none"
+              stroke="url(#vaultWheelRimGrad)"
+              strokeWidth="2.4"
+            />
+            <circle
+              cx="68"
+              cy="50"
+              r="13.5"
+              fill="none"
+              stroke="#ffffff"
+              strokeWidth="0.6"
+              opacity="0.8"
+            />
+
+            {/* 6 Radial Spokes (Every 60 Degrees) */}
+            {[0, 60, 120, 180, 240, 300].map((angle) => {
               const rad = (angle * Math.PI) / 180;
-              const x1 = 50 + 36 * Math.cos(rad);
-              const y1 = 50 + 36 * Math.sin(rad);
-              const x2 = 50 + 40 * Math.cos(rad);
-              const y2 = 50 + 40 * Math.sin(rad);
+              const x1 = +(68 + 3.8 * Math.cos(rad)).toFixed(2);
+              const y1 = +(50 + 3.8 * Math.sin(rad)).toFixed(2);
+              const x2 = +(68 + 13.5 * Math.cos(rad)).toFixed(2);
+              const y2 = +(50 + 13.5 * Math.sin(rad)).toFixed(2);
               return (
                 <line
-                  key={i}
+                  key={angle}
                   x1={x1}
                   y1={y1}
                   x2={x2}
                   y2={y2}
-                  stroke="url(#vaultGoldAccent)"
-                  strokeWidth="2"
+                  stroke="url(#vaultSpokeGrad)"
+                  strokeWidth="2.2"
                   strokeLinecap="round"
                 />
               );
             })}
+
+            {/* Central Wheel Hub */}
+            <circle
+              cx="68"
+              cy="50"
+              r="4"
+              fill="url(#vaultHubGrad)"
+              stroke="#cbd5e1"
+              strokeWidth="0.8"
+            />
+            <circle
+              cx="68"
+              cy="50"
+              r="1.8"
+              fill="#1e293b"
+              stroke="#94a3b8"
+              strokeWidth="0.5"
+            />
           </g>
-
-          {/* LAYER 2: Counter-Clockwise Combination Dial (Calibrated Degree Markings) */}
-          <g className="animate-vault-reverse" style={{ transformOrigin: '50px 50px' }}>
-            <circle cx="50" cy="50" r="29" stroke="#94a3b8" strokeWidth="0.8" strokeDasharray="1.5 3.5" opacity="0.75" />
-            {/* 4 Cardinal Diamond Markers */}
-            {[0, 90, 180, 270].map((angle, i) => {
-              const rad = (angle * Math.PI) / 180;
-              const mx = 50 + 29 * Math.cos(rad);
-              const my = 50 + 29 * Math.sin(rad);
-              return (
-                <circle key={i} cx={mx} cy={my} r="1.5" fill="#fde047" />
-              );
-            })}
-          </g>
-
-          {/* LAYER 3: Clockwise Heavy 3-Spoke Vault Wheel Handle */}
-          <g className="animate-vault-wheel" style={{ transformOrigin: '50px 50px' }}>
-            {[0, 120, 240].map((angle, i) => {
-              const rad = (angle * Math.PI) / 180;
-              const x1 = 50 + 8 * Math.cos(rad);
-              const y1 = 50 + 8 * Math.sin(rad);
-              const x2 = 50 + 26 * Math.cos(rad);
-              const y2 = 50 + 26 * Math.sin(rad);
-              const hx = 50 + 27 * Math.cos(rad);
-              const hy = 50 + 27 * Math.sin(rad);
-              return (
-                <g key={i}>
-                  {/* Heavy Brass Spoke Arm */}
-                  <line
-                    x1={x1}
-                    y1={y1}
-                    x2={x2}
-                    y2={y2}
-                    stroke="url(#vaultGoldAccent)"
-                    strokeWidth="3.2"
-                    strokeLinecap="round"
-                  />
-                  {/* Outer Spoke Handle Grip Bulb */}
-                  <circle
-                    cx={hx}
-                    cy={hy}
-                    r="3.5"
-                    fill="url(#vaultGoldAccent)"
-                    stroke="#0a192f"
-                    strokeWidth="1"
-                    filter="url(#vaultSoftGlow)"
-                  />
-                </g>
-              );
-            })}
-          </g>
-
-          {/* LAYER 4: Armored Center Lock Hub (Static with Shield Emblem & Green Security Diode) */}
-          <circle
-            cx="50"
-            cy="50"
-            r="12.5"
-            fill="url(#vaultSteelHub)"
-            stroke="url(#vaultGoldAccent)"
-            strokeWidth="1.8"
-          />
-          
-          {/* Inner Monogram Shield */}
-          <path
-            d="M 50 43 L 55 45.5 L 55 51 C 55 54.5 52.5 56.5 50 57.5 C 47.5 56.5 45 54.5 45 51 L 45 45.5 Z"
-            fill="#0a192f"
-            stroke="#f59e0b"
-            strokeWidth="1"
-          />
-          <path
-            d="M 48 51.5 L 50 47.5 L 52 51.5"
-            stroke="#fde047"
-            strokeWidth="1.1"
-            strokeLinecap="round"
-            strokeLinejoin="round"
-          />
-
-          {/* Central Pulsing Green LED */}
-          <circle cx="50" cy="42" r="1.3" fill="#10b981" />
         </svg>
       </div>
 
