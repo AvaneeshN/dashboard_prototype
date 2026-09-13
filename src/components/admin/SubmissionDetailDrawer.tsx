@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useEffect, useState, useMemo } from 'react';
+import React, { useEffect, useState } from 'react';
 import { useStore, getExpiringContracts } from '@/lib/store';
 import { 
   FormSubmission, 
@@ -645,14 +645,17 @@ export const SubmissionDetailDrawer: React.FC<SubmissionDetailDrawerProps> = ({
     }
   };
 
-  const filteredAdminAtt = useMemo(() => {
-    return attendanceRecords.filter(r => {
-      if (adminAttFilterMonth !== 'all' && r.month !== adminAttFilterMonth) return false;
-      if (adminAttFilterYear !== 'all' && r.year !== adminAttFilterYear) return false;
-      if (adminAttFilterCode && !r.candidateCode.toLowerCase().includes(adminAttFilterCode.toLowerCase()) && !r.candidateName.toLowerCase().includes(adminAttFilterCode.toLowerCase())) return false;
-      return true;
-    });
-  }, [attendanceRecords, adminAttFilterMonth, adminAttFilterYear, adminAttFilterCode]);
+  const filteredAdminAtt = attendanceRecords.filter(r => {
+    if (adminAttFilterMonth !== 'all' && r.month !== adminAttFilterMonth) return false;
+    if (adminAttFilterYear !== 'all' && r.year !== adminAttFilterYear) return false;
+    if (adminAttFilterCode) {
+      const code = (r.candidateCode || '').toLowerCase();
+      const name = (r.candidateName || '').toLowerCase();
+      const q = adminAttFilterCode.toLowerCase().trim();
+      if (!code.includes(q) && !name.includes(q)) return false;
+    }
+    return true;
+  });
 
   return (
     <>
