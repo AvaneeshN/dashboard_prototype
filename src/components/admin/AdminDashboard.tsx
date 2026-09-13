@@ -337,11 +337,9 @@ export const AdminDashboard: React.FC = () => {
           </p>
         </div>
 
-        <div className="flex flex-wrap items-center gap-2.5">
-          {/* Top Right Rotating Security Vault (Below Navbar) */}
-          <RotatingVault size="sm" />
-
-          {/* Authenticated Clearance Badge (Immutable - strictly governed by login credentials) */}
+        <div className="flex items-center gap-4 self-start md:self-end">
+          <div className="flex flex-wrap items-center gap-2.5">
+            {/* Authenticated Clearance Badge (Immutable - strictly governed by login credentials) */}
           <div className="flex items-center gap-2 px-3.5 py-1.5 rounded-full bg-white border border-zinc-200 shadow-2xs">
             {isSenior ? (
               <>
@@ -390,6 +388,12 @@ export const AdminDashboard: React.FC = () => {
               <span>Export CSV (Senior Only)</span>
             </div>
           )}
+          </div>
+
+          {/* Top Right Rotating Security Vault (Positioned at Far Right Corner) */}
+          <div className="hidden sm:flex items-center pl-3.5 border-l border-zinc-200 shrink-0">
+            <RotatingVault size="md" />
+          </div>
         </div>
       </div>
 

@@ -958,9 +958,7 @@ export const ClientDashboard: React.FC = () => {
         </div>
 
         {/* Top Right Header Controls & Rotating Vault */}
-        <div className="flex flex-wrap items-center gap-3 self-start md:self-auto">
-          <RotatingVault size="sm" />
-
+        <div className="flex items-center gap-4 self-start md:self-end">
           {/* View Switcher Pill */}
           <div className="flex items-center gap-1.5 p-1 rounded-full bg-zinc-200/80 border border-zinc-300">
             <button
@@ -986,6 +984,11 @@ export const ClientDashboard: React.FC = () => {
               <LayoutDashboard className="w-3.5 h-3.5" />
               <span>Analytics Dashboard</span>
             </button>
+          </div>
+
+          {/* Top Right Rotating Security Vault (Positioned at Far Right Corner) */}
+          <div className="hidden sm:flex items-center pl-3.5 border-l border-zinc-200 shrink-0">
+            <RotatingVault size="md" />
           </div>
         </div>
       </div>
