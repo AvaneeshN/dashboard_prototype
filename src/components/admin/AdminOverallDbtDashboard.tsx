@@ -2,6 +2,7 @@
 
 import React, { useState, useMemo } from 'react';
 import { FormSubmission, ApprenticeRecord, NAPSPortalRecord } from '@/types';
+import { generateAutoContinuedDbtRecords } from '@/lib/store';
 import { GlassCard } from '@/components/ui/GlassCard';
 import { 
   Search, 
@@ -107,7 +108,7 @@ export const AdminOverallDbtDashboard: React.FC<AdminOverallDbtDashboardProps> =
       const estName = sub.company_name || sub.client_name || 'Establishment';
       const estCodeFallback = sub.establishment_details?.pan || sub.naps_portal_id || sub.id;
       const candidates = sub.candidates || [];
-      const napsRecords = sub.naps_records || [];
+      const napsRecords = generateAutoContinuedDbtRecords(sub);
 
       // Track which candidates have been represented via naps_records
       const processedCandIds = new Set<string>();

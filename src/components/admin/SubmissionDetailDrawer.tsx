@@ -1,7 +1,7 @@
 'use client';
 
 import React, { useEffect, useState } from 'react';
-import { useStore } from '@/lib/store';
+import { useStore, getExpiringContracts } from '@/lib/store';
 import { 
   FormSubmission, 
   SubmissionStatus, 
@@ -28,6 +28,8 @@ import {
   Clock, 
   CheckCircle2, 
   AlertCircle, 
+  AlertTriangle,
+  UserX,
   FileText, 
   Download, 
   User, 
@@ -84,7 +86,7 @@ export const SubmissionDetailDrawer: React.FC<SubmissionDetailDrawerProps> = ({
   const isSenior = isSeniorAdmin(user?.role);
 
   const [activeTab, setActiveTab] = useState<'application' | 'documents' | 'candidates' | 'dbt_claims' | 'spoc_logs' | 'naps_portal' | 'invoices'>('application');
-  const [candidateFilter, setCandidateFilter] = useState<'all' | 'allocated' | 'pending'>('all');
+  const [candidateFilter, setCandidateFilter] = useState<'all' | 'allocated' | 'pending' | 'terminated'>('all');
   const [previewingDoc, setPreviewingDoc] = useState<any>(null);
 
   // Invoice Management States (Admin/Company)
@@ -1747,21 +1749,54 @@ export const SubmissionDetailDrawer: React.FC<SubmissionDetailDrawerProps> = ({
               {activeTab === 'candidates' && (
                 <div className="space-y-3">
                   {(() => {
+                    const expiringList = getExpiringContracts(candidateList);
                     const allocatedCount = candidateList.filter(c => c.contractCode && c.contractCode !== 'CN Pending').length;
                     const pendingCount = candidateList.filter(c => !c.contractCode || c.contractCode === 'CN Pending').length;
+                    const terminatedCount = candidateList.filter(c => c.contractStatus === 'Terminated' || c.status === 'Terminated').length;
                     const displayedCandidates = candidateList.filter(cand => {
                       if (candidateFilter === 'allocated') return Boolean(cand.contractCode && cand.contractCode !== 'CN Pending');
                       if (candidateFilter === 'pending') return !cand.contractCode || cand.contractCode === 'CN Pending';
+                      if (candidateFilter === 'terminated') return cand.contractStatus === 'Terminated' || cand.status === 'Terminated';
                       return true;
                     });
 
                     return (
                       <>
+                        {/* 45-Day Prior Contract Expiry Warning Banner */}
+                        {expiringList.length > 0 && (
+                          <div className="p-3.5 rounded-2xl bg-amber-500/10 border border-amber-500/30 text-amber-900 space-y-2 mb-3">
+                            <div className="flex items-center justify-between">
+                              <div className="flex items-center gap-2 font-bold text-xs">
+                                <AlertTriangle className="w-4 h-4 text-amber-600 shrink-0" />
+                                <span>Contract Expiry Alert: {expiringList.length} candidate(s) expiring within 45 days</span>
+                              </div>
+                              <span className="text-[10px] font-mono font-bold bg-amber-200/80 px-2 py-0.5 rounded-full text-amber-900">
+                                Prior Notification Active
+                              </span>
+                            </div>
+                            <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 pt-1">
+                              {expiringList.map(({ candidate: c, daysRemaining, expiryDateStr, isExpired }) => (
+                                <div key={c.id} className="p-2 rounded-xl bg-white border border-amber-200 flex items-center justify-between text-[11px]">
+                                  <div>
+                                    <div className="font-bold text-zinc-900">{c.name}</div>
+                                    <div className="text-[10px] font-mono text-zinc-500">Expires: {expiryDateStr}</div>
+                                  </div>
+                                  <span className={`px-2 py-0.5 rounded-full text-[10px] font-bold font-mono ${
+                                    isExpired ? 'bg-rose-100 text-rose-800' : daysRemaining <= 15 ? 'bg-rose-100 text-rose-700' : 'bg-amber-100 text-amber-800'
+                                  }`}>
+                                    {isExpired ? 'EXPIRED' : `${daysRemaining} days left`}
+                                  </span>
+                                </div>
+                              ))}
+                            </div>
+                          </div>
+                        )}
+
                         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 mb-3">
                           <div className="text-xs font-bold text-zinc-900 uppercase font-mono">
                             Apprentice Candidate Records & Attached Files ({candidateList.length})
                           </div>
-                          <div className="flex items-center gap-1.5">
+                          <div className="flex items-center gap-1.5 flex-wrap">
                             <button
                               type="button"
                               onClick={() => setCandidateFilter('all')}
@@ -1793,8 +1828,21 @@ export const SubmissionDetailDrawer: React.FC<SubmissionDetailDrawerProps> = ({
                                   : 'bg-amber-100 text-amber-900 hover:bg-amber-200 border border-amber-300'
                               }`}
                             >
-                              Pending Allocation ({pendingCount})
+                              Pending ({pendingCount})
                             </button>
+                            {terminatedCount > 0 && (
+                              <button
+                                type="button"
+                                onClick={() => setCandidateFilter('terminated')}
+                                className={`px-3 py-1 rounded-full text-[11px] font-bold transition-all cursor-pointer ${
+                                  candidateFilter === 'terminated'
+                                    ? 'bg-rose-600 text-white shadow-xs'
+                                    : 'bg-rose-100 text-rose-900 hover:bg-rose-200 border border-rose-300'
+                                }`}
+                              >
+                                Terminated ({terminatedCount})
+                              </button>
+                            )}
                           </div>
                         </div>
 
@@ -1803,9 +1851,10 @@ export const SubmissionDetailDrawer: React.FC<SubmissionDetailDrawerProps> = ({
                             {displayedCandidates.map(cand => {
                               const expDate = cand.contractExpireDate || (cand.onboardingDate ? new Date(new Date(cand.onboardingDate).setFullYear(new Date(cand.onboardingDate).getFullYear() + 1)).toISOString().split('T')[0] : '-');
                               const isCnApproved = Boolean(cand.contractCode && cand.contractCode !== 'CN Pending');
+                              const isTerminated = cand.contractStatus === 'Terminated' || cand.status === 'Terminated';
 
                               return (
-                                <div key={cand.id} className="p-4 rounded-2xl bg-zinc-50 border border-zinc-200 text-xs space-y-3">
+                                <div key={cand.id} className={`p-4 rounded-2xl border text-xs space-y-3 ${isTerminated ? 'bg-rose-50/30 border-rose-200' : 'bg-zinc-50 border-zinc-200'}`}>
                                   <div className="flex items-center justify-between flex-wrap gap-2">
                                     <div>
                                       <div className="flex items-center gap-2 flex-wrap">
@@ -1813,7 +1862,11 @@ export const SubmissionDetailDrawer: React.FC<SubmissionDetailDrawerProps> = ({
                                         <span className="px-2 py-0.5 rounded-md text-[10px] font-mono font-bold bg-purple-100 text-purple-900 border border-purple-200">
                                           {cand.enrollmentScheme || 'NAPS'}
                                         </span>
-                                        {isCnApproved ? (
+                                        {isTerminated ? (
+                                          <span className="px-2 py-0.5 rounded-md text-[10px] font-mono font-bold bg-rose-100 text-rose-900 border border-rose-300">
+                                            Terminated: {cand.terminationDate || 'Closed'} ({cand.terminationReason || 'Early cessation'})
+                                          </span>
+                                        ) : isCnApproved ? (
                                           <span className="px-2 py-0.5 rounded-md text-[10px] font-mono font-bold bg-emerald-100 text-emerald-900 border border-emerald-300">
                                             CN: {cand.contractCode}
                                           </span>
@@ -1831,15 +1884,19 @@ export const SubmissionDetailDrawer: React.FC<SubmissionDetailDrawerProps> = ({
                                       <div className="text-[10px] font-mono text-zinc-400 mt-0.5">{cand.id} · {cand.email || 'Verified'} · {cand.phone || 'Phone Logged'}</div>
                                     </div>
                                     <div className="flex items-center gap-2">
-                                      <button
-                                        type="button"
-                                        onClick={() => handleOpenAddNaps(cand)}
-                                        className="px-2.5 py-1 rounded-xl bg-[#0a192f] text-white hover:bg-zinc-800 text-[10px] font-bold cursor-pointer transition-colors"
-                                      >
-                                        {cand.contractCode ? 'Edit CN / DBT Record' : '+ Assign CN Number'}
-                                      </button>
-                                      <span className="px-2.5 py-0.5 rounded-full text-[10px] font-bold bg-zinc-900 text-white">
-                                        {cand.status}
+                                      {!isTerminated && (
+                                        <button
+                                          type="button"
+                                          onClick={() => handleOpenAddNaps(cand)}
+                                          className="px-2.5 py-1 rounded-xl bg-[#0a192f] text-white hover:bg-zinc-800 text-[10px] font-bold cursor-pointer transition-colors"
+                                        >
+                                          {cand.contractCode ? 'Edit CN / DBT Record' : '+ Assign CN Number'}
+                                        </button>
+                                      )}
+                                      <span className={`px-2.5 py-0.5 rounded-full text-[10px] font-bold ${
+                                        isTerminated ? 'bg-rose-700 text-white' : 'bg-zinc-900 text-white'
+                                      }`}>
+                                        {isTerminated ? 'Terminated' : cand.status}
                                       </span>
                                     </div>
                                   </div>

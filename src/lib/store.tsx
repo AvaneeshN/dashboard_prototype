@@ -95,6 +95,8 @@ interface AuthState {
   updateNAPSRecord: (submissionId: string, recordId: string, updates: Partial<NAPSPortalRecord>) => Promise<void>;
   deleteNAPSRecord: (submissionId: string, recordId: string) => Promise<void>;
   updateClientComplianceReport: (submissionId: string, updates: Partial<FormSubmission>) => Promise<void>;
+  terminateApprenticeContract: (submissionId: string, candidateId: string, terminationData: { date: string; reason: string; remarks?: string }) => Promise<void>;
+  syncAutoContinuedDbtRecords: (submissionId: string) => Promise<void>;
 
   // Stipend Payment Management (Client enters monthly, Admin reviews/updates DBT fields)
   addStipendPayment: (submissionId: string, record: Omit<StipendPaymentRecord, 'id'>) => Promise<StipendPaymentRecord>;
@@ -175,6 +177,216 @@ export const parseSubmissionFromSupabase = (raw: any): FormSubmission => {
     nats_establishment_details: raw.nats_establishment_details || resp.nats_establishment_details,
     stipend_payments: raw.stipend_payments || resp.stipend_payments || []
   };
+};
+
+// Month Parsing and Auto-Continuation Helpers
+export const MONTH_NAMES = ['JAN', 'FEB', 'MAR', 'APR', 'MAY', 'JUN', 'JUL', 'AUG', 'SEP', 'OCT', 'NOV', 'DEC'];
+
+export const parseYearMonthFromDate = (dateStr?: string): { year: number; monthIndex: number } | null => {
+  if (!dateStr) return null;
+  const clean = dateStr.trim();
+
+  // Format 'MAR-2026' or 'MAR 2026'
+  const mParts = clean.split(/[- ]/);
+  if (mParts.length === 2) {
+    const mIdx = MONTH_NAMES.indexOf(mParts[0].toUpperCase());
+    const y = parseInt(mParts[1], 10);
+    if (mIdx !== -1 && !isNaN(y)) return { year: y, monthIndex: mIdx };
+  }
+
+  // Format 'YYYY-MM-DD' or 'YYYY-MM'
+  if (clean.includes('-')) {
+    const parts = clean.split('-');
+    if (parts.length >= 2) {
+      if (parts[0].length === 4) {
+        const y = parseInt(parts[0], 10);
+        const m = parseInt(parts[1], 10) - 1;
+        if (!isNaN(y) && !isNaN(m) && m >= 0 && m <= 11) return { year: y, monthIndex: m };
+      } else if (parts[2]?.length === 4) {
+        // 'DD-MM-YYYY'
+        const y = parseInt(parts[2], 10);
+        const m = parseInt(parts[1], 10) - 1;
+        if (!isNaN(y) && !isNaN(m) && m >= 0 && m <= 11) return { year: y, monthIndex: m };
+      }
+    }
+  }
+
+  const d = new Date(clean);
+  if (!isNaN(d.getTime())) {
+    return { year: d.getFullYear(), monthIndex: d.getMonth() };
+  }
+  return null;
+};
+
+export const getMonthsBetweenDates = (startDateStr: string, endDateStr: string): string[] => {
+  const start = parseYearMonthFromDate(startDateStr);
+  const end = parseYearMonthFromDate(endDateStr);
+  if (!start || !end) return [];
+
+  const results: string[] = [];
+  let curY = start.year;
+  let curM = start.monthIndex;
+
+  while (curY < end.year || (curY === end.year && curM <= end.monthIndex)) {
+    results.push(`${MONTH_NAMES[curM]}-${curY}`);
+    curM++;
+    if (curM > 11) {
+      curM = 0;
+      curY++;
+    }
+    if (results.length > 36) break;
+  }
+  return results;
+};
+
+// Auto-Continuation Engine: Rolls forward filled DBT data across active contract months
+export const generateAutoContinuedDbtRecords = (targetSub: FormSubmission): NAPSPortalRecord[] => {
+  const existingRecords = targetSub.naps_records || [];
+  const candidates = targetSub.candidates || [];
+  if (candidates.length === 0) return existingRecords;
+
+  const resultRecords: NAPSPortalRecord[] = [];
+  const existingKeySet = new Set<string>();
+
+  // Map existing records to candidate + normalized month, filtering out post-termination records
+  existingRecords.forEach(rec => {
+    const ym = parseYearMonthFromDate(rec.payoutMonth);
+    const normMonth = ym ? `${MONTH_NAMES[ym.monthIndex]}-${ym.year}` : rec.payoutMonth.toUpperCase();
+    const candKey = (rec.candidateId || rec.contractCode || rec.apprenticeCode || rec.candidateName || '').toLowerCase().trim();
+
+    const matchedCand = candidates.find(c => 
+      c.id === rec.candidateId || 
+      (c.contractCode && rec.contractCode && c.contractCode.toLowerCase() === rec.contractCode.toLowerCase()) ||
+      (c.name && rec.candidateName && c.name.toLowerCase() === rec.candidateName.toLowerCase())
+    );
+
+    let isPostTermination = false;
+    if (matchedCand && (matchedCand.contractStatus === 'Terminated' || matchedCand.status === 'Terminated') && matchedCand.terminationDate) {
+      const termYM = parseYearMonthFromDate(matchedCand.terminationDate);
+      if (termYM && ym) {
+        if (ym.year > termYM.year || (ym.year === termYM.year && ym.monthIndex > termYM.monthIndex)) {
+          isPostTermination = true;
+        }
+      }
+    }
+
+    if (!isPostTermination) {
+      resultRecords.push(rec);
+      existingKeySet.add(`${candKey}::${normMonth}`);
+    }
+  });
+
+  // For each candidate who has at least one DBT record filled, auto-continue active months
+  candidates.forEach(cand => {
+    const candRecords = existingRecords.filter(r => 
+      r.candidateId === cand.id || 
+      (cand.contractCode && r.contractCode && cand.contractCode.toLowerCase() === r.contractCode.toLowerCase()) ||
+      (cand.name && r.candidateName && cand.name.toLowerCase() === r.candidateName.toLowerCase())
+    );
+
+    // Candidates whose DBT data has NEVER been entered are not auto-continued
+    if (candRecords.length === 0) return;
+
+    const baseRec = candRecords[candRecords.length - 1] || candRecords[0];
+    const startDateStr = baseRec.contractStartDate || cand.onboardingDate || '2026-03-01';
+    let endDateStr = baseRec.contractEndDate || cand.contractExpireDate || '2027-02-28';
+
+    // If candidate is terminated, cap auto-continuation at termination date
+    const isTerminated = cand.contractStatus === 'Terminated' || cand.status === 'Terminated';
+    if (isTerminated && cand.terminationDate) {
+      endDateStr = cand.terminationDate;
+    }
+
+    const validMonths = getMonthsBetweenDates(startDateStr, endDateStr);
+    const candKey = (cand.id || cand.contractCode || cand.apprenticeCode || cand.name || '').toLowerCase().trim();
+
+    validMonths.forEach(mStr => {
+      const key = `${candKey}::${mStr}`;
+      if (!existingKeySet.has(key)) {
+        const autoRec: NAPSPortalRecord = {
+          ...baseRec,
+          id: `naps-auto-${cand.id || 'cand'}-${mStr.toLowerCase()}`,
+          candidateId: cand.id,
+          candidateName: cand.name,
+          candidateAadhaarName: baseRec.candidateAadhaarName || cand.name,
+          apprenticeCode: baseRec.apprenticeCode || cand.apprenticeCode || '',
+          contractCode: baseRec.contractCode || cand.contractCode || '',
+          establishmentCode: baseRec.establishmentCode || targetSub.responses?.establishmentCode || '',
+          location: baseRec.location || '',
+          ojtDistrict: baseRec.ojtDistrict || cand.ojtDistrict || '',
+          ojtState: baseRec.ojtState || cand.ojtState || '',
+          dob: baseRec.dob || cand.dob,
+          gender: baseRec.gender || cand.gender,
+          mobileNumber: baseRec.mobileNumber || cand.phone,
+          emailId: baseRec.emailId || cand.email,
+          stipend: baseRec.stipend || cand.stipendAmount || 0,
+          amount: baseRec.amount || cand.dbtEligibleAmount || 1500,
+          qualification: baseRec.qualification || cand.qualification,
+          curriculum: baseRec.curriculum || cand.tradeOrRole,
+          contractStartDate: startDateStr,
+          contractEndDate: baseRec.contractEndDate || cand.contractExpireDate || endDateStr,
+          payoutMonth: mStr,
+          paymentStatus: 'UNPAID',
+          dbtStatus: 'UNPAID',
+          remarks: isTerminated ? 'Contract active prior to termination' : 'Auto-continued (Contract Active)',
+          isAutoContinued: true,
+          sourceRecordId: baseRec.id,
+          createdAt: new Date().toISOString()
+        };
+
+        resultRecords.push(autoRec);
+        existingKeySet.add(key);
+      }
+    });
+  });
+
+  return resultRecords;
+};
+
+// 45-Day Prior Contract Expiry Detection Helper
+export interface ExpiringContractInfo {
+  candidate: ApprenticeRecord;
+  daysRemaining: number;
+  expiryDateStr: string;
+  isExpired: boolean;
+  status: 'Critical' | 'Warning' | 'Healthy';
+}
+
+export const getExpiringContracts = (candidates: ApprenticeRecord[] = []): ExpiringContractInfo[] => {
+  const now = new Date();
+  now.setHours(0, 0, 0, 0);
+
+  const results: ExpiringContractInfo[] = [];
+
+  candidates.forEach(cand => {
+    // Terminated or completed contracts are not in the active expiring workflow
+    if (cand.contractStatus === 'Terminated' || cand.status === 'Terminated' || cand.status === 'Completed') {
+      return;
+    }
+
+    const expiryDateStr = cand.contractExpireDate;
+    if (!expiryDateStr) return;
+
+    const expDate = new Date(expiryDateStr);
+    if (isNaN(expDate.getTime())) return;
+    expDate.setHours(0, 0, 0, 0);
+
+    const diffTime = expDate.getTime() - now.getTime();
+    const daysRemaining = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+
+    // Alert window: 45 days prior, up to any current expiration
+    if (daysRemaining <= 45) {
+      results.push({
+        candidate: cand,
+        daysRemaining,
+        expiryDateStr,
+        isExpired: daysRemaining < 0,
+        status: daysRemaining <= 15 ? 'Critical' : daysRemaining <= 30 ? 'Warning' : 'Healthy'
+      });
+    }
+  });
+
+  return results.sort((a, b) => a.daysRemaining - b.daysRemaining);
 };
 
 const StoreContext = createContext<AuthState | null>(null);
@@ -1442,9 +1654,15 @@ export const StoreProvider: React.FC<{ children: React.ReactNode }> = ({ childre
     const existingRecords = targetSub.naps_records || [];
     const updatedRecords = [newRecord, ...existingRecords];
 
+    // Automatically roll forward subsequent active contract months
+    const autoExpandedRecords = generateAutoContinuedDbtRecords({
+      ...targetSub,
+      naps_records: updatedRecords
+    });
+
     const updatedSub: FormSubmission = {
       ...targetSub,
-      naps_records: updatedRecords,
+      naps_records: autoExpandedRecords,
       last_active_at: new Date().toISOString()
     };
 
@@ -1455,7 +1673,7 @@ export const StoreProvider: React.FC<{ children: React.ReactNode }> = ({ childre
     if (user && (user.id === targetSub.client_id || user.email.toLowerCase() === targetSub.client_email.toLowerCase())) {
       const updatedMetrics: ClientApprenticeMetrics = {
         ...(user.apprenticeMetrics || {} as any),
-        napsPortalRecords: updatedRecords
+        napsPortalRecords: autoExpandedRecords
       };
       setUser({ ...user, apprenticeMetrics: updatedMetrics });
     }
@@ -1552,6 +1770,133 @@ export const StoreProvider: React.FC<{ children: React.ReactNode }> = ({ childre
         actionItems: updates.action_items || user.apprenticeMetrics?.actionItems,
         stipendPayments: updates.stipend_payments || user.apprenticeMetrics?.stipendPayments,
         lastMonthOnboardedList: updates.candidates || user.apprenticeMetrics?.lastMonthOnboardedList
+      };
+      setUser({ ...user, apprenticeMetrics: updatedMetrics });
+    }
+
+    await persistSubmissionToSupabase(updatedSub);
+  };
+
+  const terminateApprenticeContract = async (
+    submissionId: string, 
+    candidateId: string, 
+    terminationData: { date: string; reason: string; remarks?: string }
+  ): Promise<void> => {
+    const targetSub = submissions.find(s => s.id === submissionId) || getActiveClientSubmission();
+    if (!targetSub) throw new Error('Client submission record not found.');
+
+    const candidate = (targetSub.candidates || []).find(c => c.id === candidateId);
+    if (!candidate) throw new Error('Candidate record not found.');
+
+    const updatedCandidates = (targetSub.candidates || []).map(c => {
+      if (c.id === candidateId) {
+        return {
+          ...c,
+          status: 'Terminated' as const,
+          contractStatus: 'Terminated' as const,
+          terminationDate: terminationData.date,
+          terminationReason: terminationData.reason
+        };
+      }
+      return c;
+    });
+
+    const termYM = parseYearMonthFromDate(terminationData.date);
+
+    // Prune any existing NAPS records for months AFTER termination month
+    const updatedNapsRecords = (targetSub.naps_records || []).filter(rec => {
+      const isCand = rec.candidateId === candidateId || 
+        (candidate.contractCode && rec.contractCode && candidate.contractCode.toLowerCase() === rec.contractCode.toLowerCase()) ||
+        (candidate.name && rec.candidateName && candidate.name.toLowerCase() === rec.candidateName.toLowerCase());
+      if (!isCand) return true;
+
+      if (termYM) {
+        const rYM = parseYearMonthFromDate(rec.payoutMonth);
+        if (rYM) {
+          if (rYM.year > termYM.year || (rYM.year === termYM.year && rYM.monthIndex > termYM.monthIndex)) {
+            return false;
+          }
+        }
+      }
+      return true;
+    });
+
+    // Create a SPOC Notification Log
+    const targetRecipientEmail = targetSub.assigned_company_spoc?.email || user?.email || 'admin@company.com';
+    const targetRecipientName = targetSub.assigned_company_spoc?.name || user?.full_name || 'Company SPOC';
+
+    const spocNotice: SPOCEmailLog = {
+      id: `spoc-term-${Date.now()}`,
+      candidateId: candidate.id,
+      candidateName: candidate.name,
+      recipientEmail: targetRecipientEmail,
+      recipientName: targetRecipientName,
+      companyName: targetSub.company_name || 'Establishment',
+      subject: `[Contract Terminated] Early Cessation Notice: ${candidate.name} (${candidate.contractCode || candidate.apprenticeCode || 'N/A'})`,
+      documentNames: ['Termination_Notice.pdf', 'Contract_De-Registration.pdf'],
+      sentAt: new Date().toISOString(),
+      status: 'Delivered',
+      previewBodyHtml: `<p>Contract for <strong>${candidate.name}</strong> terminated effective ${terminationData.date}. Reason: ${terminationData.reason}. De-register apprentice on NAPS portal. Monthly DBT logging ceased.</p>`
+    };
+
+    const updatedSpocLogs = [spocNotice, ...(targetSub.spoc_logs || [])];
+
+    // Create a Compliance Action Item
+    const termActionItem: ComplianceActionItem = {
+      id: `act-term-${Date.now()}`,
+      observation: `Contract Terminated: ${candidate.name} (${candidate.contractCode || 'CN Pending'})`,
+      actionRequired: `De-register apprentice on NAPS portal due to early termination (${terminationData.reason}). Future DBT subsidy claims halted.`,
+      owner: targetSub.assigned_company_spoc?.name || 'Operations SPOC',
+      targetDate: terminationData.date,
+      status: 'Open',
+      addedBy: 'client'
+    };
+
+    const updatedActionItems = [termActionItem, ...(targetSub.action_items || [])];
+
+    const updatedSub: FormSubmission = {
+      ...targetSub,
+      candidates: updatedCandidates,
+      naps_records: updatedNapsRecords,
+      spoc_logs: updatedSpocLogs,
+      action_items: updatedActionItems,
+      last_active_at: new Date().toISOString()
+    };
+
+    const updatedSubmissions = submissions.map(s => s.id === targetSub.id ? updatedSub : s);
+    setSubmissions(updatedSubmissions);
+
+    if (user && (user.id === targetSub.client_id || user.email.toLowerCase() === targetSub.client_email.toLowerCase())) {
+      const updatedMetrics: ClientApprenticeMetrics = {
+        ...(user.apprenticeMetrics || {} as any),
+        spocEmailLogs: updatedSpocLogs,
+        actionItems: updatedActionItems,
+        napsPortalRecords: updatedNapsRecords
+      };
+      setUser({ ...user, apprenticeMetrics: updatedMetrics });
+    }
+
+    await persistSubmissionToSupabase(updatedSub);
+  };
+
+  const syncAutoContinuedDbtRecords = async (submissionId: string): Promise<void> => {
+    const targetSub = submissions.find(s => s.id === submissionId);
+    if (!targetSub) return;
+
+    const autoExpanded = generateAutoContinuedDbtRecords(targetSub);
+    const updatedSub: FormSubmission = {
+      ...targetSub,
+      naps_records: autoExpanded,
+      last_active_at: new Date().toISOString()
+    };
+
+    const updatedSubmissions = submissions.map(s => s.id === submissionId ? updatedSub : s);
+    setSubmissions(updatedSubmissions);
+
+    if (user && (user.id === targetSub.client_id || user.email.toLowerCase() === targetSub.client_email.toLowerCase())) {
+      const updatedMetrics: ClientApprenticeMetrics = {
+        ...(user.apprenticeMetrics || {} as any),
+        napsPortalRecords: autoExpanded
       };
       setUser({ ...user, apprenticeMetrics: updatedMetrics });
     }
@@ -1850,6 +2195,8 @@ export const StoreProvider: React.FC<{ children: React.ReactNode }> = ({ childre
         updateNAPSRecord,
         deleteNAPSRecord,
         updateClientComplianceReport,
+        terminateApprenticeContract,
+        syncAutoContinuedDbtRecords,
         addStipendPayment,
         updateStipendPayment,
         addActionItem,

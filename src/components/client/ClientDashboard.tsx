@@ -1,8 +1,8 @@
 'use client';
 
 import React, { useState, useEffect, useMemo } from 'react';
-import { useStore } from '@/lib/store';
-import { ApprenticeRecord, UploadedDocument, SPOCEmailLog, NAPSPortalRecord, ComplianceInvoiceRecord, ComplianceActionItem, ClientApprenticeMetrics, DBTClaimRecord, StipendPaymentRecord } from '@/types';
+import { useStore, getExpiringContracts, generateAutoContinuedDbtRecords } from '@/lib/store';
+import { ApprenticeRecord, UploadedDocument, SPOCEmailLog, NAPSPortalRecord, ComplianceInvoiceRecord, ComplianceActionItem, ClientApprenticeMetrics, DBTClaimRecord, StipendPaymentRecord, FormSubmission } from '@/types';
 import { GlassCard } from '@/components/ui/GlassCard';
 import { ClientIntakeWizard } from './ClientIntakeWizard';
 import { DocumentViewerModal } from '@/components/ui/DocumentViewerModal';
@@ -48,7 +48,9 @@ import {
   Table,
   Filter,
   Lock,
-  AlertCircle
+  AlertCircle,
+  AlertTriangle,
+  UserX
 } from 'lucide-react';
 import { 
   ResponsiveContainer, 
@@ -101,13 +103,24 @@ export const ClientDashboard: React.FC = () => {
     fileDBTClaim,
     assignCompanySpoc,
     addStipendPayment,
-    addActionItem
+    addActionItem,
+    terminateApprenticeContract,
+    syncAutoContinuedDbtRecords
   } = useStore();
 
   const [activeTab, setActiveTab] = useState<ClientViewTab>('compliance_report');
   const [activeMainView, setActiveMainView] = useState<'intake' | 'dashboard'>('dashboard');
   const [searchQuery, setSearchQuery] = useState('');
   const [statusFilter, setStatusFilter] = useState<string>('all');
+
+  // Termination Modal State
+  const [showTerminateModal, setShowTerminateModal] = useState(false);
+  const [terminatingCandidate, setTerminatingCandidate] = useState<ApprenticeRecord | null>(null);
+  const [termDate, setTermDate] = useState(new Date().toISOString().split('T')[0]);
+  const [termReason, setTermReason] = useState('Mutual Agreement');
+  const [termRemarks, setTermRemarks] = useState('');
+  const [termSubmitting, setTermSubmitting] = useState(false);
+  const [termSuccessMsg, setTermSuccessMsg] = useState<string | null>(null);
   
   // Interactive Month and Year Filters
   const [selectedReportMonth, setSelectedReportMonth] = useState<string>('all');
@@ -323,11 +336,38 @@ export const ClientDashboard: React.FC = () => {
     return [];
   }, [activeSubmission, user?.apprenticeMetrics?.spocEmailLogs]);
 
+  // Expiring contracts within 45 days
+  const expiringContractsList = useMemo(() => {
+    return getExpiringContracts(candidateList);
+  }, [candidateList]);
+
+  // DBT Records with automated monthly continuation across contract duration
   const effectiveNapsRecords: NAPSPortalRecord[] = useMemo(() => {
-    if (activeSubmission) return activeSubmission.naps_records || [];
-    if (user?.apprenticeMetrics?.napsPortalRecords) return user.apprenticeMetrics.napsPortalRecords;
+    if (activeSubmission) {
+      return generateAutoContinuedDbtRecords(activeSubmission);
+    }
+    if (user?.apprenticeMetrics?.napsPortalRecords) {
+      const pseudoSub: FormSubmission = {
+        id: 'client-pseudo',
+        client_id: user?.id || 'client',
+        client_name: user?.full_name || 'Client',
+        client_email: user?.email || '',
+        company_name: user?.company_name || '',
+        status: 'approved',
+        current_step: 2,
+        total_steps: 2,
+        completion_percentage: 100,
+        time_spent_seconds: 0,
+        responses: {},
+        candidates: user.apprenticeMetrics.lastMonthOnboardedList || [],
+        naps_records: user.apprenticeMetrics.napsPortalRecords || [],
+        started_at: new Date().toISOString(),
+        last_active_at: new Date().toISOString()
+      };
+      return generateAutoContinuedDbtRecords(pseudoSub);
+    }
     return [];
-  }, [activeSubmission, user?.apprenticeMetrics?.napsPortalRecords]);
+  }, [activeSubmission, user?.apprenticeMetrics?.napsPortalRecords, user?.apprenticeMetrics?.lastMonthOnboardedList, user?.id, user?.full_name, user?.email, user?.company_name]);
 
   const effectiveStipendPayments: StipendPaymentRecord[] = useMemo(() => {
     if (activeSubmission?.stipend_payments && activeSubmission.stipend_payments.length > 0) {
@@ -1364,6 +1404,36 @@ export const ClientDashboard: React.FC = () => {
 
                   {/* Section 3: Contract Numbers (CN) – Candidates Onboarded on Month */}
                   <div className="rounded-3xl bg-white border border-zinc-200 p-6 sm:p-7 shadow-sm space-y-4">
+                    {/* 45-Day Prior Contract Expiry Notification Banner */}
+                    {expiringContractsList.length > 0 && (
+                      <div className="p-4 rounded-2xl bg-amber-500/10 border border-amber-500/30 text-amber-900 space-y-2">
+                        <div className="flex items-center justify-between">
+                          <div className="flex items-center gap-2 font-bold text-xs">
+                            <AlertTriangle className="w-4 h-4 text-amber-600 shrink-0" />
+                            <span>Contract Expiry Warning: {expiringContractsList.length} candidate(s) expiring within 45 days</span>
+                          </div>
+                          <span className="text-[10px] font-mono font-bold bg-amber-200/80 px-2 py-0.5 rounded-full text-amber-900">
+                            Action Required
+                          </span>
+                        </div>
+                        <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-2 pt-1">
+                          {expiringContractsList.map(({ candidate: c, daysRemaining, expiryDateStr, isExpired }) => (
+                            <div key={c.id} className="p-2.5 rounded-xl bg-white/80 border border-amber-200/60 flex items-center justify-between text-[11px]">
+                              <div>
+                                <div className="font-bold text-zinc-900">{c.name}</div>
+                                <div className="text-[10px] font-mono text-zinc-500">Expires: {expiryDateStr}</div>
+                              </div>
+                              <span className={`px-2 py-0.5 rounded-full text-[10px] font-bold font-mono ${
+                                isExpired ? 'bg-rose-100 text-rose-800' : daysRemaining <= 15 ? 'bg-rose-100 text-rose-700' : 'bg-amber-100 text-amber-800'
+                              }`}>
+                                {isExpired ? 'EXPIRED' : `${daysRemaining} days left`}
+                              </span>
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+                    )}
+
                     <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-zinc-200 pb-3">
                       <div className="flex items-center gap-2">
                         <div className="w-2.5 h-2.5 rounded-full bg-[#0a192f]"></div>
@@ -1462,9 +1532,10 @@ export const ClientDashboard: React.FC = () => {
                               const resolvedAP = app.apprenticeCode || matchedNaps?.apprenticeCode;
                               const isApproved = Boolean(resolvedCN && resolvedCN !== 'CN Pending');
                               const expDate = app.contractExpireDate || (app.onboardingDate ? new Date(new Date(app.onboardingDate).setFullYear(new Date(app.onboardingDate).getFullYear() + 1)).toISOString().split('T')[0] : '-');
+                              const isTerminated = app.contractStatus === 'Terminated' || app.status === 'Terminated';
 
                               return (
-                                <tr key={app.id || idx} className="hover:bg-zinc-50/80 transition-colors">
+                                <tr key={app.id || idx} className={`transition-colors ${isTerminated ? 'bg-rose-50/40 hover:bg-rose-50/70' : 'hover:bg-zinc-50/80'}`}>
                                   <td className="px-4 py-3 font-mono text-zinc-400 font-bold">{idx + 1}</td>
                                   <td className="px-4 py-3">
                                     <div className="font-bold text-zinc-900">{app.name}</div>
@@ -1472,6 +1543,11 @@ export const ClientDashboard: React.FC = () => {
                                       <span className="px-1.5 py-0.5 rounded text-[9px] font-mono font-bold bg-purple-100 text-purple-900 border border-purple-200">
                                         {app.enrollmentScheme || 'NAPS'}
                                       </span>
+                                      {isTerminated && (
+                                        <span className="px-1.5 py-0.5 rounded text-[9px] font-mono font-bold bg-rose-100 text-rose-800 border border-rose-200">
+                                          Terminated ({app.terminationDate || 'Closed'})
+                                        </span>
+                                      )}
                                     </div>
                                   </td>
                                   <td className="px-4 py-3 font-mono">
@@ -1530,31 +1606,57 @@ export const ClientDashboard: React.FC = () => {
                                     </div>
                                   </td>
                                   <td className="px-4 py-3">
-                                    <span className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[10px] font-bold ${
-                                      isApproved
-                                        ? 'bg-emerald-100 text-emerald-800 border border-emerald-200'
-                                        : 'bg-amber-100 text-amber-800 border border-amber-200'
-                                    }`}>
-                                      {isApproved ? (
-                                        <>
-                                          <CheckCircle2 className="w-3 h-3 text-emerald-600" />
-                                          <span>Approved on NAPS Portal</span>
-                                        </>
-                                      ) : (
-                                        <>
-                                          <Clock className="w-3 h-3 text-amber-600" />
-                                          <span>Portal CN Allocation in Progress</span>
-                                        </>
-                                      )}
-                                    </span>
+                                    {isTerminated ? (
+                                      <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[10px] font-bold bg-rose-100 text-rose-800 border border-rose-300">
+                                        <AlertCircle className="w-3 h-3 text-rose-600" />
+                                        <span>Contract Terminated</span>
+                                      </span>
+                                    ) : (
+                                      <span className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[10px] font-bold ${
+                                        isApproved
+                                          ? 'bg-emerald-100 text-emerald-800 border border-emerald-200'
+                                          : 'bg-amber-100 text-amber-800 border border-amber-200'
+                                      }`}>
+                                        {isApproved ? (
+                                          <>
+                                            <CheckCircle2 className="w-3 h-3 text-emerald-600" />
+                                            <span>Approved on NAPS Portal</span>
+                                          </>
+                                        ) : (
+                                          <>
+                                            <Clock className="w-3 h-3 text-amber-600" />
+                                            <span>Portal CN Allocation in Progress</span>
+                                          </>
+                                        )}
+                                      </span>
+                                    )}
                                   </td>
                                   <td className="px-4 py-3 text-right">
-                                    <button
-                                      onClick={() => setSelectedContractCandidate(app as ApprenticeRecord)}
-                                      className="text-xs font-bold text-sky-700 hover:text-sky-900 cursor-pointer"
-                                    >
-                                      View Contract
-                                    </button>
+                                    <div className="flex items-center justify-end gap-2">
+                                      <button
+                                        onClick={() => setSelectedContractCandidate(app as ApprenticeRecord)}
+                                        className="text-xs font-bold text-sky-700 hover:text-sky-900 cursor-pointer"
+                                      >
+                                        Contract
+                                      </button>
+                                      {!isTerminated && (
+                                        <button
+                                          type="button"
+                                          onClick={() => {
+                                            setTerminatingCandidate(app as ApprenticeRecord);
+                                            setTermDate(new Date().toISOString().split('T')[0]);
+                                            setTermReason('Mutual Agreement');
+                                            setTermRemarks('');
+                                            setShowTerminateModal(true);
+                                          }}
+                                          className="px-2 py-0.5 rounded text-[10px] font-bold bg-rose-50 text-rose-700 hover:bg-rose-100 border border-rose-200 transition-colors cursor-pointer flex items-center gap-1"
+                                          title="Terminate Contract Early"
+                                        >
+                                          <UserX className="w-3 h-3" />
+                                          <span>Terminate</span>
+                                        </button>
+                                      )}
+                                    </div>
                                   </td>
                                 </tr>
                               );
@@ -2050,7 +2152,16 @@ export const ClientDashboard: React.FC = () => {
                                   <td className="px-3 py-2.5 text-sky-800 font-bold">{apCode}</td>
                                   <td className="px-3 py-2.5 text-zinc-500">{benId}</td>
                                   <td className="px-3 py-2.5 font-bold text-zinc-800">{cnNum}</td>
-                                  <td className="px-3 py-2.5 font-sans text-zinc-600 max-w-xs truncate">{rem}</td>
+                                  <td className="px-3 py-2.5 font-sans text-zinc-600 max-w-xs truncate">
+                                    <div className="flex items-center gap-1.5">
+                                      {r.isAutoContinued && (
+                                        <span className="px-1.5 py-0.5 rounded text-[9px] font-mono font-bold bg-sky-100 text-sky-800 border border-sky-200 shrink-0">
+                                          Auto-Continued
+                                        </span>
+                                      )}
+                                      <span>{rem}</span>
+                                    </div>
+                                  </td>
                                   <td className="px-3 py-2.5 text-zinc-600">{startDate}</td>
                                   <td className="px-3 py-2.5 text-zinc-600">{endDate}</td>
                                   <td className="px-3 py-2.5">
@@ -2155,6 +2266,36 @@ export const ClientDashboard: React.FC = () => {
                   transition={{ duration: 0.2 }}
                 >
                   <GlassCard className="p-6">
+                    {/* 45-Day Prior Contract Expiry Notification Banner */}
+                    {expiringContractsList.length > 0 && (
+                      <div className="mb-6 p-4 rounded-2xl bg-amber-500/10 border border-amber-500/30 text-amber-900 space-y-2">
+                        <div className="flex items-center justify-between">
+                          <div className="flex items-center gap-2 font-bold text-xs">
+                            <AlertTriangle className="w-4 h-4 text-amber-600 shrink-0" />
+                            <span>Contract Expiry Warning: {expiringContractsList.length} candidate(s) expiring within 45 days</span>
+                          </div>
+                          <span className="text-[10px] font-mono font-bold bg-amber-200/80 px-2 py-0.5 rounded-full text-amber-900">
+                            Action Required
+                          </span>
+                        </div>
+                        <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-2 pt-1">
+                          {expiringContractsList.map(({ candidate: c, daysRemaining, expiryDateStr, isExpired }) => (
+                            <div key={c.id} className="p-2.5 rounded-xl bg-white/80 border border-amber-200/60 flex items-center justify-between text-[11px]">
+                              <div>
+                                <div className="font-bold text-zinc-900">{c.name}</div>
+                                <div className="text-[10px] font-mono text-zinc-500">Expires: {expiryDateStr}</div>
+                              </div>
+                              <span className={`px-2 py-0.5 rounded-full text-[10px] font-bold font-mono ${
+                                isExpired ? 'bg-rose-100 text-rose-800' : daysRemaining <= 15 ? 'bg-rose-100 text-rose-700' : 'bg-amber-100 text-amber-800'
+                              }`}>
+                                {isExpired ? 'EXPIRED' : `${daysRemaining} days left`}
+                              </span>
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+                    )}
+
                     <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-6">
                       <div>
                         <h3 className="text-xs font-extrabold uppercase tracking-wider text-zinc-900 font-mono">
@@ -2187,6 +2328,7 @@ export const ClientDashboard: React.FC = () => {
                           <option value="allocated">Allocated ({candidateList.filter(c => c.contractCode && c.contractCode !== 'CN Pending').length})</option>
                           <option value="active">Active</option>
                           <option value="under training">Under Training</option>
+                          <option value="terminated">Terminated ({candidateList.filter(c => c.contractStatus === 'Terminated' || c.status === 'Terminated').length})</option>
                         </select>
 
                         <button
@@ -2426,24 +2568,54 @@ export const ClientDashboard: React.FC = () => {
                                   </td>
 
                                   <td className="py-3.5 px-4">
-                                    <button
-                                      onClick={() => setSelectedContractCandidate(app)}
-                                      className="px-2.5 py-1 rounded-full text-[10px] font-semibold bg-zinc-100 hover:bg-zinc-200 text-zinc-800 border border-zinc-200 transition-all cursor-pointer flex items-center gap-1"
-                                    >
-                                      <FileSignature className="w-3 h-3" />
-                                      <span>{app.contractStatus} ↗</span>
-                                    </button>
-                                  </td>
+                                     <div className="flex flex-col gap-1 items-start">
+                                       <button
+                                         onClick={() => setSelectedContractCandidate(app)}
+                                         className={`px-2.5 py-1 rounded-full text-[10px] font-semibold border transition-all cursor-pointer flex items-center gap-1 ${
+                                           app.contractStatus === 'Terminated' || app.status === 'Terminated'
+                                             ? 'bg-rose-50 text-rose-800 border-rose-300'
+                                             : 'bg-zinc-100 hover:bg-zinc-200 text-zinc-800 border-zinc-200'
+                                         }`}
+                                       >
+                                         <FileSignature className="w-3 h-3" />
+                                         <span>{app.contractStatus} ↗</span>
+                                       </button>
+                                       {(app.contractStatus === 'Terminated' || app.status === 'Terminated') && app.terminationDate && (
+                                         <span className="text-[9px] font-mono text-rose-700">
+                                           Terminated: {app.terminationDate}
+                                         </span>
+                                       )}
+                                     </div>
+                                   </td>
 
-                                  <td className="py-3.5 px-4 text-right">
-                                    <button
-                                      onClick={() => removeApprentice(app.id)}
-                                      className="p-1.5 rounded-full hover:bg-rose-50 text-zinc-400 hover:text-rose-600 transition-colors cursor-pointer"
-                                      title="Remove Candidate"
-                                    >
-                                      <Trash2 className="w-3.5 h-3.5" />
-                                    </button>
-                                  </td>
+                                   <td className="py-3.5 px-4 text-right">
+                                     <div className="flex items-center justify-end gap-1.5">
+                                       {!(app.contractStatus === 'Terminated' || app.status === 'Terminated') && (
+                                         <button
+                                           type="button"
+                                           onClick={() => {
+                                             setTerminatingCandidate(app);
+                                             setTermDate(new Date().toISOString().split('T')[0]);
+                                             setTermReason('Mutual Agreement');
+                                             setTermRemarks('');
+                                             setShowTerminateModal(true);
+                                           }}
+                                           className="px-2 py-1 rounded text-[10px] font-bold bg-rose-50 text-rose-700 hover:bg-rose-100 border border-rose-200 transition-colors cursor-pointer flex items-center gap-1"
+                                           title="Terminate Contract Early"
+                                         >
+                                           <UserX className="w-3 h-3" />
+                                           <span>Terminate</span>
+                                         </button>
+                                       )}
+                                       <button
+                                         onClick={() => removeApprentice(app.id)}
+                                         className="p-1.5 rounded-full hover:bg-rose-50 text-zinc-400 hover:text-rose-600 transition-colors cursor-pointer"
+                                         title="Remove Candidate"
+                                       >
+                                         <Trash2 className="w-3.5 h-3.5" />
+                                       </button>
+                                     </div>
+                                   </td>
                                 </tr>
                               );
                             })
@@ -3759,6 +3931,160 @@ export const ClientDashboard: React.FC = () => {
                   </button>
                 </div>
               </form>
+            </motion.div>
+          </div>
+        )}
+      </AnimatePresence>
+
+      {/* Early Contract Termination Modal */}
+      <AnimatePresence>
+        {showTerminateModal && terminatingCandidate && (
+          <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-xs">
+            <motion.div
+              initial={{ opacity: 0, scale: 0.95 }}
+              animate={{ opacity: 1, scale: 1 }}
+              exit={{ opacity: 0, scale: 0.95 }}
+              className="bg-white rounded-3xl p-6 sm:p-7 max-w-lg w-full shadow-2xl border border-zinc-200 space-y-5"
+            >
+              <div className="flex items-center justify-between border-b border-zinc-100 pb-3">
+                <div className="flex items-center gap-2.5">
+                  <div className="w-9 h-9 rounded-2xl bg-rose-50 border border-rose-200 flex items-center justify-center text-rose-700 shrink-0">
+                    <UserX className="w-4 h-4" />
+                  </div>
+                  <div>
+                    <h3 className="text-sm font-extrabold text-zinc-900">
+                      Early Contract Termination
+                    </h3>
+                    <p className="text-xs text-zinc-500">
+                      Cease contract and halt future DBT subsidy claims
+                    </p>
+                  </div>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => setShowTerminateModal(false)}
+                  className="p-1 rounded-full hover:bg-zinc-100 text-zinc-400 hover:text-zinc-700 cursor-pointer"
+                >
+                  <X className="w-4 h-4" />
+                </button>
+              </div>
+
+              <div className="p-3.5 rounded-2xl bg-rose-50/70 border border-rose-200 text-xs text-rose-900 space-y-1">
+                <div className="font-bold">Candidate: {terminatingCandidate.name}</div>
+                <div className="text-[11px] font-mono text-rose-800">
+                  Contract: {terminatingCandidate.contractCode || 'CN Pending'} · Scheme: {terminatingCandidate.enrollmentScheme || 'NAPS'}
+                </div>
+                <p className="text-[11px] text-rose-700 pt-1">
+                  Once marked as Terminated, the company SPOC will be notified immediately. Future monthly DBT subsidy claims for this candidate will no longer be logged starting from the following month.
+                </p>
+              </div>
+
+              <form
+                onSubmit={async (e) => {
+                  e.preventDefault();
+                  if (!termDate || !termReason.trim()) return;
+                  const subId = activeSubmission?.id || 'sub-' + (user?.id || 'client');
+                  setTermSubmitting(true);
+                  try {
+                    await terminateApprenticeContract(subId, terminatingCandidate.id, {
+                      date: termDate,
+                      reason: termReason,
+                      remarks: termRemarks
+                    });
+                    setShowTerminateModal(false);
+                    setTermSuccessMsg(`Contract for ${terminatingCandidate.name} marked as Terminated. SPOC alert dispatched and future DBT logging halted.`);
+                    setTimeout(() => setTermSuccessMsg(null), 6000);
+                  } catch (err: any) {
+                    console.error('Termination error:', err);
+                  } finally {
+                    setTermSubmitting(false);
+                  }
+                }}
+                className="space-y-4 text-xs"
+              >
+                <div>
+                  <label className="block text-[11px] font-bold text-zinc-700 mb-1">
+                    Effective Termination Date *
+                  </label>
+                  <input
+                    type="date"
+                    value={termDate}
+                    onChange={(e) => setTermDate(e.target.value)}
+                    required
+                    className="w-full px-3 py-2 rounded-xl bg-zinc-50 border border-zinc-200 text-zinc-900 text-xs font-mono focus:outline-none focus:border-black"
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-[11px] font-bold text-zinc-700 mb-1">
+                    Reason for Early Termination *
+                  </label>
+                  <select
+                    value={termReason}
+                    onChange={(e) => setTermReason(e.target.value)}
+                    className="w-full px-3 py-2 rounded-xl bg-zinc-50 border border-zinc-200 text-zinc-900 text-xs font-medium focus:outline-none focus:border-black cursor-pointer"
+                  >
+                    <option value="Mutual Agreement">Mutual Agreement</option>
+                    <option value="Resignation by Apprentice">Resignation by Apprentice</option>
+                    <option value="Performance / Non-Attendance">Performance / Non-Attendance</option>
+                    <option value="Disciplinary Grounds">Disciplinary Grounds</option>
+                    <option value="Medical Reasons">Medical Reasons</option>
+                    <option value="Contract Expiry Pre-mature">Contract Expiry Pre-mature</option>
+                    <option value="Other">Other Operational Reason</option>
+                  </select>
+                </div>
+
+                <div>
+                  <label className="block text-[11px] font-bold text-zinc-700 mb-1">
+                    Additional Remarks / Notes (Optional)
+                  </label>
+                  <textarea
+                    rows={2}
+                    value={termRemarks}
+                    onChange={(e) => setTermRemarks(e.target.value)}
+                    placeholder="Enter any handover notes or portal de-registration instructions..."
+                    className="w-full px-3 py-2 rounded-xl bg-zinc-50 border border-zinc-200 text-zinc-900 text-xs focus:outline-none focus:border-black"
+                  />
+                </div>
+
+                <div className="pt-3 border-t border-zinc-200 flex items-center justify-end gap-2">
+                  <button
+                    type="button"
+                    onClick={() => setShowTerminateModal(false)}
+                    className="px-4 py-2 rounded-xl bg-zinc-100 hover:bg-zinc-200 text-zinc-700 font-bold cursor-pointer transition-colors"
+                  >
+                    Cancel
+                  </button>
+                  <button
+                    type="submit"
+                    disabled={termSubmitting}
+                    className="px-5 py-2 rounded-xl bg-rose-700 hover:bg-rose-800 text-white font-bold flex items-center gap-1.5 shadow-md cursor-pointer transition-all disabled:opacity-50"
+                  >
+                    <UserX className="w-3.5 h-3.5" />
+                    <span>{termSubmitting ? 'Terminating...' : 'Confirm Termination'}</span>
+                  </button>
+                </div>
+              </form>
+            </motion.div>
+          </div>
+        )}
+      </AnimatePresence>
+
+      {/* Termination Toast Alert */}
+      <AnimatePresence>
+        {termSuccessMsg && (
+          <div className="fixed bottom-6 right-6 z-50 max-w-md">
+            <motion.div
+              initial={{ opacity: 0, y: 16 }}
+              animate={{ opacity: 1, y: 0 }}
+              exit={{ opacity: 0, y: 16 }}
+              className="p-4 rounded-2xl bg-zinc-900 text-white shadow-xl flex items-start gap-3 text-xs"
+            >
+              <CheckCircle2 className="w-4 h-4 text-emerald-400 shrink-0 mt-0.5" />
+              <div className="space-y-0.5">
+                <div className="font-bold text-white">Contract Termination Logged</div>
+                <div className="text-zinc-300 text-[11px]">{termSuccessMsg}</div>
+              </div>
             </motion.div>
           </div>
         )}

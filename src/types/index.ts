@@ -119,9 +119,11 @@ export interface ApprenticeRecord {
   enrollmentScheme?: 'NAPS' | 'NATS' | 'Others';
   stipendAmount: number;
   dbtEligibleAmount: number;
-  contractStatus: 'Generated' | 'Signed' | 'Pending Verification';
+  contractStatus: 'Generated' | 'Signed' | 'Pending Verification' | 'Terminated';
   contractCode?: string;
   apprenticeCode?: string;
+  terminationDate?: string;
+  terminationReason?: string;
   attendanceRate: string;
   daysPresent?: number;
   totalWorkingDays?: number;
@@ -214,6 +216,9 @@ export interface NAPSPortalRecord {
   dbtStatus?: 'PAID' | 'UNPAID' | 'FAIL' | string;
   paymentFailureReason?: string;
   remarks?: string;
+  isAutoContinued?: boolean;
+  sourceRecordId?: string;
+  isTerminated?: boolean;
   createdAt?: string;
 }
 
@@ -426,6 +431,7 @@ export interface IntakeFormData {
   keyPainPoints?: string;
 
   // Establishment Registration Details (Official NAPS/NATS Register)
+  establishmentCode?: string;
   establishmentType?: string;
   establishmentCategory?: string;
   panNumber?: string;
