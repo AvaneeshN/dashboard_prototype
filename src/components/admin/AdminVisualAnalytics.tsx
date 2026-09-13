@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useMemo } from 'react';
+import React, { useState, useMemo } from 'react';
 import { useStore } from '@/lib/store';
 import { GlassCard } from '@/components/ui/GlassCard';
 import { 
@@ -13,7 +13,9 @@ import {
   BadgeIndianRupee,
   TrendingUp,
   MapPin,
-  Users2
+  Users2,
+  Filter,
+  X
 } from 'lucide-react';
 import { 
   ResponsiveContainer, 
@@ -28,8 +30,11 @@ import {
 export const AdminVisualAnalytics: React.FC = () => {
   const { submissions } = useStore();
 
+  // Selected client/establishment filter state ('all' or specific submission id)
+  const [selectedEstablishmentFilter, setSelectedEstablishmentFilter] = useState<string>('all');
+
   // Filter out any internal system records from client intakes
-  const clientSubmissions = useMemo(() => {
+  const allClientSubmissions = useMemo(() => {
     return submissions.filter(s => 
       s.id !== 'system_admin_config' && 
       s.id !== 'system_intake_config' && 
@@ -37,6 +42,28 @@ export const AdminVisualAnalytics: React.FC = () => {
       s.company_name !== 'Platform Organization'
     );
   }, [submissions]);
+
+  // Client/Establishment options for the dropdown filter
+  const establishmentOptions = useMemo(() => {
+    return allClientSubmissions.map(sub => {
+      const name = sub.company_name || sub.client_name || 'Unnamed Establishment';
+      const code = sub.establishment_details?.pan || sub.responses?.establishmentCode || sub.naps_portal_id || '';
+      return {
+        id: sub.id,
+        name,
+        code,
+        candidateCount: (sub.candidates || []).length
+      };
+    }).sort((a, b) => a.name.localeCompare(b.name));
+  }, [allClientSubmissions]);
+
+  // Active client submissions based on the selected filter
+  const clientSubmissions = useMemo(() => {
+    if (selectedEstablishmentFilter === 'all') {
+      return allClientSubmissions;
+    }
+    return allClientSubmissions.filter(s => s.id === selectedEstablishmentFilter);
+  }, [allClientSubmissions, selectedEstablishmentFilter]);
 
   // Compute live real metrics from database
   const liveStats = useMemo(() => {
@@ -273,11 +300,11 @@ export const AdminVisualAnalytics: React.FC = () => {
   return (
     <div className="space-y-7 font-sans text-zinc-900">
       
-      {/* Top Title & View Mode Toggle Bar */}
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 p-4 rounded-3xl bg-white border border-zinc-200 shadow-sm">
+      {/* Top Title, Client/Establishment Filter & Indicator Bar */}
+      <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-4 p-5 rounded-3xl bg-white border border-zinc-200 shadow-sm">
         <div className="flex items-center gap-3">
-          <div className="w-9 h-9 rounded-2xl bg-zinc-100 border border-zinc-200 flex items-center justify-center shrink-0">
-            <TrendingUp className="w-4 h-4 text-zinc-800" />
+          <div className="w-10 h-10 rounded-2xl bg-zinc-100 border border-zinc-200 flex items-center justify-center shrink-0">
+            <TrendingUp className="w-5 h-5 text-zinc-800" />
           </div>
           <div>
             <h2 className="text-sm font-extrabold uppercase tracking-wider text-zinc-900 font-mono">
@@ -289,12 +316,46 @@ export const AdminVisualAnalytics: React.FC = () => {
           </div>
         </div>
 
-        {/* Live Database Indicator Badge */}
-        <div className="flex items-center gap-2 px-3.5 py-1.5 rounded-full bg-emerald-50 border border-emerald-200 self-start sm:self-center">
-          <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" />
-          <span className="text-xs font-bold font-mono text-emerald-800">
-            Live Database ({clientSubmissions.length} Registered Intakes)
-          </span>
+        {/* Filter Controls & Live Database Badge */}
+        <div className="flex flex-wrap items-center gap-3 self-start lg:self-center">
+          {/* Client / Establishment Filter Selector */}
+          <div className="flex items-center gap-2 p-1.5 px-3 rounded-2xl bg-zinc-50 border border-zinc-200">
+            <Filter className="w-3.5 h-3.5 text-zinc-500 shrink-0" />
+            <span className="text-[11px] font-bold text-zinc-600 uppercase font-mono">Establishment:</span>
+            <select
+              value={selectedEstablishmentFilter}
+              onChange={(e) => setSelectedEstablishmentFilter(e.target.value)}
+              className="px-2.5 py-1 rounded-xl bg-white border border-zinc-200 text-zinc-900 text-xs font-semibold focus:outline-none focus:border-black cursor-pointer shadow-2xs max-w-[220px] sm:max-w-[280px] truncate"
+            >
+              <option value="all">All Establishments ({allClientSubmissions.length})</option>
+              {establishmentOptions.map(opt => (
+                <option key={opt.id} value={opt.id}>
+                  {opt.name} {opt.code ? `(${opt.code})` : ''} — {opt.candidateCount} candidate{opt.candidateCount === 1 ? '' : 's'}
+                </option>
+              ))}
+            </select>
+
+            {selectedEstablishmentFilter !== 'all' && (
+              <button
+                type="button"
+                onClick={() => setSelectedEstablishmentFilter('all')}
+                className="p-1 rounded-full hover:bg-zinc-200 text-zinc-500 hover:text-zinc-800 transition-colors cursor-pointer"
+                title="Reset to all establishments"
+              >
+                <X className="w-3.5 h-3.5" />
+              </button>
+            )}
+          </div>
+
+          {/* Active Filter Scope Indicator Badge */}
+          <div className="flex items-center gap-2 px-3.5 py-2 rounded-2xl bg-emerald-50 border border-emerald-200">
+            <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" />
+            <span className="text-xs font-bold font-mono text-emerald-800">
+              {selectedEstablishmentFilter === 'all' 
+                ? `All Intakes (${clientSubmissions.length})` 
+                : `${clientSubmissions[0]?.company_name || 'Selected Client'} (${liveStats.totalCandidates} apprentices)`}
+            </span>
+          </div>
         </div>
       </div>
 
