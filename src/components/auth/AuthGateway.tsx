@@ -213,25 +213,15 @@ export const AuthGateway: React.FC = () => {
 
       <div className="relative z-10 w-full max-w-[440px] flex flex-col items-center">
         
-        {/* Header Branding */}
-        <div className="text-center mb-6 space-y-2.5 flex flex-col items-center">
-          <div className="w-14 h-14 rounded-2xl overflow-hidden shadow-md border-2 border-[#1e3a5f] bg-[#0a192f] flex items-center justify-center p-1">
+        {/* Company Logo */}
+        <div className="mb-6 flex flex-col items-center">
+          <div className="w-16 h-16 rounded-2xl overflow-hidden shadow-lg border-2 border-[#1e3a5f] bg-[#0a192f] flex items-center justify-center p-1 hover:scale-105 transition-transform">
             <img 
               src="/wf47-logo.jpg" 
               alt="WF47 ZYNG Logo" 
               className="w-full h-full object-cover rounded-xl"
             />
           </div>
-          <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-[11px] font-mono font-bold tracking-wider uppercase text-zinc-700 bg-white border border-zinc-200 shadow-xs">
-            <span>✦</span>
-            <span>WF47 ZYNG Compliance Portal</span>
-          </div>
-          <h1 className="text-2xl sm:text-3xl font-extrabold text-zinc-900 tracking-tight">
-            Enterprise Apprentice Intake
-          </h1>
-          <p className="text-xs text-zinc-500 max-w-sm mx-auto leading-relaxed">
-            Direct DBT subsidy claiming, candidate quota tracking, and monthly reconciliation portal.
-          </p>
         </div>
 
         {/* Outer Glass Container */}
