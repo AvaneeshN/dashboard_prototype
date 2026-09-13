@@ -28,11 +28,12 @@ export const Navbar: React.FC = () => {
               className="w-9 h-9 rounded-xl object-cover border border-amber-400/40 shadow-xs" 
             />
             <div>
-              <div className="font-extrabold text-sm tracking-tight text-white leading-none">
-                WF47 ZYNG
+              <div className="font-extrabold text-sm text-white leading-none tracking-wide">
+                <span>WF47</span>
+                <span className="ml-1.5">ZYNG</span>
               </div>
-              <div className="text-[10px] font-mono text-slate-300 mt-0.5">
-                Compliance Management Portal
+              <div className="text-[10px] font-mono text-slate-300 mt-1">
+                Powered by Workforce2047 Partners LLP
               </div>
             </div>
           </div>
@@ -64,12 +65,16 @@ export const Navbar: React.FC = () => {
           />
           <div>
             <div className="flex items-center gap-2">
-              <span className="font-extrabold text-sm tracking-tight text-white">
-                WF47 ZYNG
+              <span className="font-extrabold text-sm text-white tracking-wide">
+                <span>WF47</span>
+                <span className="ml-1.5">ZYNG</span>
               </span>
               <span className="text-[10px] font-mono uppercase px-2 py-0.5 rounded-full bg-[#112240] text-amber-300 border border-amber-400/30">
                 {isAdmin ? 'DBT Admin Portal' : 'Client Portal'}
               </span>
+            </div>
+            <div className="text-[9.5px] font-mono text-slate-300 mt-0.5">
+              Powered by Workforce2047 Partners LLP
             </div>
           </div>
         </Link>
