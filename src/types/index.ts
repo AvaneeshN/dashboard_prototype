@@ -209,7 +209,7 @@ export interface NAPSPortalRecord {
   candidateDbtConsent: 'Yes' | 'No' | string;
   eKycStatus: 'Yes' | 'No' | string;
   establishmentSharedStatus: 'paid' | 'pending' | string;
-  amount: number; // e.g. 1500.0
+  amount: number;
   paymentStatus: 'PAID' | 'UNPAID' | 'FAIL' | 'PENDING' | 'FAILED' | string;
   dbtStatus?: 'PAID' | 'UNPAID' | 'FAIL' | string;
   paymentFailureReason?: string;

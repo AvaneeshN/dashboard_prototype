@@ -21,13 +21,15 @@ export const Navbar: React.FC = () => {
     return (
       <header className="sticky top-0 z-30 w-full border-b border-[#1e3a5f] bg-[#0a192f] text-white shadow-md font-sans">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 h-16 flex items-center justify-between">
-          <div className="flex items-center gap-2.5">
-            <div className="w-8 h-8 rounded-lg bg-[#112240] border border-amber-400/40 flex items-center justify-center text-amber-300 font-serif font-bold text-xs shadow-xs tracking-tighter">
-              C
-            </div>
+          <div className="flex items-center gap-3">
+            <img 
+              src="/wf47-logo.jpg" 
+              alt="WF47 ZYNG Logo" 
+              className="w-9 h-9 rounded-xl object-cover border border-amber-400/40 shadow-xs" 
+            />
             <div>
               <div className="font-extrabold text-sm tracking-tight text-white leading-none">
-                Console
+                WF47 ZYNG
               </div>
               <div className="text-[10px] font-mono text-slate-300 mt-0.5">
                 Compliance Management Portal
@@ -54,14 +56,16 @@ export const Navbar: React.FC = () => {
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 h-16 flex items-center justify-between">
         
         {/* Logo */}
-        <Link href={isAdmin ? '/admin' : '/client'} className="flex items-center gap-2.5 group">
-          <div className="w-8 h-8 rounded-lg bg-[#112240] border border-amber-400/40 flex items-center justify-center text-amber-300 font-serif font-bold text-xs shadow-xs tracking-tighter transition-transform group-hover:scale-105">
-            C
-          </div>
+        <Link href={isAdmin ? '/admin' : '/client'} className="flex items-center gap-3 group">
+          <img 
+            src="/wf47-logo.jpg" 
+            alt="WF47 ZYNG Logo" 
+            className="w-9 h-9 rounded-xl object-cover border border-amber-400/40 shadow-xs transition-transform group-hover:scale-105" 
+          />
           <div>
             <div className="flex items-center gap-2">
               <span className="font-extrabold text-sm tracking-tight text-white">
-                Console
+                WF47 ZYNG
               </span>
               <span className="text-[10px] font-mono uppercase px-2 py-0.5 rounded-full bg-[#112240] text-amber-300 border border-amber-400/30">
                 {isAdmin ? 'DBT Admin Portal' : 'Client Portal'}

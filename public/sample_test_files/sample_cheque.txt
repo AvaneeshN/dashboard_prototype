@@ -1,0 +1,16 @@
+﻿STATE BANK OF INDIA
+CHAKAN INDUSTRIAL BRANCH, PUNE - 410501
+IFSC: SBIN0001423 | MICR: 411002045
+
+=======================================================
+                    CANCELLED CHEQUE
+=======================================================
+Pay: ------------------ CANCELLED ---------------------
+Rupees: ---------------- CANCELLED --------------------
+A/C No.: 30981123456
+Account Holder: BHARAT MOBILITY DYNAMICS LIMITED
+Account Type: Current Account
+Cheque No: 004521
+
+Authorized Signatory
+For BHARAT MOBILITY DYNAMICS LIMITED

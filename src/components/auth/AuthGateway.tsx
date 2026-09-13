@@ -84,7 +84,7 @@ export const AuthGateway: React.FC = () => {
 
         const res = await login(targetEmail, targetRole, adminPasskey.trim());
         if (res.success) {
-          setSuccessMsg(`Passkey verified. Unlocking ${targetRole === 'junior_admin' ? 'Junior Operations' : 'Senior Administrator'} Console...`);
+          setSuccessMsg(`Passkey verified. Unlocking WF47 ZYNG ${targetRole === 'junior_admin' ? 'Junior Operations' : 'Senior Administrator'} Portal...`);
           setTimeout(() => {
             router.push('/admin');
           }, 400);
@@ -139,7 +139,7 @@ export const AuthGateway: React.FC = () => {
           const targetEmail = targetRole === 'junior_admin' ? 'junior.admin@company.com' : 'admin@company.com';
           const adminRes = await login(targetEmail, targetRole, normPass);
           if (adminRes.success) {
-            setSuccessMsg(`Administrator credentials recognized. Unlocking ${targetRole === 'junior_admin' ? 'Junior Operations' : 'Senior Administrator'} Console...`);
+            setSuccessMsg(`Administrator credentials recognized. Unlocking WF47 ZYNG ${targetRole === 'junior_admin' ? 'Junior Operations' : 'Senior Administrator'} Portal...`);
             setTimeout(() => {
               router.push('/admin');
             }, 300);
@@ -214,16 +214,23 @@ export const AuthGateway: React.FC = () => {
       <div className="relative z-10 w-full max-w-[440px] flex flex-col items-center">
         
         {/* Header Branding */}
-        <div className="text-center mb-6 space-y-2">
-          <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-[11px] font-mono font-bold tracking-wider uppercase text-zinc-600 bg-white border border-zinc-200 shadow-xs">
+        <div className="text-center mb-6 space-y-2.5 flex flex-col items-center">
+          <div className="w-14 h-14 rounded-2xl overflow-hidden shadow-md border-2 border-[#1e3a5f] bg-[#0a192f] flex items-center justify-center p-1">
+            <img 
+              src="/wf47-logo.jpg" 
+              alt="WF47 ZYNG Logo" 
+              className="w-full h-full object-cover rounded-xl"
+            />
+          </div>
+          <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-[11px] font-mono font-bold tracking-wider uppercase text-zinc-700 bg-white border border-zinc-200 shadow-xs">
             <span>✦</span>
-            <span>Management Portal</span>
+            <span>WF47 ZYNG Compliance Portal</span>
           </div>
           <h1 className="text-2xl sm:text-3xl font-extrabold text-zinc-900 tracking-tight">
-            Enterprise apprentice intake
+            Enterprise Apprentice Intake
           </h1>
           <p className="text-xs text-zinc-500 max-w-sm mx-auto leading-relaxed">
-            Direct DBT subsidy claiming, candidate quota tracking, and monthly reconciliation console.
+            Direct DBT subsidy claiming, candidate quota tracking, and monthly reconciliation portal.
           </p>
         </div>
 
@@ -361,7 +368,7 @@ export const AuthGateway: React.FC = () => {
                       <div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />
                     ) : (
                       <>
-                        <span className="uppercase tracking-wider">UNLOCK ADMIN CONSOLE</span>
+                        <span className="uppercase tracking-wider">UNLOCK WF47 ZYNG ADMIN</span>
                         <ArrowUpRight className="w-4 h-4 stroke-[2.5]" />
                       </>
                     )}

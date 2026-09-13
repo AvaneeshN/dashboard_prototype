@@ -40,7 +40,7 @@ export default function AdminPage() {
             Administrator Access Required
           </h2>
           <p className="text-xs text-zinc-500">
-            This console is strictly restricted to verified operations and compliance administrators.
+            WF47 ZYNG administration is strictly restricted to verified operations and compliance administrators.
           </p>
           <button
             onClick={() => router.push('/')}

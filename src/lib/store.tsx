@@ -108,6 +108,75 @@ interface AuthState {
   deleteInvoice: (submissionId: string, invoiceId: string) => Promise<void>;
 }
 
+// Helper to strip non-column properties and embed nested structures safely into responses JSONB
+export const prepareSubmissionForSupabase = (sub: FormSubmission) => {
+  const {
+    establishment_details,
+    nats_establishment_details,
+    stipend_payments,
+    ...validColumns
+  } = sub;
+
+  const enrichedResponses: Record<string, any> = {
+    ...(sub.responses || {})
+  };
+  if (establishment_details) {
+    enrichedResponses.establishment_details = establishment_details;
+  }
+  if (nats_establishment_details) {
+    enrichedResponses.nats_establishment_details = nats_establishment_details;
+  }
+  if (stipend_payments) {
+    enrichedResponses.stipend_payments = stipend_payments;
+  }
+
+  return {
+    ...validColumns,
+    responses: enrichedResponses
+  };
+};
+
+// Helper to reconstitute complete FormSubmission from Supabase row
+export const parseSubmissionFromSupabase = (raw: any): FormSubmission => {
+  const resp = raw.responses || {};
+  return {
+    ...raw,
+    candidates: raw.candidates || [],
+    dbt_claims: raw.dbt_claims || [],
+    spoc_logs: raw.spoc_logs || [],
+    naps_records: raw.naps_records || [],
+    invoices: raw.invoices || [],
+    action_items: raw.action_items || [],
+    establishment_details: raw.establishment_details || resp.establishment_details || (resp.companyName ? {
+      establishmentName: resp.companyName,
+      establishmentType: resp.establishmentType || 'FOOD SERVICE / SERVICES',
+      establishmentCategory: resp.establishmentCategory || resp.industry || 'General',
+      pan: resp.panNumber || '',
+      address: resp.registeredAddress || '',
+      city: resp.city || '',
+      district: resp.district || '',
+      state: resp.state || resp.operationalStates || '',
+      pincode: resp.pincode || '',
+      contactPerson: resp.contactName || '',
+      contactPhone: resp.contactPhone || '',
+      contactEmail: resp.contactEmail || '',
+      landline: resp.landlineNumber || '',
+      gstin: resp.gstinNumber || '',
+      headOfEstablishment: resp.headOfEstablishmentName || '',
+      headOfEstablishmentEmail: resp.headOfEstablishmentEmail || '',
+      designation: resp.headOfEstablishmentDesignation || '',
+      documents: {
+        panDoc: resp.companyDocs?.panDoc,
+        gstDoc: resp.companyDocs?.gstDoc,
+        chequeDoc: resp.companyDocs?.chequeDoc,
+        signatoryDoc: resp.companyDocs?.signatoryDoc
+      }
+    } : undefined),
+    nats_establishment_details: raw.nats_establishment_details || resp.nats_establishment_details,
+    stipend_payments: raw.stipend_payments || resp.stipend_payments || []
+  };
+};
+
 const StoreContext = createContext<AuthState | null>(null);
 
 export const StoreProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
@@ -255,7 +324,9 @@ export const StoreProvider: React.FC<{ children: React.ReactNode }> = ({ childre
             .select('*')
             .order('last_active_at', { ascending: false });
 
-          const allRemoteSubs: FormSubmission[] = (!subsError && remoteSubs) ? remoteSubs : [];
+          const allRemoteSubs: FormSubmission[] = (!subsError && remoteSubs) 
+            ? remoteSubs.map(parseSubmissionFromSupabase) 
+            : [];
 
           // Hydrate Admin Organization SPOC directly from Supabase DB
           const systemAdminRecord = allRemoteSubs.find(s => s.id === 'system_admin_config');
@@ -455,12 +526,14 @@ export const StoreProvider: React.FC<{ children: React.ReactNode }> = ({ childre
             const supabase = createClient();
             const { data: remoteSubs } = await supabase.from('form_submissions').select('*').order('last_active_at', { ascending: false });
             if (remoteSubs) {
-              const activeSubs = remoteSubs.filter(s => 
-                s.id !== 'system_admin_config' && 
-                s.id !== 'system_intake_config' && 
-                s.client_id !== 'system-admin' &&
-                s.company_name !== 'Platform Organization'
-              );
+              const activeSubs = remoteSubs
+                .map(parseSubmissionFromSupabase)
+                .filter(s => 
+                  s.id !== 'system_admin_config' && 
+                  s.id !== 'system_intake_config' && 
+                  s.client_id !== 'system-admin' &&
+                  s.company_name !== 'Platform Organization'
+                );
               setSubmissions(activeSubs);
             }
 
@@ -530,12 +603,14 @@ export const StoreProvider: React.FC<{ children: React.ReactNode }> = ({ childre
           // Fetch fresh submissions from Supabase
           const { data: remoteSubs } = await supabase.from('form_submissions').select('*').order('last_active_at', { ascending: false });
           if (remoteSubs) {
-            const activeSubs = remoteSubs.filter(s => 
-              s.id !== 'system_admin_config' && 
-              s.id !== 'system_intake_config' && 
-              s.client_id !== 'system-admin' &&
-              s.company_name !== 'Platform Organization'
-            );
+            const activeSubs = remoteSubs
+              .map(parseSubmissionFromSupabase)
+              .filter(s => 
+                s.id !== 'system_admin_config' && 
+                s.id !== 'system_intake_config' && 
+                s.client_id !== 'system-admin' &&
+                s.company_name !== 'Platform Organization'
+              );
             liveSubmissions = activeSubs;
             setSubmissions(activeSubs);
           }
@@ -756,14 +831,16 @@ export const StoreProvider: React.FC<{ children: React.ReactNode }> = ({ childre
 
   const getActiveClientSubmission = (): FormSubmission | undefined => {
     if (!user) return undefined;
-    const normalizedEmail = user.email.toLowerCase();
-    return submissions.find(s => 
+    const normalizedEmail = (user.email || '').toLowerCase().trim();
+    const userSubs = submissions.filter(s => 
       s.id !== 'system_admin_config' && 
       s.id !== 'system_intake_config' && 
       s.client_id !== 'system-admin' &&
       s.company_name !== 'Platform Organization' &&
-      (s.client_email.toLowerCase() === normalizedEmail || s.client_id === user.id)
+      (((s.client_email || '').toLowerCase().trim() === normalizedEmail) || (s.client_id && s.client_id === user.id))
     );
+    if (userSubs.length === 0) return undefined;
+    return userSubs.find(s => s.status === 'submitted' || s.status === 'under_review' || s.status === 'approved') || userSubs[0];
   };
 
   const recalculateUserMetrics = (userProfile: UserProfile, candidates: ApprenticeRecord[], totalQuota: number, dbtOptIn: boolean = true): ClientApprenticeMetrics => {
@@ -820,18 +897,22 @@ export const StoreProvider: React.FC<{ children: React.ReactNode }> = ({ childre
   };
 
   // Helper to persist any updated FormSubmission directly to Supabase
-  const persistSubmissionToSupabase = async (submission: FormSubmission) => {
-    if (!isSupabaseConfigured()) return;
+  const persistSubmissionToSupabase = async (submission: FormSubmission): Promise<boolean> => {
+    if (!isSupabaseConfigured()) return false;
     try {
       const supabase = createClient();
-      const { error: upsertError } = await supabase.from('form_submissions').upsert([submission]);
+      const payload = prepareSubmissionForSupabase(submission);
+      const { error: upsertError } = await supabase.from('form_submissions').upsert([payload]);
       if (upsertError) {
-        console.error('[ERROR] Supabase form_submissions update FAILED:', upsertError.message, upsertError.details);
+        console.error('[ERROR] Supabase form_submissions update FAILED:', upsertError.message, upsertError.details, upsertError.hint);
+        return false;
       } else {
         console.log('[OK] Supabase form_submissions updated for:', submission.id);
+        return true;
       }
     } catch (err) {
       console.error('[ERROR] Supabase update exception:', err);
+      return false;
     }
   };
 
@@ -921,6 +1002,14 @@ export const StoreProvider: React.FC<{ children: React.ReactNode }> = ({ childre
       dynamicMetrics.establishmentDetails = establishmentDetails;
       const updatedUser = { ...user, company_name: mergedResponses.companyName || user.company_name, apprenticeMetrics: dynamicMetrics };
       setUser(updatedUser);
+
+      // Keep company_name in Supabase profiles in sync
+      if (isSupabaseConfigured() && mergedResponses.companyName && mergedResponses.companyName !== user.company_name) {
+        try {
+          const supabase = createClient();
+          await supabase.from('profiles').update({ company_name: mergedResponses.companyName }).eq('id', user.id);
+        } catch (e) {}
+      }
     }
 
     await persistSubmissionToSupabase(updatedSubmission);
@@ -1678,7 +1767,7 @@ export const StoreProvider: React.FC<{ children: React.ReactNode }> = ({ childre
           s.id !== 'system_intake_config' && 
           s.client_id !== 'system-admin' &&
           s.company_name !== 'Platform Organization'
-        );
+        ).map(prepareSubmissionForSupabase);
         const { error: subsError } = await supabase.from('form_submissions').upsert(clientOnlySubs);
         if (subsError) {
           console.error('[ERROR] Sync form_submissions FAILED:', subsError.message, subsError.details, subsError.hint);

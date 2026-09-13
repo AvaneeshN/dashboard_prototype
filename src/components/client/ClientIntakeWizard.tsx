@@ -73,7 +73,7 @@ const INITIAL_FORM_STATE: IntakeFormData = {
   agreedToTerms: true
 };
 
-export const ClientIntakeWizard: React.FC = () => {
+export const ClientIntakeWizard: React.FC<{ onComplete?: () => void }> = ({ onComplete }) => {
   const { user, getActiveClientSubmission, saveSubmissionStep, recordAbandonment, requiredDocuments } = useStore();
   const [currentSection, setCurrentSection] = useState<number>(1);
   const [formData, setFormData] = useState<IntakeFormData>(INITIAL_FORM_STATE);
@@ -424,7 +424,7 @@ export const ClientIntakeWizard: React.FC = () => {
             Onboarding Application Submitted
           </h2>
           <p className="text-zinc-500 max-w-md mx-auto text-xs leading-relaxed mb-8 font-medium">
-            Establishment details and candidate requirements for <strong>{formData.companyName || 'your organization'}</strong> ({formData.requiredApprenticeCount} apprentices) have been registered into the administration console.
+            Establishment details and candidate requirements for <strong>{formData.companyName || 'your organization'}</strong> ({formData.requiredApprenticeCount} apprentices) have been registered into the WF47 ZYNG portal.
           </p>
 
           <div className="grid grid-cols-1 sm:grid-cols-3 gap-3.5 mb-8 text-left text-xs">
@@ -451,13 +451,17 @@ export const ClientIntakeWizard: React.FC = () => {
             >
               Modify Details
             </button>
-            <a
-              href="/client"
+            <button
+              type="button"
+              onClick={() => {
+                if (onComplete) onComplete();
+                else if (typeof window !== 'undefined') window.location.href = '/client';
+              }}
               className="px-6 py-2.5 rounded-full bg-black text-white hover:bg-zinc-800 text-xs font-bold cursor-pointer transition-all shadow-md flex items-center gap-1.5"
             >
               <span>View Analytics Dashboard</span>
               <ArrowUpRight className="w-4 h-4" />
-            </a>
+            </button>
           </div>
         </GlassCard>
       </div>

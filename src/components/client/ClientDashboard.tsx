@@ -173,12 +173,12 @@ export const ClientDashboard: React.FC = () => {
     tradeType: 'optional' as 'optional' | 'designated',
     gender: 'Male' as 'Male' | 'Female' | 'Others',
     socialCategory: 'General' as 'General' | 'OBC' | 'SC' | 'ST' | 'Minority',
-    ojtState: 'Karnataka',
+    ojtState: '',
     qualification: '',
-    stipendAmount: 18500,
-    dbtEligibleAmount: 0,
-    joiningDate: new Date().toISOString().split('T')[0],
-    contractExpireDate: new Date(new Date().setFullYear(new Date().getFullYear() + 1)).toISOString().split('T')[0],
+    stipendAmount: '' as unknown as number,
+    dbtEligibleAmount: '' as unknown as number,
+    joiningDate: '',
+    contractExpireDate: '',
     enrollmentScheme: 'NAPS' as 'NAPS' | 'NATS' | 'Others',
     panNumber: '',
     aparId: '',
@@ -666,6 +666,8 @@ export const ClientDashboard: React.FC = () => {
     if (!candidateForm.stipendAmount || Number(candidateForm.stipendAmount) < 1000) errors.push('Monthly Stipend is required and must be at least ₹1,000.');
     if (!candidateForm.joiningDate) errors.push('Date of Joining (DOJ) is required.');
     if (!candidateForm.contractExpireDate) errors.push('Contract Expiry Date is required.');
+    if (!candidateForm.gender?.trim()) errors.push('Gender selection is required.');
+    if (!candidateForm.ojtState?.trim()) errors.push('OJT Training State is required.');
     if (!candidateForm.bankName?.trim()) errors.push('Bank Name is required.');
     if (!candidateForm.bankAccountNumber?.trim()) errors.push('Bank Account Number is required.');
     if (!candidateForm.ifscCode?.trim()) errors.push('Bank IFSC Code is required.');
@@ -674,12 +676,15 @@ export const ClientDashboard: React.FC = () => {
     // Scheme-specific document and data validation
     if (candidateForm.enrollmentScheme === 'NATS') {
       if (!candidateForm.panNumber?.trim()) errors.push('PAN Card Number is required for NATS candidates.');
+      if (!candidateForm.aparId?.trim()) errors.push('APAAR ID (12-digit) is mandatory for NATS candidates.');
+      if (!candidateDocs.aparIdDoc) errors.push('APAAR ID Proof Document is mandatory for NATS.');
       if (!candidateDocs.panDoc) errors.push('Candidate PAN Card Document is required for NATS.');
       if (!candidateDocs.allSemesterDoc) errors.push('All Semester Marksheets Document is required for NATS.');
       if (!candidateDocs.docGrad && !candidateDocs.educationDoc) errors.push('Degree / Provisional Certificate is required for NATS.');
       if (!candidateDocs.photoDoc) errors.push('Candidate Passport Photo is required.');
       if (!candidateDocs.signatureDoc) errors.push('Candidate Signature is required.');
       if (!candidateDocs.aadhaarDoc) errors.push('Candidate Aadhaar Card Document is required.');
+      if (!candidateDocs.resumeDoc) errors.push('Candidate Resume / CV is mandatory.');
     } else {
       // NAPS / Standard
       if (!candidateDocs.photoDoc) errors.push('Candidate Passport Photo is required.');
@@ -689,6 +694,7 @@ export const ClientDashboard: React.FC = () => {
       if (!candidateDocs.doc12th) errors.push('12th Marksheet is required.');
       if (!candidateDocs.docGrad && !candidateDocs.educationDoc) errors.push('Graduation Certificate / Degree is required.');
       if (!candidateDocs.bankProofDoc) errors.push('Cancelled Cheque / Bank Proof is required.');
+      if (!candidateDocs.resumeDoc) errors.push('Candidate Resume / CV is mandatory.');
     }
 
     if (errors.length > 0) {
@@ -770,14 +776,14 @@ export const ClientDashboard: React.FC = () => {
       aadhaarNumber: '',
       tradeOrRole: '',
       tradeType: 'optional',
-      gender: 'Male',
-      socialCategory: 'General',
-      ojtState: 'Karnataka',
+      gender: '' as 'Male' | 'Female' | 'Others',
+      socialCategory: '' as 'General' | 'OBC' | 'SC' | 'ST' | 'Minority',
+      ojtState: '',
       qualification: '',
-      stipendAmount: 0,
-      dbtEligibleAmount: 0,
-      joiningDate: new Date().toISOString().split('T')[0],
-      contractExpireDate: new Date(new Date().setFullYear(new Date().getFullYear() + 1)).toISOString().split('T')[0],
+      stipendAmount: '' as unknown as number,
+      dbtEligibleAmount: '' as unknown as number,
+      joiningDate: '',
+      contractExpireDate: '',
       enrollmentScheme: 'NAPS',
       panNumber: '',
       aparId: '',
@@ -823,14 +829,14 @@ export const ClientDashboard: React.FC = () => {
       email: '',
       phone: '',
       aadhaarNumber: '',
-      tradeOrRole: defaultRole,
+      tradeOrRole: '',
       tradeType: 'optional',
-      gender: 'Male',
-      socialCategory: 'General',
-      ojtState: 'Karnataka',
+      gender: '' as 'Male' | 'Female' | 'Others',
+      socialCategory: '' as 'General' | 'OBC' | 'SC' | 'ST' | 'Minority',
+      ojtState: '',
       qualification: '',
-      stipendAmount: Number(activeSubmission?.responses?.stipendPerApprentice) || 0,
-      dbtEligibleAmount: 0,
+      stipendAmount: '' as unknown as number,
+      dbtEligibleAmount: '' as unknown as number,
       joiningDate: defaultJoiningDate,
       contractExpireDate: defaultExpire,
       enrollmentScheme: 'NAPS',
@@ -1009,7 +1015,7 @@ export const ClientDashboard: React.FC = () => {
               </div>
             </div>
           )}
-          <ClientIntakeWizard />
+          <ClientIntakeWizard onComplete={() => setActiveMainView('dashboard')} />
         </div>
       ) : (
         <div className="space-y-6">
@@ -1139,7 +1145,7 @@ export const ClientDashboard: React.FC = () => {
                           <strong className="text-white font-semibold">{clientDisplayName}</strong>
                         </div>
                         <div>
-                          <span className="text-zinc-400 text-[11px]">Portal NAPS ID:</span>{' '}
+                          <span className="text-zinc-400 text-[11px]">Portal NAPS/NATS/Others ID:</span>{' '}
                           <strong className="text-white font-mono font-bold bg-white/10 px-2 py-0.5 rounded">{portalNapsId}</strong>
                         </div>
                         <div>
@@ -1207,7 +1213,6 @@ export const ClientDashboard: React.FC = () => {
                           1. Quota & Onboarding Overview
                         </h3>
                       </div>
-                      <span className="text-xs text-zinc-500 font-mono">Statutory Quota: 2.5% – 15%</span>
                     </div>
 
                     <div className="grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-7 gap-3">
@@ -1339,7 +1344,7 @@ export const ClientDashboard: React.FC = () => {
 
                       <div className="p-4 rounded-2xl bg-amber-50/80 border border-amber-200">
                         <span className="text-[11px] font-bold text-amber-900 uppercase tracking-tight">
-                          Portal Reference / NAPS ID
+                          Portal Reference / NAPS/NATS/Others ID
                         </span>
                         <div className="mt-2 text-base font-extrabold text-amber-900 font-mono tracking-wide">
                           {portalNapsId}
@@ -1563,7 +1568,6 @@ export const ClientDashboard: React.FC = () => {
                         </div>
                       </div>
                       <div className="flex items-center gap-2 flex-wrap">
-                        <span className="text-xs text-zinc-500 font-mono hidden md:inline">DBT Subsidy ₹1,500 / candidate / month</span>
                         <button
                           type="button"
                           onClick={() => setShowStipendModal(true)}
@@ -2642,28 +2646,15 @@ export const ClientDashboard: React.FC = () => {
                     <div>
                       <label className="block font-bold text-zinc-700 mb-1">Gender *</label>
                       <select
-                        value={candidateForm.gender || 'Male'}
+                        required
+                        value={candidateForm.gender || ''}
                         onChange={(e) => setCandidateForm({ ...candidateForm, gender: e.target.value as 'Male' | 'Female' | 'Others' })}
                         className="w-full px-3 py-2 rounded-2xl bg-zinc-50 border border-zinc-200 text-zinc-900 text-xs focus:outline-none focus:border-black font-semibold cursor-pointer"
                       >
+                        <option value="" disabled>Select Gender</option>
                         <option value="Male">Male</option>
                         <option value="Female">Female</option>
                         <option value="Others">Others</option>
-                      </select>
-                    </div>
-
-                    <div>
-                      <label className="block font-bold text-zinc-700 mb-1">Social Category *</label>
-                      <select
-                        value={candidateForm.socialCategory || 'General'}
-                        onChange={(e) => setCandidateForm({ ...candidateForm, socialCategory: e.target.value as any })}
-                        className="w-full px-3 py-2 rounded-2xl bg-zinc-50 border border-zinc-200 text-zinc-900 text-xs focus:outline-none focus:border-black font-semibold cursor-pointer"
-                      >
-                        <option value="General">General</option>
-                        <option value="OBC">OBC (Other Backward Class)</option>
-                        <option value="SC">SC (Scheduled Caste)</option>
-                        <option value="ST">ST (Scheduled Tribe)</option>
-                        <option value="Minority">Minority</option>
                       </select>
                     </div>
 
@@ -2724,9 +2715,10 @@ export const ClientDashboard: React.FC = () => {
                         required
                         step={500}
                         min={1000}
-                        value={candidateForm.stipendAmount ?? ''}
+                        placeholder="e.g. 15000"
+                        value={candidateForm.stipendAmount === ('' as unknown as number) || candidateForm.stipendAmount === 0 ? '' : candidateForm.stipendAmount}
                         onChange={(e) => {
-                          const val = e.target.value === '' ? '' : parseInt(e.target.value, 10) || 0;
+                          const val = e.target.value === '' ? ('' as unknown as number) : parseInt(e.target.value, 10) || 0;
                           setCandidateForm({ ...candidateForm, stipendAmount: val as number });
                         }}
                         className="w-full px-3 py-2 rounded-2xl bg-zinc-50 border border-zinc-200 text-zinc-900 text-xs focus:outline-none focus:border-black font-bold"
@@ -2744,11 +2736,11 @@ export const ClientDashboard: React.FC = () => {
                         required
                         min={0}
                         step={100}
-                        placeholder="e.g. 1500, 4500, etc."
-                        value={candidateForm.dbtEligibleAmount === 0 ? '' : candidateForm.dbtEligibleAmount}
+                        placeholder="Enter DBT subsidy amount"
+                        value={candidateForm.dbtEligibleAmount === ('' as unknown as number) || candidateForm.dbtEligibleAmount === 0 ? '' : candidateForm.dbtEligibleAmount}
                         onChange={(e) => {
-                          const val = e.target.value === '' ? 0 : parseInt(e.target.value, 10) || 0;
-                          setCandidateForm({ ...candidateForm, dbtEligibleAmount: val });
+                          const val = e.target.value === '' ? ('' as unknown as number) : parseInt(e.target.value, 10) || 0;
+                          setCandidateForm({ ...candidateForm, dbtEligibleAmount: val as number });
                         }}
                         className="w-full px-3 py-2 rounded-2xl bg-zinc-50 border border-zinc-200 text-zinc-900 text-xs focus:outline-none focus:border-black font-bold"
                       />
@@ -2997,8 +2989,8 @@ export const ClientDashboard: React.FC = () => {
                       {/* 8. APAR ID Document */}
                       <div className="p-3 rounded-2xl bg-zinc-50 border border-zinc-200 flex flex-col justify-between">
                         <div className="flex items-center justify-between mb-1.5">
-                          <span className="font-bold text-zinc-800 text-xs">8. APAR ID Proof</span>
-                          <span className="text-[9px] font-mono px-1.5 py-0.5 rounded-full bg-zinc-100 text-zinc-600">APAAR ID</span>
+                          <span className="font-bold text-zinc-800 text-xs">8. APAR ID Proof *</span>
+                          <span className="text-[9px] font-mono px-1.5 py-0.5 rounded-full bg-zinc-200 text-zinc-700 font-bold">APAAR ID</span>
                         </div>
                         <label className="p-2 rounded-xl bg-white border border-zinc-200 hover:border-black flex items-center gap-2 cursor-pointer transition-colors text-[11px]">
                           <UploadCloud className="w-3.5 h-3.5 text-zinc-400 shrink-0" />
@@ -3010,6 +3002,26 @@ export const ClientDashboard: React.FC = () => {
                             accept=".pdf,.docx,.doc,.txt,.png,.jpg,.jpeg"
                             className="hidden"
                             onChange={(e) => handleDocFileSelect(e.target.files?.[0] || null, 'APAR ID')}
+                          />
+                        </label>
+                      </div>
+
+                      {/* 9. Candidate Resume / CV */}
+                      <div className="p-3 rounded-2xl bg-zinc-50 border border-zinc-200 flex flex-col justify-between">
+                        <div className="flex items-center justify-between mb-1.5">
+                          <span className="font-bold text-zinc-800 text-xs">9. Candidate Resume / CV *</span>
+                          <span className="text-[9px] font-mono px-1.5 py-0.5 rounded-full bg-zinc-200 text-zinc-700 font-bold">DOCX / PDF / TXT</span>
+                        </div>
+                        <label className="p-2 rounded-xl bg-white border border-zinc-200 hover:border-black flex items-center gap-2 cursor-pointer transition-colors text-[11px]">
+                          <UploadCloud className="w-3.5 h-3.5 text-zinc-400 shrink-0" />
+                          <span className="truncate font-mono text-zinc-700">
+                            {candidateDocs.resumeDoc?.name || 'Attach Resume (.docx/.pdf/.txt)'}
+                          </span>
+                          <input
+                            type="file"
+                            accept=".pdf,.docx,.doc,.txt,.png,.jpg,.jpeg"
+                            className="hidden"
+                            onChange={(e) => handleDocFileSelect(e.target.files?.[0] || null, 'Resume')}
                           />
                         </label>
                       </div>
@@ -3160,8 +3172,8 @@ export const ClientDashboard: React.FC = () => {
                       {/* Resume / CV */}
                       <div className="p-3 rounded-2xl bg-zinc-50 border border-zinc-200 flex flex-col justify-between">
                         <div className="flex items-center justify-between mb-1.5">
-                          <span className="font-bold text-zinc-800 text-xs">Candidate Resume / CV</span>
-                          <span className="text-[9px] font-mono px-1.5 py-0.5 rounded-full bg-zinc-200 text-zinc-700">DOCX / PDF / TXT</span>
+                          <span className="font-bold text-zinc-800 text-xs">Candidate Resume / CV *</span>
+                          <span className="text-[9px] font-mono px-1.5 py-0.5 rounded-full bg-zinc-200 text-zinc-700 font-bold">DOCX / PDF / TXT</span>
                         </div>
                         <label className="p-2 rounded-xl bg-white border border-zinc-200 hover:border-black flex items-center gap-2 cursor-pointer transition-colors text-[11px]">
                           <UploadCloud className="w-3.5 h-3.5 text-zinc-400 shrink-0" />

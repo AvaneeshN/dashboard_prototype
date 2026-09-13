@@ -19,8 +19,8 @@ const jetbrainsMono = JetBrains_Mono({
 });
 
 export const metadata: Metadata = {
-  title: 'Management Console | Apprentice Intake & Analytics Portal',
-  description: 'Enterprise Apprentice Intake, DBT Subsidy Management & Payroll Reconciliation Portal.'
+  title: 'WF47 ZYNG | Apprentice Intake & Analytics Portal',
+  description: 'WF47 ZYNG - Enterprise Apprentice Intake, DBT Subsidy Management & Payroll Reconciliation Portal.'
 };
 
 export default function RootLayout({

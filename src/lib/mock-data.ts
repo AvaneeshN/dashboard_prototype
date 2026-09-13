@@ -20,7 +20,7 @@ export const INITIAL_LOGIN_LOGS: LoginActivityLog[] = [
     role_attempted: 'admin',
     status: 'success',
     ip_address: '192.168.1.1',
-    user_agent: 'Console Admin Client',
+    user_agent: 'WF47 ZYNG Admin Client',
     created_at: new Date().toISOString()
   }
 ];

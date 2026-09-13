@@ -448,6 +448,52 @@ export const SubmissionDetailDrawer: React.FC<SubmissionDetailDrawerProps> = ({
     setShowNapsModal(true);
   };
 
+  const applyCandidateToNapsForm = (matched: ApprenticeRecord, baseForm?: Partial<Omit<NAPSPortalRecord, 'id'>>) => {
+    setNapsForm(prev => {
+      const current = { ...prev, ...(baseForm || {}) };
+      return {
+        ...current,
+        candidateId: matched.id,
+        candidateName: matched.name,
+        candidateAadhaarName: matched.name,
+        dob: matched.dob || current.dob,
+        gender: matched.gender || current.gender,
+        mobileNumber: matched.phone || current.mobileNumber,
+        emailId: matched.email || current.emailId,
+        stipend: matched.stipendAmount || current.stipend,
+        qualification: matched.qualification || current.qualification,
+        curriculum: matched.tradeOrRole || current.curriculum,
+        apprenticeCode: matched.apprenticeCode || current.apprenticeCode,
+        contractCode: matched.contractCode || current.contractCode,
+        contractStartDate: matched.onboardingDate || current.contractStartDate,
+        contractEndDate: matched.contractExpireDate || (matched.onboardingDate ? new Date(new Date(matched.onboardingDate).setFullYear(new Date(matched.onboardingDate).getFullYear() + 1)).toISOString().split('T')[0] : current.contractEndDate),
+        documentReceiveDate: matched.documentReceiveDate || current.documentReceiveDate,
+        location: (matched.ojtDistrict ? `${matched.ojtDistrict}, ${matched.ojtState || ''}` : current.location),
+        amount: (matched.dbtEligibleAmount !== undefined && matched.dbtEligibleAmount !== null && matched.dbtEligibleAmount > 0) ? matched.dbtEligibleAmount : current.amount
+      };
+    });
+  };
+
+  const handleCnCodeInputChange = (newCn: string) => {
+    const cleanCn = newCn.trim().toLowerCase();
+    const matched = cleanCn ? candidateList.find(c => c.contractCode && c.contractCode.trim().toLowerCase() === cleanCn) : null;
+    if (matched) {
+      applyCandidateToNapsForm(matched, { contractCode: newCn });
+    } else {
+      setNapsForm(prev => ({ ...prev, contractCode: newCn }));
+    }
+  };
+
+  const handleApCodeInputChange = (newAp: string) => {
+    const cleanAp = newAp.trim().toLowerCase();
+    const matched = cleanAp ? candidateList.find(c => c.apprenticeCode && c.apprenticeCode.trim().toLowerCase() === cleanAp) : null;
+    if (matched) {
+      applyCandidateToNapsForm(matched, { apprenticeCode: newAp });
+    } else {
+      setNapsForm(prev => ({ ...prev, apprenticeCode: newAp }));
+    }
+  };
+
   const handleSaveNapsForm = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!napsForm.apprenticeCode || !napsForm.contractCode) return;
@@ -459,25 +505,17 @@ export const SubmissionDetailDrawer: React.FC<SubmissionDetailDrawerProps> = ({
     }
 
     // Automatically sync contractCode, apprenticeCode, contractStatus, and dbtEligibleAmount to candidate record
-    const targetCandidateId = napsForm.candidateId || (candidateList.length === 1 ? candidateList[0].id : null);
+    const targetCandidateId = napsForm.candidateId || 
+      candidateList.find(c => 
+        (napsForm.contractCode && c.contractCode && c.contractCode.trim().toLowerCase() === napsForm.contractCode.trim().toLowerCase()) ||
+        (napsForm.apprenticeCode && c.apprenticeCode && c.apprenticeCode.trim().toLowerCase() === napsForm.apprenticeCode.trim().toLowerCase()) ||
+        (napsForm.candidateName && c.name && c.name.toLowerCase() === napsForm.candidateName.toLowerCase())
+      )?.id || 
+      (candidateList.length === 1 ? candidateList[0].id : null);
+
     if (targetCandidateId) {
       const updatedCandidates = candidateList.map(c => {
         if (c.id === targetCandidateId) {
-          return {
-            ...c,
-            contractCode: napsForm.contractCode,
-            apprenticeCode: napsForm.apprenticeCode,
-            dbtEligibleAmount: Number(napsForm.amount) || c.dbtEligibleAmount || 0,
-            contractStatus: 'Signed' as const
-          };
-        }
-        return c;
-      });
-      await updateClientComplianceReport(submission.id, { candidates: updatedCandidates });
-    } else if (napsForm.candidateName) {
-      // Match by name if candidateId wasn't explicit
-      const updatedCandidates = candidateList.map(c => {
-        if (c.name.toLowerCase() === napsForm.candidateName?.toLowerCase()) {
           return {
             ...c,
             contractCode: napsForm.contractCode,
@@ -2101,60 +2139,125 @@ export const SubmissionDetailDrawer: React.FC<SubmissionDetailDrawerProps> = ({
               </div>
 
               <form onSubmit={handleSaveNapsForm} className="space-y-3.5 text-xs">
-                {/* Candidate Linkage Selector */}
-                {candidateList.length > 0 && (
-                  <div className="p-3 rounded-2xl bg-sky-50/80 border border-sky-200 space-y-1.5">
-                    <div className="flex items-center justify-between">
-                      <label className="text-[11px] font-bold text-sky-950 uppercase tracking-tight flex items-center gap-1.5">
-                        <Users className="w-3.5 h-3.5 text-sky-700" />
-                        <span>Link to Employee / Candidate</span>
-                      </label>
-                      <span className="text-[10px] text-sky-700 font-mono">Auto-populates Aadhaar Name, DOB, Gender, Phone, Email, Stipend, Qualification & Curriculum</span>
+                {/* CN / AP Number Lookup & Candidate Auto-fill Configuration */}
+                <div className="p-3.5 rounded-2xl bg-amber-500/10 border-2 border-amber-500/30 space-y-3">
+                  <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-1.5">
+                    <div className="flex items-center gap-2">
+                      <div className="w-6 h-6 rounded-lg bg-amber-500/20 text-amber-900 flex items-center justify-center font-bold text-xs font-mono">
+                        #
+                      </div>
+                      <div>
+                        <h4 className="text-[12px] font-extrabold text-zinc-900 uppercase font-mono tracking-tight">
+                          Configure by CN Number or AP Code
+                        </h4>
+                        <p className="text-[10px] text-zinc-600 font-mono">
+                          Input CN or AP code to instantly match and auto-prefill candidate profile, stipend, and contact details
+                        </p>
+                      </div>
                     </div>
-                    <select
-                      value={napsForm.candidateId || ''}
-                      onChange={(e) => {
-                        const selId = e.target.value;
-                        const matched = candidateList.find(c => c.id === selId);
-                        if (matched) {
-                          setNapsForm({
-                            ...napsForm,
-                            candidateId: matched.id,
-                            candidateName: matched.name,
-                            candidateAadhaarName: matched.name,
-                            dob: matched.dob || napsForm.dob,
-                            gender: matched.gender || napsForm.gender,
-                            mobileNumber: matched.phone || napsForm.mobileNumber,
-                            emailId: matched.email || napsForm.emailId,
-                            stipend: matched.stipendAmount || napsForm.stipend,
-                            qualification: matched.qualification || napsForm.qualification,
-                            curriculum: matched.tradeOrRole || napsForm.curriculum,
-                            apprenticeCode: matched.apprenticeCode || napsForm.apprenticeCode,
-                            contractCode: matched.contractCode || napsForm.contractCode,
-                            contractStartDate: matched.onboardingDate || napsForm.contractStartDate,
-                            contractEndDate: matched.contractExpireDate || (matched.onboardingDate ? new Date(new Date(matched.onboardingDate).setFullYear(new Date(matched.onboardingDate).getFullYear() + 1)).toISOString().split('T')[0] : napsForm.contractEndDate),
-                            documentReceiveDate: matched.documentReceiveDate || napsForm.documentReceiveDate,
-                            location: (matched.ojtDistrict ? `${matched.ojtDistrict}, ${matched.ojtState || ''}` : napsForm.location)
-                          });
-                        } else {
-                          setNapsForm({
-                            ...napsForm,
-                            candidateId: '',
-                            candidateName: ''
-                          });
-                        }
-                      }}
-                      className="w-full px-3 py-2 rounded-xl bg-white border border-sky-300 text-zinc-900 font-medium text-xs focus:outline-none focus:border-sky-600"
-                    >
-                      <option value="">-- Select Candidate (Optional, Recommended) --</option>
-                      {candidateList.map(c => (
-                        <option key={c.id} value={c.id}>
-                          {c.name} ({c.tradeOrRole}) {c.contractCode ? `· CN: ${c.contractCode}` : '· [No CN yet]'}
-                        </option>
-                      ))}
-                    </select>
+                    {candidateList.length > 0 && (
+                      <span className="text-[10px] text-zinc-500 font-mono bg-white/70 px-2 py-0.5 rounded-md border border-amber-200">
+                        {candidateList.length} candidate(s) onboarded
+                      </span>
+                    )}
                   </div>
-                )}
+
+                  {/* Dropdown Selector by CN / AP Number */}
+                  {candidateList.length > 0 && (
+                    <div>
+                      <label className="block text-[10px] font-bold uppercase tracking-wider text-zinc-700 mb-1">
+                        Select by CN / AP Number:
+                      </label>
+                      <select
+                        value={
+                          candidateList.find(c => 
+                            (napsForm.candidateId && c.id === napsForm.candidateId) ||
+                            (napsForm.contractCode && c.contractCode && c.contractCode.toLowerCase() === napsForm.contractCode.toLowerCase()) ||
+                            (napsForm.apprenticeCode && c.apprenticeCode && c.apprenticeCode.toLowerCase() === napsForm.apprenticeCode.toLowerCase())
+                          )?.id || ''
+                        }
+                        onChange={(e) => {
+                          const selId = e.target.value;
+                          const matched = candidateList.find(c => c.id === selId);
+                          if (matched) {
+                            applyCandidateToNapsForm(matched);
+                          }
+                        }}
+                        className="w-full px-3 py-2 rounded-xl bg-white border border-amber-300 text-zinc-900 font-medium text-xs focus:outline-none focus:border-amber-600 cursor-pointer"
+                      >
+                        <option value="">-- Choose Onboarded Candidate by CN / AP --</option>
+                        {candidateList.map(c => (
+                          <option key={c.id} value={c.id}>
+                            {c.contractCode ? `CN: ${c.contractCode}` : '[Pending CN]'} | {c.apprenticeCode ? `AP: ${c.apprenticeCode}` : '[Pending AP]'} — {c.name} ({c.tradeOrRole})
+                          </option>
+                        ))}
+                      </select>
+                    </div>
+                  )}
+
+                  {/* Direct CN and AP inputs */}
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                    <div>
+                      <label className="block text-[11px] font-bold text-zinc-800 mb-1">
+                        CN Number (Contract Code) *
+                      </label>
+                      <input
+                        type="text"
+                        required
+                        value={napsForm.contractCode || ''}
+                        onChange={(e) => handleCnCodeInputChange(e.target.value)}
+                        placeholder="e.g. CN072687468"
+                        className="w-full px-3 py-2.5 rounded-xl bg-white border-2 border-amber-400/60 text-zinc-900 font-mono font-bold text-xs focus:outline-none focus:border-amber-600"
+                      />
+                    </div>
+
+                    <div>
+                      <label className="block text-[11px] font-bold text-zinc-800 mb-1">
+                        AP Code (Apprentice Code) *
+                      </label>
+                      <input
+                        type="text"
+                        required
+                        value={napsForm.apprenticeCode || ''}
+                        onChange={(e) => handleApCodeInputChange(e.target.value)}
+                        placeholder="e.g. A012691340"
+                        className="w-full px-3 py-2.5 rounded-xl bg-white border-2 border-amber-400/60 text-zinc-900 font-mono font-bold text-xs focus:outline-none focus:border-amber-600"
+                      />
+                    </div>
+                  </div>
+
+                  {/* Auto-match status indicator */}
+                  {(() => {
+                    const matchedCandidate = candidateList.find(c =>
+                      (napsForm.candidateId && c.id === napsForm.candidateId) ||
+                      (napsForm.contractCode && c.contractCode && c.contractCode.trim().toLowerCase() === napsForm.contractCode.trim().toLowerCase()) ||
+                      (napsForm.apprenticeCode && c.apprenticeCode && c.apprenticeCode.trim().toLowerCase() === napsForm.apprenticeCode.trim().toLowerCase())
+                    );
+
+                    if (matchedCandidate) {
+                      return (
+                        <div className="flex items-center gap-2 p-2.5 rounded-xl bg-emerald-50 border border-emerald-300 text-emerald-900 text-xs">
+                          <CheckCircle2 className="w-4 h-4 text-emerald-600 shrink-0" />
+                          <div className="font-mono text-[11px] leading-tight">
+                            <span className="font-bold text-emerald-800">Matched Candidate: </span>
+                            <span className="font-extrabold">{matchedCandidate.name}</span>
+                            {matchedCandidate.tradeOrRole ? ` (${matchedCandidate.tradeOrRole})` : ''}
+                            {matchedCandidate.stipendAmount ? ` | Stipend: ₹${matchedCandidate.stipendAmount}` : ''}
+                            <span className="text-emerald-700 ml-1">— All candidate details auto-prefilled below</span>
+                          </div>
+                        </div>
+                      );
+                    } else if (napsForm.contractCode || napsForm.apprenticeCode) {
+                      return (
+                        <div className="flex items-center gap-2 p-2 rounded-xl bg-zinc-100 border border-zinc-200 text-zinc-600 text-xs font-mono text-[10px]">
+                          <AlertCircle className="w-3.5 h-3.5 text-zinc-400 shrink-0" />
+                          <span>No onboarded candidate found matching this CN / AP number. You can fill details manually below.</span>
+                        </div>
+                      );
+                    }
+                    return null;
+                  })()}
+                </div>
 
                 {/* Row 1: Document Receive Date, Establishment Code, Location */}
                 <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
@@ -2196,7 +2299,12 @@ export const SubmissionDetailDrawer: React.FC<SubmissionDetailDrawerProps> = ({
                 {/* Row 2: Candidate Aadhar Name, DOB, Gender */}
                 <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
                   <div>
-                    <label className="block text-[11px] font-bold text-zinc-700 mb-1">Candidate Aadhar Name *</label>
+                    <div className="flex items-center justify-between mb-1">
+                      <label className="block text-[11px] font-bold text-zinc-700">Candidate Aadhar Name *</label>
+                      {napsForm.candidateName && (
+                        <span className="text-[9px] text-emerald-700 font-mono font-semibold">Prefilled</span>
+                      )}
+                    </div>
                     <input
                       type="text"
                       required
@@ -2256,7 +2364,12 @@ export const SubmissionDetailDrawer: React.FC<SubmissionDetailDrawerProps> = ({
                   </div>
 
                   <div>
-                    <label className="block text-[11px] font-bold text-zinc-700 mb-1">Stipend (₹) *</label>
+                    <div className="flex items-center justify-between mb-1">
+                      <label className="block text-[11px] font-bold text-zinc-700">Stipend (₹) *</label>
+                      {Boolean(napsForm.stipend && napsForm.stipend > 0) && (
+                        <span className="text-[9px] text-emerald-700 font-mono font-semibold">Prefilled</span>
+                      )}
+                    </div>
                     <input
                       type="number"
                       required
@@ -2269,7 +2382,7 @@ export const SubmissionDetailDrawer: React.FC<SubmissionDetailDrawerProps> = ({
                   </div>
                 </div>
 
-                {/* Row 4: Qualification, Curriculum, AP Code */}
+                {/* Row 4: Qualification, Curriculum, Beneficiary ID */}
                 <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
                   <div>
                     <label className="block text-[11px] font-bold text-zinc-700 mb-1">Qualification</label>
@@ -2294,21 +2407,6 @@ export const SubmissionDetailDrawer: React.FC<SubmissionDetailDrawerProps> = ({
                   </div>
 
                   <div>
-                    <label className="block text-[11px] font-bold text-zinc-700 mb-1">AP Code *</label>
-                    <input
-                      type="text"
-                      required
-                      value={napsForm.apprenticeCode}
-                      onChange={(e) => setNapsForm({ ...napsForm, apprenticeCode: e.target.value })}
-                      placeholder="e.g. A012691340"
-                      className="w-full px-3 py-2 rounded-xl bg-zinc-50 border border-zinc-200 text-zinc-900 font-mono text-xs focus:outline-none focus:border-black font-bold"
-                    />
-                  </div>
-                </div>
-
-                {/* Row 5: Beneficiary ID, CN Number, Remarks */}
-                <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
-                  <div>
                     <label className="block text-[11px] font-bold text-zinc-700 mb-1">Beneficiary ID</label>
                     <input
                       type="text"
@@ -2318,32 +2416,9 @@ export const SubmissionDetailDrawer: React.FC<SubmissionDetailDrawerProps> = ({
                       className="w-full px-3 py-2 rounded-xl bg-zinc-50 border border-zinc-200 text-zinc-900 font-mono text-xs focus:outline-none focus:border-black"
                     />
                   </div>
-
-                  <div>
-                    <label className="block text-[11px] font-bold text-zinc-700 mb-1">CN Number *</label>
-                    <input
-                      type="text"
-                      required
-                      value={napsForm.contractCode}
-                      onChange={(e) => setNapsForm({ ...napsForm, contractCode: e.target.value })}
-                      placeholder="e.g. CN072687468"
-                      className="w-full px-3 py-2 rounded-xl bg-zinc-50 border border-zinc-200 text-zinc-900 font-mono text-xs focus:outline-none focus:border-black font-semibold"
-                    />
-                  </div>
-
-                  <div>
-                    <label className="block text-[11px] font-bold text-zinc-700 mb-1">Remarks</label>
-                    <input
-                      type="text"
-                      value={napsForm.remarks || ''}
-                      onChange={(e) => setNapsForm({ ...napsForm, remarks: e.target.value })}
-                      placeholder="e.g. Verified by State DGT"
-                      className="w-full px-3 py-2 rounded-xl bg-zinc-50 border border-zinc-200 text-zinc-900 text-xs focus:outline-none focus:border-black"
-                    />
-                  </div>
                 </div>
 
-                {/* Row 6: Contract Start Date, Contract End Date, DBT Status */}
+                {/* Row 5: Contract Start Date, Contract End Date, DBT Status */}
                 <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
                   <div>
                     <label className="block text-[11px] font-bold text-zinc-700 mb-1">Contract Start Date</label>
@@ -2384,6 +2459,18 @@ export const SubmissionDetailDrawer: React.FC<SubmissionDetailDrawerProps> = ({
                       <option value="FAIL">FAIL</option>
                     </select>
                   </div>
+                </div>
+
+                {/* Row 6: Remarks */}
+                <div>
+                  <label className="block text-[11px] font-bold text-zinc-700 mb-1">Remarks</label>
+                  <input
+                    type="text"
+                    value={napsForm.remarks || ''}
+                    onChange={(e) => setNapsForm({ ...napsForm, remarks: e.target.value })}
+                    placeholder="e.g. Verified by State DGT"
+                    className="w-full px-3 py-2 rounded-xl bg-zinc-50 border border-zinc-200 text-zinc-900 text-xs focus:outline-none focus:border-black"
+                  />
                 </div>
 
                 {/* Additional Government Ledger Fields (Month/Year & DBT Amount) */}

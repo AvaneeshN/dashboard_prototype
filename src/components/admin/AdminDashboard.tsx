@@ -213,13 +213,6 @@ export const AdminDashboard: React.FC = () => {
   const failedLogins = loginLogs.filter(l => l.status === 'failed').length;
   const successLogins = loginLogs.filter(l => l.status === 'success').length;
 
-  // Dynamic Total DBT Disbursed from actual submissions and claims
-  const totalDbtDisbursed = clientSubmissions.reduce((acc, sub) => {
-    const claimsTotal = (sub.dbt_claims || []).reduce((cAcc, claim) => cAcc + (claim.amountSettled || claim.amountClaimed || 0), 0);
-    const candidateDbt = (sub.candidates || []).reduce((candAcc, c) => candAcc + (c.dbtEligibleAmount || 0), 0);
-    return acc + (claimsTotal > 0 ? claimsTotal : candidateDbt);
-  }, 0);
-
   // Count total and pending candidates across submissions
   const totalApprenticesAcrossClients = clientSubmissions.reduce((acc, s) => acc + (s.candidates?.length || 0), 0);
   const pendingAllocatedCandidatesCount = clientSubmissions.reduce(
@@ -528,7 +521,7 @@ export const AdminDashboard: React.FC = () => {
               </div>
 
               {/* Executive Grid Stat Row */}
-              <div className="grid grid-cols-1 sm:grid-cols-5 border border-zinc-200 rounded-3xl bg-white overflow-hidden shadow-sm divide-y sm:divide-y-0 sm:divide-x divide-zinc-200">
+              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 border border-zinc-200 rounded-3xl bg-white overflow-hidden shadow-sm divide-y sm:divide-y-0 sm:divide-x divide-zinc-200">
                 <div className="p-6">
                   <span className="font-mono text-xs font-bold uppercase tracking-wider text-zinc-400 block mb-1">
                     CLIENT INTAKES
@@ -538,20 +531,6 @@ export const AdminDashboard: React.FC = () => {
                   </div>
                   <div className="text-xs text-zinc-500 font-medium mt-1">
                     {completedCount} Completed · {inProgressCount} Drafts
-                  </div>
-                </div>
-
-                <div className="p-6">
-                  <span className="font-mono text-xs font-bold uppercase tracking-wider text-zinc-400 block mb-1">
-                    TOTAL DBT DISBURSED
-                  </span>
-                  <div className="text-4xl font-extrabold text-zinc-900 tracking-tight">
-                    {totalDbtDisbursed > 0 
-                      ? (totalDbtDisbursed >= 100000 ? `₹${(totalDbtDisbursed / 100000).toFixed(1)}L` : `₹${totalDbtDisbursed.toLocaleString()}`) 
-                      : '₹0'}
-                  </div>
-                  <div className="text-xs text-zinc-500 font-medium mt-1">
-                    {totalDbtDisbursed > 0 ? 'Monthly cycle settled' : 'No settlements logged yet'}
                   </div>
                 </div>
 
