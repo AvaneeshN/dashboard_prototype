@@ -214,7 +214,7 @@ export const AuthGateway: React.FC = () => {
 
       {/* Top Right Rotating Security Vault (Below Navbar) */}
       <div className="absolute top-4 right-4 sm:top-6 sm:right-8 z-20">
-        <RotatingVault size="md" showLabel={true} />
+        <RotatingVault size="md" />
       </div>
 
       <div className="relative z-10 w-full max-w-[440px] flex flex-col items-center">

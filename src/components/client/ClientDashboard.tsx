@@ -959,7 +959,7 @@ export const ClientDashboard: React.FC = () => {
 
         {/* Top Right Header Controls & Rotating Vault */}
         <div className="flex flex-wrap items-center gap-3 self-start md:self-auto">
-          <RotatingVault size="sm" showLabel={true} />
+          <RotatingVault size="sm" />
 
           {/* View Switcher Pill */}
           <div className="flex items-center gap-1.5 p-1 rounded-full bg-zinc-200/80 border border-zinc-300">

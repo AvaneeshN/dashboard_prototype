@@ -339,7 +339,7 @@ export const AdminDashboard: React.FC = () => {
 
         <div className="flex flex-wrap items-center gap-2.5">
           {/* Top Right Rotating Security Vault (Below Navbar) */}
-          <RotatingVault size="sm" showLabel={true} />
+          <RotatingVault size="sm" />
 
           {/* Authenticated Clearance Badge (Immutable - strictly governed by login credentials) */}
           <div className="flex items-center gap-2 px-3.5 py-1.5 rounded-full bg-white border border-zinc-200 shadow-2xs">
