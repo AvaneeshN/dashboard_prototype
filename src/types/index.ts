@@ -258,6 +258,32 @@ export interface StipendPaymentRecord {
   reviewedAt?: string;
 }
 
+export interface MonthlyAttendanceRecord {
+  id: string;
+  candidateId: string;
+  candidateCode: string;       // Apprentice code
+  candidateName: string;
+  beneficiaryId: string;
+  contractCode: string;
+  month: string;               // e.g. "JANUARY", "FEBRUARY"
+  year: string;                // e.g. "2026"
+  // Client inputs
+  contractStipend: number;
+  courseEligibleDays: number;
+  presentDays: number;
+  absentDays: number;
+  // Admin inputs (after calculations)
+  stipendPayable: number;
+  establishmentContribution: number;
+  dbtAmount: number;
+  // Metadata
+  submittedByClient: boolean;
+  submittedAt?: string;
+  reviewedByAdmin: boolean;
+  reviewedAt?: string;
+  status: 'PENDING_CLIENT' | 'SUBMITTED' | 'REVIEWED' | 'COMPLETED';
+}
+
 export interface ClientApprenticeMetrics {
   clientName: string;
   companyName: string;
@@ -309,6 +335,7 @@ export interface ClientApprenticeMetrics {
   invoices?: ComplianceInvoiceRecord[];
   actionItems?: ComplianceActionItem[];
   stipendPayments?: StipendPaymentRecord[];
+  attendanceRecords?: MonthlyAttendanceRecord[];
   establishmentDetails?: NAPSEstablishmentDetails;
   natsEstablishmentDetails?: NATSEstablishmentDetails;
 }
@@ -510,6 +537,7 @@ export interface FormSubmission {
   invoices?: ComplianceInvoiceRecord[];
   action_items?: ComplianceActionItem[];
   stipend_payments?: StipendPaymentRecord[];
+  attendance_records?: MonthlyAttendanceRecord[];
   reporting_month?: string;
   naps_portal_id?: string;
   sanctioned_quota?: number;

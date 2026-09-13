@@ -2,7 +2,7 @@
 
 import React, { useState, useEffect, useMemo } from 'react';
 import { useStore, getExpiringContracts, generateAutoContinuedDbtRecords } from '@/lib/store';
-import { ApprenticeRecord, UploadedDocument, SPOCEmailLog, NAPSPortalRecord, ComplianceInvoiceRecord, ComplianceActionItem, ClientApprenticeMetrics, DBTClaimRecord, StipendPaymentRecord, FormSubmission } from '@/types';
+import { ApprenticeRecord, UploadedDocument, SPOCEmailLog, NAPSPortalRecord, ComplianceInvoiceRecord, ComplianceActionItem, ClientApprenticeMetrics, DBTClaimRecord, StipendPaymentRecord, FormSubmission, MonthlyAttendanceRecord } from '@/types';
 import { GlassCard } from '@/components/ui/GlassCard';
 import { ClientIntakeWizard } from './ClientIntakeWizard';
 import { DocumentViewerModal } from '@/components/ui/DocumentViewerModal';
@@ -20,7 +20,8 @@ import {
   PlusCircle, 
   CheckCircle2, 
   Download, 
-  Calendar, 
+  Calendar,
+  CalendarDays,
   BarChart2, 
   PieChart as PieIcon, 
   FileText,
@@ -105,8 +106,13 @@ export const ClientDashboard: React.FC = () => {
     addStipendPayment,
     addActionItem,
     terminateApprenticeContract,
-    syncAutoContinuedDbtRecords
+    syncAutoContinuedDbtRecords,
+    addAttendanceRecord,
+    updateAttendanceRecord,
+    bulkCreateMonthlyAttendance
   } = useStore();
+
+  const MONTH_OPTIONS = ['JANUARY','FEBRUARY','MARCH','APRIL','MAY','JUNE','JULY','AUGUST','SEPTEMBER','OCTOBER','NOVEMBER','DECEMBER'];
 
   const [activeTab, setActiveTab] = useState<ClientViewTab>('compliance_report');
   const [activeMainView, setActiveMainView] = useState<'intake' | 'dashboard'>('dashboard');
@@ -158,6 +164,16 @@ export const ClientDashboard: React.FC = () => {
     datePaid: '',
     remarks: ''
   });
+
+  // Attendance Ledger State
+  const [attendanceFilterMonth, setAttendanceFilterMonth] = useState<string>('all');
+  const [attendanceFilterYear, setAttendanceFilterYear] = useState<string>(new Date().getFullYear().toString());
+  const [attendanceFilterCode, setAttendanceFilterCode] = useState<string>('');
+  const [editingAttendanceRows, setEditingAttendanceRows] = useState<Record<string, Partial<MonthlyAttendanceRecord>>>({});
+  const [attendanceSubmitting, setAttendanceSubmitting] = useState(false);
+  const [attendanceSuccessMsg, setAttendanceSuccessMsg] = useState<string | null>(null);
+  const [generatingAttendance, setGeneratingAttendance] = useState(false);
+  const [showLegacyStipends, setShowLegacyStipends] = useState(false);
 
   // Action Item Modal States
   const [showActionItemModal, setShowActionItemModal] = useState(false);
@@ -388,6 +404,38 @@ export const ClientDashboard: React.FC = () => {
       return true;
     });
   }, [effectiveStipendPayments, selectedReportMonth, selectedReportYear]);
+
+  const effectiveAttendanceRecords: MonthlyAttendanceRecord[] = useMemo(() => {
+    if (activeSubmission?.attendance_records && activeSubmission.attendance_records.length > 0) {
+      return activeSubmission.attendance_records;
+    }
+    if (user?.apprenticeMetrics?.attendanceRecords && user.apprenticeMetrics.attendanceRecords.length > 0) {
+      return user.apprenticeMetrics.attendanceRecords;
+    }
+    return [];
+  }, [activeSubmission?.attendance_records, user?.apprenticeMetrics?.attendanceRecords]);
+
+  const filteredAttendanceRecords = useMemo(() => {
+    return effectiveAttendanceRecords.filter(r => {
+      if (attendanceFilterMonth !== 'all' && r.month !== attendanceFilterMonth) return false;
+      if (attendanceFilterYear !== 'all' && r.year !== attendanceFilterYear) return false;
+      if (attendanceFilterCode && !r.candidateCode.toLowerCase().includes(attendanceFilterCode.toLowerCase()) && !r.candidateName.toLowerCase().includes(attendanceFilterCode.toLowerCase())) return false;
+      return true;
+    });
+  }, [effectiveAttendanceRecords, attendanceFilterMonth, attendanceFilterYear, attendanceFilterCode]);
+
+  const currentMonthAttendancePending = useMemo(() => {
+    if (candidateList.length === 0) return false;
+    const activeCandidates = candidateList.filter(c => c.status !== 'Terminated' && c.contractStatus !== 'Terminated');
+    if (activeCandidates.length === 0) return false;
+
+    const now = new Date();
+    const currentMonth = MONTH_OPTIONS[now.getMonth()];
+    const currentYear = now.getFullYear().toString();
+    const currentMonthRecords = effectiveAttendanceRecords.filter(r => r.month === currentMonth && r.year === currentYear);
+    if (currentMonthRecords.length === 0) return true;
+    return currentMonthRecords.some(r => r.status === 'PENDING_CLIENT');
+  }, [candidateList, effectiveAttendanceRecords]);
 
   const effectiveInvoices: ComplianceInvoiceRecord[] = useMemo(() => {
     if (activeSubmission?.invoices && activeSubmission.invoices.length > 0) return activeSubmission.invoices;
@@ -941,6 +989,88 @@ export const ClientDashboard: React.FC = () => {
       console.error('Submit stipend error:', err);
     } finally {
       setStipendSubmitting(false);
+    }
+  };
+
+  // Attendance Ledger Handlers
+  const handleGenerateAttendanceMonth = async () => {
+    if (!activeSubmission) return;
+    setGeneratingAttendance(true);
+    try {
+      const month = attendanceFilterMonth !== 'all' ? attendanceFilterMonth : MONTH_OPTIONS[new Date().getMonth()];
+      const year = attendanceFilterYear !== 'all' ? attendanceFilterYear : new Date().getFullYear().toString();
+      const created = await bulkCreateMonthlyAttendance(activeSubmission.id, month, year);
+      if (created.length > 0) {
+        setAttendanceSuccessMsg(`Generated attendance rows for ${created.length} candidates for ${month} ${year}.`);
+      } else {
+        setAttendanceSuccessMsg(`All candidates already have attendance records for ${month} ${year}.`);
+      }
+      setTimeout(() => setAttendanceSuccessMsg(null), 4000);
+    } catch (err) {
+      console.error('Error generating attendance:', err);
+    } finally {
+      setGeneratingAttendance(false);
+    }
+  };
+
+  const handleAttendanceFieldChange = (recordId: string, field: string, value: number) => {
+    setEditingAttendanceRows(prev => ({
+      ...prev,
+      [recordId]: { ...(prev[recordId] || {}), [field]: value }
+    }));
+  };
+
+  const handleSubmitAttendanceRow = async (record: MonthlyAttendanceRecord) => {
+    if (!activeSubmission) return;
+    const edits = editingAttendanceRows[record.id];
+    if (!edits) return;
+    setAttendanceSubmitting(true);
+    try {
+      await updateAttendanceRecord(activeSubmission.id, record.id, {
+        ...edits,
+        submittedByClient: true,
+        submittedAt: new Date().toISOString(),
+        status: 'SUBMITTED'
+      });
+      setEditingAttendanceRows(prev => {
+        const copy = { ...prev };
+        delete copy[record.id];
+        return copy;
+      });
+      setAttendanceSuccessMsg(`Attendance for ${record.candidateName} (${record.month} ${record.year}) submitted.`);
+      setTimeout(() => setAttendanceSuccessMsg(null), 4000);
+    } catch (err) {
+      console.error('Error submitting attendance:', err);
+    } finally {
+      setAttendanceSubmitting(false);
+    }
+  };
+
+  const handleSubmitAllPendingAttendance = async () => {
+    if (!activeSubmission) return;
+    const pendingRecords = filteredAttendanceRecords.filter(r => r.status === 'PENDING_CLIENT');
+    const editedRecords = pendingRecords.filter(r => editingAttendanceRows[r.id]);
+    if (editedRecords.length === 0) return;
+    setAttendanceSubmitting(true);
+    try {
+      for (const record of editedRecords) {
+        const edits = editingAttendanceRows[record.id];
+        if (edits) {
+          await updateAttendanceRecord(activeSubmission.id, record.id, {
+            ...edits,
+            submittedByClient: true,
+            submittedAt: new Date().toISOString(),
+            status: 'SUBMITTED'
+          });
+        }
+      }
+      setEditingAttendanceRows({});
+      setAttendanceSuccessMsg(`Submitted attendance for ${editedRecords.length} candidates.`);
+      setTimeout(() => setAttendanceSuccessMsg(null), 4000);
+    } catch (err) {
+      console.error('Error submitting all attendance:', err);
+    } finally {
+      setAttendanceSubmitting(false);
     }
   };
 
@@ -1667,104 +1797,298 @@ export const ClientDashboard: React.FC = () => {
                     </div>
                   </div>
 
-                  {/* Section 4: Stipend Payment & DBT (Direct Benefit Transfer) Status */}
+                  {/* Section 4: Monthly Attendance & Stipend Ledger */}
                   <div className="rounded-3xl bg-white border border-zinc-200 p-6 sm:p-7 shadow-sm space-y-4">
                     <div className="flex flex-col sm:flex-row sm:items-center justify-between border-b border-zinc-200 pb-3 gap-2">
                       <div className="flex items-center gap-2">
                         <div className="w-2.5 h-2.5 rounded-full bg-[#0a192f]"></div>
                         <div>
                           <h3 className="text-sm font-extrabold uppercase tracking-wider text-zinc-900">
-                            4. STIPEND PAYMENT & DBT (DIRECT BENEFIT TRANSFER) STATUS
+                            4. MONTHLY ATTENDANCE & STIPEND LEDGER
                           </h3>
                         </div>
                       </div>
                       <div className="flex items-center gap-2 flex-wrap">
                         <button
                           type="button"
-                          onClick={() => setShowStipendModal(true)}
-                          className="px-3.5 py-1.5 rounded-xl bg-[#0a192f] hover:bg-[#102a4c] text-white text-xs font-bold flex items-center gap-1.5 shadow-sm transition-all cursor-pointer"
+                          onClick={handleGenerateAttendanceMonth}
+                          disabled={generatingAttendance}
+                          className="px-3.5 py-1.5 rounded-xl bg-[#0a192f] hover:bg-[#102a4c] text-white text-xs font-bold flex items-center gap-1.5 shadow-sm transition-all cursor-pointer disabled:opacity-50"
                         >
-                          <Plus className="w-3.5 h-3.5" />
-                          <span>+ Submit Monthly Stipend</span>
+                          <CalendarDays className="w-3.5 h-3.5" />
+                          <span>{generatingAttendance ? 'Generating...' : 'Generate Current Month'}</span>
                         </button>
                       </div>
                     </div>
 
-                    {stipendSuccessMsg && (
+                    {currentMonthAttendancePending && (
+                      <div className="p-3.5 rounded-2xl bg-amber-50 border border-amber-200 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
+                        <div className="flex items-start gap-2.5">
+                          <AlertTriangle className="w-4 h-4 text-amber-600 shrink-0 mt-0.5" />
+                          <div className="text-xs text-amber-800">
+                            <strong>Action Required:</strong> Monthly attendance for <strong>{MONTH_OPTIONS[new Date().getMonth()]} {new Date().getFullYear()}</strong> is pending. Please input and submit attendance details for all active apprentices.
+                          </div>
+                        </div>
+                        <button
+                          type="button"
+                          onClick={handleGenerateAttendanceMonth}
+                          disabled={generatingAttendance}
+                          className="shrink-0 px-3 py-1.5 rounded-xl bg-amber-700 hover:bg-amber-800 text-white text-[11px] font-bold shadow-xs transition-all cursor-pointer disabled:opacity-50 flex items-center gap-1.5"
+                        >
+                          <CalendarDays className="w-3 h-3" />
+                          <span>{generatingAttendance ? 'Initializing...' : 'Initialize Current Month'}</span>
+                        </button>
+                      </div>
+                    )}
+
+                    {attendanceSuccessMsg && (
                       <div className="p-3 rounded-2xl bg-emerald-50 border border-emerald-200 text-emerald-800 text-xs font-semibold flex items-center justify-between">
-                        <span>{stipendSuccessMsg}</span>
-                        <button onClick={() => setStipendSuccessMsg(null)} className="text-emerald-600 hover:text-emerald-900">
+                        <span>{attendanceSuccessMsg}</span>
+                        <button onClick={() => setAttendanceSuccessMsg(null)} className="text-emerald-600 hover:text-emerald-900">
                           <X className="w-3.5 h-3.5" />
                         </button>
                       </div>
                     )}
 
+                    <div className="flex flex-wrap items-center gap-3">
+                      <select 
+                        value={attendanceFilterMonth}
+                        onChange={(e) => setAttendanceFilterMonth(e.target.value)}
+                        className="px-3 py-1.5 rounded-xl bg-zinc-50 border border-zinc-200 text-zinc-900 text-xs font-bold focus:outline-none focus:border-black cursor-pointer"
+                      >
+                        <option value="all">All Months</option>
+                        {MONTH_OPTIONS.map(m => <option key={m} value={m}>{m}</option>)}
+                      </select>
+                      <select 
+                        value={attendanceFilterYear}
+                        onChange={(e) => setAttendanceFilterYear(e.target.value)}
+                        className="px-3 py-1.5 rounded-xl bg-zinc-50 border border-zinc-200 text-zinc-900 text-xs font-bold focus:outline-none focus:border-black cursor-pointer"
+                      >
+                        <option value="all">All Years</option>
+                        <option value="2024">2024</option>
+                        <option value="2025">2025</option>
+                        <option value="2026">2026</option>
+                        <option value="2027">2027</option>
+                        <option value="2028">2028</option>
+                      </select>
+                      <div className="relative">
+                        <Search className="w-3.5 h-3.5 absolute left-3 top-1/2 -translate-y-1/2 text-zinc-400" />
+                        <input
+                          type="text"
+                          placeholder="Search Code or Name..."
+                          value={attendanceFilterCode}
+                          onChange={(e) => setAttendanceFilterCode(e.target.value)}
+                          className="pl-8 pr-3 py-1.5 rounded-xl bg-zinc-50 border border-zinc-200 text-zinc-900 text-xs focus:outline-none focus:border-black"
+                        />
+                      </div>
+                    </div>
+
                     <div className="overflow-x-auto rounded-2xl border border-zinc-200">
-                      <table className="w-full text-left text-xs text-zinc-700">
+                      <table className="w-full text-left text-xs text-zinc-700 whitespace-nowrap">
                         <thead className="bg-[#0a192f] text-white font-bold text-[11px] uppercase tracking-wider">
                           <tr>
-                            <th className="px-4 py-3">Month</th>
-                            <th className="px-4 py-3">Stipend Paid by Employer (₹)</th>
-                            <th className="px-4 py-3">Date Paid</th>
-                            <th className="px-4 py-3">DBT by Govt. (₹)</th>
-                            <th className="px-4 py-3">DBT Release Date</th>
+                            <th className="px-4 py-3">Apprentice Code</th>
+                            <th className="px-4 py-3">Candidate Name</th>
+                            <th className="px-4 py-3">Beneficiary ID</th>
+                            <th className="px-4 py-3">Contract Code</th>
+                            <th className="px-4 py-3">Contract Stipend (₹)</th>
+                            <th className="px-4 py-3">Course Eligible Days</th>
+                            <th className="px-4 py-3">Present Days</th>
+                            <th className="px-4 py-3">Absent Days</th>
+                            <th className="px-4 py-3">Stipend Payable (₹)</th>
+                            <th className="px-4 py-3">Est. Contribution (₹)</th>
+                            <th className="px-4 py-3">DBT Amount (₹)</th>
                             <th className="px-4 py-3">Status</th>
-                            <th className="px-4 py-3">Remarks</th>
+                            <th className="px-4 py-3 text-center">Action</th>
                           </tr>
                         </thead>
                         <tbody className="divide-y divide-zinc-200 font-mono">
-                          {displayedStipendPayments.length === 0 ? (
+                          {filteredAttendanceRecords.length === 0 ? (
                             <tr>
-                              <td colSpan={7} className="px-4 py-8 text-center text-zinc-400 font-sans font-medium">
-                                No monthly stipend disbursements recorded for this cycle. Click "+ Submit Monthly Stipend" to enter paid amounts.
+                              <td colSpan={13} className="px-4 py-8 text-center text-zinc-400 font-sans font-medium">
+                                No attendance records found for the selected filters. Click &quot;Initialize Current Month&quot; to generate attendance rows for your active apprentices.
                               </td>
                             </tr>
                           ) : (
-                            displayedStipendPayments.map((p, mIdx) => (
-                              <tr key={p.id || mIdx} className="hover:bg-zinc-50/80 transition-colors">
-                                <td className="px-4 py-3 font-bold text-zinc-900 font-sans uppercase">
-                                  {p.month} {p.year && p.year !== 'all' ? p.year : ''}
-                                  {p.submittedByClient && (
-                                    <span className="ml-2 px-1.5 py-0.5 rounded text-[9px] bg-rose-100 text-rose-800 border border-rose-300 font-bold">Client</span>
-                                  )}
-                                </td>
-                                <td className="px-4 py-3 font-bold text-zinc-800">
-                                  {p.stipendPaidByEmployer ? p.stipendPaidByEmployer.toLocaleString('en-IN') : '-'}
-                                </td>
-                                <td className="px-4 py-3 text-zinc-600 font-semibold">{p.datePaid || '-'}</td>
-                                <td className="px-4 py-3 font-bold text-emerald-700">
-                                  {p.dbtByGovt && p.dbtByGovt > 0 ? p.dbtByGovt.toLocaleString('en-IN') : '0'}
-                                </td>
-                                <td className="px-4 py-3">
-                                  {p.dbtReleaseDate === 'UNDER PROCESS' ? (
-                                    <span className="font-bold text-amber-600">UNDER PROCESS</span>
+                            filteredAttendanceRecords.map((record) => {
+                              const isPending = record.status === 'PENDING_CLIENT';
+                              const currentEdits = editingAttendanceRows[record.id] || {};
+                              const stipend = currentEdits.contractStipend ?? record.contractStipend;
+                              const eligibleDays = currentEdits.courseEligibleDays ?? record.courseEligibleDays;
+                              const present = currentEdits.presentDays ?? record.presentDays;
+                              const absent = currentEdits.absentDays ?? record.absentDays;
+
+                              return (
+                                <tr key={record.id} className="hover:bg-zinc-50/80 transition-colors">
+                                  <td className="px-4 py-3 font-bold text-zinc-900">{record.candidateCode}</td>
+                                  <td className="px-4 py-3 font-sans font-semibold text-zinc-800 truncate max-w-[150px]" title={record.candidateName}>{record.candidateName}</td>
+                                  <td className="px-4 py-3">{record.beneficiaryId || '-'}</td>
+                                  <td className="px-4 py-3">{record.contractCode || '-'}</td>
+                                  
+                                  {isPending ? (
+                                    <>
+                                      <td className="px-4 py-2">
+                                        <input type="number" value={stipend} onChange={(e) => handleAttendanceFieldChange(record.id, 'contractStipend', Number(e.target.value))} className="w-16 sm:w-20 px-1.5 py-1 text-xs border border-zinc-300 rounded-lg text-center font-mono focus:ring-1 focus:ring-[#0a192f] focus:border-[#0a192f] outline-none bg-white" />
+                                      </td>
+                                      <td className="px-4 py-2">
+                                        <input type="number" value={eligibleDays} onChange={(e) => handleAttendanceFieldChange(record.id, 'courseEligibleDays', Number(e.target.value))} className="w-16 sm:w-20 px-1.5 py-1 text-xs border border-zinc-300 rounded-lg text-center font-mono focus:ring-1 focus:ring-[#0a192f] focus:border-[#0a192f] outline-none bg-white" />
+                                      </td>
+                                      <td className="px-4 py-2">
+                                        <input type="number" value={present} onChange={(e) => handleAttendanceFieldChange(record.id, 'presentDays', Number(e.target.value))} className="w-16 sm:w-20 px-1.5 py-1 text-xs border border-zinc-300 rounded-lg text-center font-mono focus:ring-1 focus:ring-[#0a192f] focus:border-[#0a192f] outline-none bg-white" />
+                                      </td>
+                                      <td className="px-4 py-2">
+                                        <input type="number" value={absent} onChange={(e) => handleAttendanceFieldChange(record.id, 'absentDays', Number(e.target.value))} className="w-16 sm:w-20 px-1.5 py-1 text-xs border border-zinc-300 rounded-lg text-center font-mono focus:ring-1 focus:ring-[#0a192f] focus:border-[#0a192f] outline-none bg-white" />
+                                      </td>
+                                    </>
                                   ) : (
-                                    <span className="text-zinc-600">{p.dbtReleaseDate || '-'}</span>
+                                    <>
+                                      <td className="px-4 py-3">{record.contractStipend}</td>
+                                      <td className="px-4 py-3">{record.courseEligibleDays}</td>
+                                      <td className="px-4 py-3">{record.presentDays}</td>
+                                      <td className="px-4 py-3">{record.absentDays}</td>
+                                    </>
                                   )}
-                                </td>
-                                <td className="px-4 py-3">
-                                  <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[10px] font-bold bg-zinc-100 text-zinc-700 border border-zinc-200">
-                                    <Lock className="w-2.5 h-2.5 text-zinc-400" />
-                                    <span>{p.status || 'SUBMITTED'}</span>
-                                  </span>
-                                </td>
-                                <td className="px-4 py-3 font-sans text-xs">
-                                  {p.remarks ? (
-                                    p.submittedByClient ? (
-                                      <span className="px-2 py-1 rounded-lg bg-rose-50 border border-rose-300 text-rose-700 font-bold text-[11px] inline-block">
-                                        [Client Remark] {p.remarks}
-                                      </span>
+
+                                  <td className="px-4 py-3 font-bold text-zinc-800">{record.stipendPayable ? record.stipendPayable.toLocaleString('en-IN') : '-'}</td>
+                                  <td className="px-4 py-3 text-zinc-600">{record.establishmentContribution ? record.establishmentContribution.toLocaleString('en-IN') : '-'}</td>
+                                  <td className="px-4 py-3 font-bold text-emerald-700">{record.dbtAmount ? record.dbtAmount.toLocaleString('en-IN') : '-'}</td>
+                                  
+                                  <td className="px-4 py-3 font-sans">
+                                    <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-bold border ${
+                                      record.status === 'PENDING_CLIENT' ? 'bg-amber-50 text-amber-700 border-amber-200' :
+                                      record.status === 'SUBMITTED' ? 'bg-blue-50 text-blue-700 border-blue-200' :
+                                      record.status === 'REVIEWED' ? 'bg-purple-50 text-purple-700 border-purple-200' :
+                                      'bg-emerald-50 text-emerald-700 border-emerald-200'
+                                    }`}>
+                                      {record.status === 'PENDING_CLIENT' ? 'Pending' :
+                                       record.status === 'SUBMITTED' ? 'Submitted' :
+                                       record.status === 'REVIEWED' ? 'Reviewed' : 'Completed'}
+                                    </span>
+                                  </td>
+                                  
+                                  <td className="px-4 py-3 text-center">
+                                    {isPending ? (
+                                      <button 
+                                        type="button"
+                                        onClick={() => handleSubmitAttendanceRow(record)}
+                                        disabled={attendanceSubmitting || !editingAttendanceRows[record.id]}
+                                        className="px-2.5 py-1 rounded-lg bg-[#0a192f] hover:bg-[#102a4c] text-white text-[10px] font-bold shadow-sm transition-all disabled:opacity-50"
+                                      >
+                                        Save
+                                      </button>
                                     ) : (
-                                      <span className="text-zinc-600">{p.remarks}</span>
-                                    )
-                                  ) : '-'}
-                                </td>
-                              </tr>
-                            ))
+                                      <CheckCircle2 className="w-4 h-4 text-emerald-500 mx-auto" />
+                                    )}
+                                  </td>
+                                </tr>
+                              );
+                            })
                           )}
                         </tbody>
                       </table>
                     </div>
+
+                    {filteredAttendanceRecords.some(r => r.status === 'PENDING_CLIENT' && editingAttendanceRows[r.id]) && (
+                      <div className="flex justify-end pt-2">
+                        <button
+                          type="button"
+                          onClick={handleSubmitAllPendingAttendance}
+                          disabled={attendanceSubmitting}
+                          className="px-4 py-2 rounded-xl bg-[#0a192f] hover:bg-[#102a4c] text-white text-xs font-bold flex items-center gap-2 shadow-sm transition-all disabled:opacity-50"
+                        >
+                          <Check className="w-3.5 h-3.5" />
+                          <span>{attendanceSubmitting ? 'Submitting...' : 'Submit All Edits'}</span>
+                        </button>
+                      </div>
+                    )}
+                    
+                    <div className="pt-2 border-t border-zinc-100">
+                      <button 
+                        onClick={() => setShowLegacyStipends(!showLegacyStipends)}
+                        className="text-[11px] font-bold text-zinc-500 hover:text-zinc-800 transition-colors flex items-center gap-1.5"
+                      >
+                        {showLegacyStipends ? <X className="w-3.5 h-3.5" /> : <Plus className="w-3.5 h-3.5" />}
+                        <span>Legacy Stipend Records ({displayedStipendPayments.length})</span>
+                      </button>
+                    </div>
+
+                    <AnimatePresence>
+                      {showLegacyStipends && (
+                        <motion.div
+                          initial={{ height: 0, opacity: 0 }}
+                          animate={{ height: 'auto', opacity: 1 }}
+                          exit={{ height: 0, opacity: 0 }}
+                          className="overflow-hidden"
+                        >
+                          <div className="mt-4 overflow-x-auto rounded-2xl border border-zinc-200">
+                            <table className="w-full text-left text-xs text-zinc-700">
+                              <thead className="bg-[#0a192f] text-white font-bold text-[11px] uppercase tracking-wider">
+                                <tr>
+                                  <th className="px-4 py-3">Month</th>
+                                  <th className="px-4 py-3">Stipend Paid by Employer (₹)</th>
+                                  <th className="px-4 py-3">Date Paid</th>
+                                  <th className="px-4 py-3">DBT by Govt. (₹)</th>
+                                  <th className="px-4 py-3">DBT Release Date</th>
+                                  <th className="px-4 py-3">Status</th>
+                                  <th className="px-4 py-3">Remarks</th>
+                                </tr>
+                              </thead>
+                              <tbody className="divide-y divide-zinc-200 font-mono">
+                                {displayedStipendPayments.length === 0 ? (
+                                  <tr>
+                                    <td colSpan={7} className="px-4 py-8 text-center text-zinc-400 font-sans font-medium">
+                                      No legacy monthly stipend disbursements recorded.
+                                    </td>
+                                  </tr>
+                                ) : (
+                                  displayedStipendPayments.map((p, mIdx) => (
+                                    <tr key={p.id || mIdx} className="hover:bg-zinc-50/80 transition-colors">
+                                      <td className="px-4 py-3 font-bold text-zinc-900 font-sans uppercase">
+                                        {p.month} {p.year && p.year !== 'all' ? p.year : ''}
+                                        {p.submittedByClient && (
+                                          <span className="ml-2 px-1.5 py-0.5 rounded text-[9px] bg-rose-100 text-rose-800 border border-rose-300 font-bold">Client</span>
+                                        )}
+                                      </td>
+                                      <td className="px-4 py-3 font-bold text-zinc-800">
+                                        {p.stipendPaidByEmployer ? p.stipendPaidByEmployer.toLocaleString('en-IN') : '-'}
+                                      </td>
+                                      <td className="px-4 py-3 text-zinc-600 font-semibold">{p.datePaid || '-'}</td>
+                                      <td className="px-4 py-3 font-bold text-emerald-700">
+                                        {p.dbtByGovt && p.dbtByGovt > 0 ? p.dbtByGovt.toLocaleString('en-IN') : '0'}
+                                      </td>
+                                      <td className="px-4 py-3">
+                                        {p.dbtReleaseDate === 'UNDER PROCESS' ? (
+                                          <span className="font-bold text-amber-600">UNDER PROCESS</span>
+                                        ) : (
+                                          <span className="text-zinc-600">{p.dbtReleaseDate || '-'}</span>
+                                        )}
+                                      </td>
+                                      <td className="px-4 py-3">
+                                        <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[10px] font-bold bg-zinc-100 text-zinc-700 border border-zinc-200">
+                                          <Lock className="w-2.5 h-2.5 text-zinc-400" />
+                                          <span>{p.status || 'SUBMITTED'}</span>
+                                        </span>
+                                      </td>
+                                      <td className="px-4 py-3 font-sans text-xs">
+                                        {p.remarks ? (
+                                          p.submittedByClient ? (
+                                            <span className="px-2 py-1 rounded-lg bg-rose-50 border border-rose-300 text-rose-700 font-bold text-[11px] inline-block">
+                                              [Client Remark] {p.remarks}
+                                            </span>
+                                          ) : (
+                                            <span className="text-zinc-600">{p.remarks}</span>
+                                          )
+                                        ) : '-'}
+                                      </td>
+                                    </tr>
+                                  ))
+                                )}
+                              </tbody>
+                            </table>
+                          </div>
+                        </motion.div>
+                      )}
+                    </AnimatePresence>
                   </div>
 
                   {/* Section 5: Invoice Status */}

@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useState, useMemo } from 'react';
 import { useStore, getExpiringContracts } from '@/lib/store';
 import { 
   FormSubmission, 
@@ -12,6 +12,7 @@ import {
   ApprenticeRecord,
   CompanyOperationsSPOC,
   StipendPaymentRecord,
+  MonthlyAttendanceRecord,
   getAdminPermissions,
   isSeniorAdmin,
   isJuniorAdmin
@@ -52,7 +53,8 @@ import {
   Copy,
   Lock,
   Search,
-  Filter
+  Filter,
+  CalendarDays
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 
@@ -80,12 +82,14 @@ export const SubmissionDetailDrawer: React.FC<SubmissionDetailDrawerProps> = ({
     addInvoice,
     deleteInvoice,
     submissions,
-    user
+    user,
+    updateAttendanceRecord,
+    bulkCreateMonthlyAttendance
   } = useStore();
   const permissions = getAdminPermissions(user?.role);
   const isSenior = isSeniorAdmin(user?.role);
 
-  const [activeTab, setActiveTab] = useState<'application' | 'documents' | 'candidates' | 'dbt_claims' | 'spoc_logs' | 'naps_portal' | 'invoices'>('application');
+  const [activeTab, setActiveTab] = useState<'application' | 'documents' | 'candidates' | 'dbt_claims' | 'spoc_logs' | 'naps_portal' | 'invoices' | 'attendance'>('application');
   const [candidateFilter, setCandidateFilter] = useState<'all' | 'allocated' | 'pending' | 'terminated'>('all');
   const [previewingDoc, setPreviewingDoc] = useState<any>(null);
 
@@ -123,6 +127,15 @@ export const SubmissionDetailDrawer: React.FC<SubmissionDetailDrawerProps> = ({
     status: 'UNDER PROCESS',
     remarks: ''
   });
+
+  // Attendance Ledger State (Admin)
+  const [adminAttFilterMonth, setAdminAttFilterMonth] = useState<string>('all');
+  const [adminAttFilterYear, setAdminAttFilterYear] = useState<string>(new Date().getFullYear().toString());
+  const [adminAttFilterCode, setAdminAttFilterCode] = useState<string>('');
+  const [editingAdminAttRows, setEditingAdminAttRows] = useState<Record<string, Partial<MonthlyAttendanceRecord>>>({});
+  const [adminAttSaving, setAdminAttSaving] = useState(false);
+  const [adminAttSuccess, setAdminAttSuccess] = useState<string | null>(null);
+  const [generatingAdminAtt, setGeneratingAdminAtt] = useState(false);
 
   // NAPS Record Modal States
   const [showNapsModal, setShowNapsModal] = useState(false);
@@ -227,6 +240,7 @@ export const SubmissionDetailDrawer: React.FC<SubmissionDetailDrawerProps> = ({
   const spocLogs = currentSub.spoc_logs || [];
   const napsRecords = currentSub.naps_records || [];
   const stipendPayments: StipendPaymentRecord[] = currentSub.stipend_payments || [];
+  const attendanceRecords: MonthlyAttendanceRecord[] = currentSub.attendance_records || [];
   const invoiceList: ComplianceInvoiceRecord[] = currentSub.invoices || [];
   const actionItemsList: ComplianceActionItem[] = currentSub.action_items || [];
 
@@ -316,6 +330,61 @@ export const SubmissionDetailDrawer: React.FC<SubmissionDetailDrawerProps> = ({
       setTimeout(() => setStipendAdminSuccess(null), 4000);
     } catch (err) {
       console.error('Error creating stipend:', err);
+    }
+  };
+
+  // Attendance Ledger Admin Handlers
+  const handleAdminGenerateAttMonth = async () => {
+    if (!submission) return;
+    setGeneratingAdminAtt(true);
+    try {
+      const MONTHS = ['JANUARY','FEBRUARY','MARCH','APRIL','MAY','JUNE','JULY','AUGUST','SEPTEMBER','OCTOBER','NOVEMBER','DECEMBER'];
+      const month = adminAttFilterMonth !== 'all' ? adminAttFilterMonth : MONTHS[new Date().getMonth()];
+      const year = adminAttFilterYear !== 'all' ? adminAttFilterYear : new Date().getFullYear().toString();
+      const created = await bulkCreateMonthlyAttendance(submission.id, month, year);
+      if (created.length > 0) {
+        setAdminAttSuccess(`Generated ${created.length} attendance rows for ${month} ${year}.`);
+      } else {
+        setAdminAttSuccess(`All candidates already have attendance records for ${month} ${year}.`);
+      }
+      setTimeout(() => setAdminAttSuccess(null), 4000);
+    } catch (err) {
+      console.error('Error generating attendance:', err);
+    } finally {
+      setGeneratingAdminAtt(false);
+    }
+  };
+
+  const handleAdminAttFieldChange = (recordId: string, field: string, value: number) => {
+    setEditingAdminAttRows(prev => ({
+      ...prev,
+      [recordId]: { ...(prev[recordId] || {}), [field]: value }
+    }));
+  };
+
+  const handleAdminSaveAttRow = async (record: MonthlyAttendanceRecord) => {
+    if (!submission) return;
+    const edits = editingAdminAttRows[record.id];
+    if (!edits) return;
+    setAdminAttSaving(true);
+    try {
+      await updateAttendanceRecord(submission.id, record.id, {
+        ...edits,
+        reviewedByAdmin: true,
+        reviewedAt: new Date().toISOString(),
+        status: 'REVIEWED'
+      });
+      setEditingAdminAttRows(prev => {
+        const copy = { ...prev };
+        delete copy[record.id];
+        return copy;
+      });
+      setAdminAttSuccess(`Updated financials for ${record.candidateName} (${record.month} ${record.year}).`);
+      setTimeout(() => setAdminAttSuccess(null), 4000);
+    } catch (err) {
+      console.error('Error saving attendance:', err);
+    } finally {
+      setAdminAttSaving(false);
     }
   };
 
@@ -576,6 +645,15 @@ export const SubmissionDetailDrawer: React.FC<SubmissionDetailDrawerProps> = ({
     }
   };
 
+  const filteredAdminAtt = useMemo(() => {
+    return attendanceRecords.filter(r => {
+      if (adminAttFilterMonth !== 'all' && r.month !== adminAttFilterMonth) return false;
+      if (adminAttFilterYear !== 'all' && r.year !== adminAttFilterYear) return false;
+      if (adminAttFilterCode && !r.candidateCode.toLowerCase().includes(adminAttFilterCode.toLowerCase()) && !r.candidateName.toLowerCase().includes(adminAttFilterCode.toLowerCase())) return false;
+      return true;
+    });
+  }, [attendanceRecords, adminAttFilterMonth, adminAttFilterYear, adminAttFilterCode]);
+
   return (
     <>
       <AnimatePresence>
@@ -672,7 +750,8 @@ export const SubmissionDetailDrawer: React.FC<SubmissionDetailDrawerProps> = ({
               { id: 'documents', label: 'Company Documents' },
               { id: 'candidates', label: `Apprentices (${candidateList.length})` },
               { id: 'dbt_claims', label: `DBT Claims (${dbtClaims.length})` },
-              { id: 'spoc_logs', label: `SPOC Alerts (${spocLogs.length})` }
+              { id: 'spoc_logs', label: `SPOC Alerts (${spocLogs.length})` },
+              { id: 'attendance', label: `Attendance (${attendanceRecords.length})` }
             ].map(tab => (
               <button
                 key={tab.id}
@@ -2143,6 +2222,206 @@ export const SubmissionDetailDrawer: React.FC<SubmissionDetailDrawerProps> = ({
                       No SPOC notifications triggered yet.
                     </div>
                   )}
+                </div>
+              )}
+
+              {/* TAB 6: Attendance Ledger */}
+              {activeTab === 'attendance' && (
+                <div className="space-y-4">
+                  <div className="flex items-center justify-between">
+                    <div>
+                      <h4 className="text-sm font-bold text-zinc-900 uppercase font-mono">
+                        MONTHLY ATTENDANCE LEDGER
+                      </h4>
+                      <p className="text-[11px] text-zinc-500">
+                        View client inputs and configure financial processing for apprentices.
+                      </p>
+                    </div>
+                    <button
+                      onClick={handleAdminGenerateAttMonth}
+                      disabled={generatingAdminAtt}
+                      className="px-3.5 py-1.5 rounded-full bg-[#0a192f] text-white hover:bg-zinc-800 text-xs font-bold transition-all disabled:opacity-50"
+                    >
+                      {generatingAdminAtt ? 'Generating...' : 'Generate Month'}
+                    </button>
+                  </div>
+
+                  {adminAttSuccess && (
+                    <div className="px-4 py-2.5 rounded-xl text-xs font-bold bg-emerald-50 border-emerald-200 text-emerald-800 border flex items-center gap-2">
+                      <CheckCircle2 className="w-4 h-4" />
+                      {adminAttSuccess}
+                    </div>
+                  )}
+
+                  {/* Filters toolbar */}
+                  <div className="p-3 bg-zinc-50 border border-zinc-200 rounded-2xl flex flex-wrap gap-3 items-center">
+                    <div className="flex items-center gap-2">
+                      <CalendarDays className="w-4 h-4 text-zinc-500" />
+                      <select
+                        value={adminAttFilterMonth}
+                        onChange={(e) => setAdminAttFilterMonth(e.target.value)}
+                        className="text-xs bg-white border border-zinc-200 rounded-lg px-2 py-1 focus:outline-none focus:border-black font-mono font-bold"
+                      >
+                        <option value="all">All Months</option>
+                        {['JANUARY','FEBRUARY','MARCH','APRIL','MAY','JUNE','JULY','AUGUST','SEPTEMBER','OCTOBER','NOVEMBER','DECEMBER'].map(m => (
+                          <option key={m} value={m}>{m}</option>
+                        ))}
+                      </select>
+                      <select
+                        value={adminAttFilterYear}
+                        onChange={(e) => setAdminAttFilterYear(e.target.value)}
+                        className="text-xs bg-white border border-zinc-200 rounded-lg px-2 py-1 focus:outline-none focus:border-black font-mono font-bold"
+                      >
+                        <option value="all">All Yrs</option>
+                        {['2024','2025','2026','2027'].map(y => (
+                          <option key={y} value={y}>{y}</option>
+                        ))}
+                      </select>
+                    </div>
+                    <div className="h-5 w-px bg-zinc-300 hidden sm:block" />
+                    <div className="flex-1 min-w-[200px] relative">
+                      <Search className="w-3.5 h-3.5 text-zinc-400 absolute left-2.5 top-1.5" />
+                      <input
+                        type="text"
+                        placeholder="Search candidate or code..."
+                        value={adminAttFilterCode}
+                        onChange={(e) => setAdminAttFilterCode(e.target.value)}
+                        className="w-full pl-8 pr-3 py-1.5 rounded-lg bg-white border border-zinc-200 text-xs focus:outline-none focus:border-black font-mono"
+                      />
+                    </div>
+                  </div>
+
+                  {/* Table */}
+                  <div className="bg-white border border-zinc-200 rounded-2xl overflow-hidden shadow-2xs">
+                    <div className="overflow-x-auto">
+                      <table className="w-full text-left text-xs whitespace-nowrap">
+                        <thead className="bg-[#0a192f] text-white">
+                          <tr>
+                            <th className="px-3 py-2 font-bold font-mono">Ap. Code</th>
+                            <th className="px-3 py-2 font-bold font-mono">Name</th>
+                            <th className="px-3 py-2 font-bold font-mono">Beneficiary ID</th>
+                            <th className="px-3 py-2 font-bold font-mono">Contract Code</th>
+                            <th className="px-3 py-2 font-bold font-mono text-right">Stipend (₹)</th>
+                            <th className="px-3 py-2 font-bold font-mono text-center">Eligible Days</th>
+                            <th className="px-3 py-2 font-bold font-mono text-center">Present</th>
+                            <th className="px-3 py-2 font-bold font-mono text-center">Absent</th>
+                            <th className="px-3 py-2 font-bold font-mono text-right">Stipend Payable (₹)</th>
+                            <th className="px-3 py-2 font-bold font-mono text-right">Est. Contrib. (₹)</th>
+                            <th className="px-3 py-2 font-bold font-mono text-right">DBT (₹)</th>
+                            <th className="px-3 py-2 font-bold font-mono text-center">Status</th>
+                            <th className="px-3 py-2 font-bold font-mono text-center">Action</th>
+                          </tr>
+                        </thead>
+                        <tbody className="divide-y divide-zinc-200">
+                          {filteredAdminAtt.length === 0 ? (
+                            <tr>
+                              <td colSpan={13} className="px-4 py-8 text-center text-zinc-400 font-mono text-[11px]">
+                                No attendance records found for criteria. Click &quot;Generate Month&quot; to populate records from active apprentice contracts.
+                              </td>
+                            </tr>
+                          ) : (
+                            filteredAdminAtt.map((record: MonthlyAttendanceRecord) => {
+                              const isClientPending = record.status === 'PENDING_CLIENT';
+                              const isSubmitted = record.status === 'SUBMITTED';
+                              const isRowEditing = isSubmitted || Boolean(editingAdminAttRows[record.id]);
+                              
+                              const valPayable = editingAdminAttRows[record.id]?.stipendPayable ?? record.stipendPayable;
+                              const valContrib = editingAdminAttRows[record.id]?.establishmentContribution ?? record.establishmentContribution;
+                              const valDbt = editingAdminAttRows[record.id]?.dbtAmount ?? record.dbtAmount;
+
+                              return (
+                                <tr key={record.id} className="hover:bg-zinc-50 transition-colors">
+                                  <td className="px-3 py-2 font-mono text-[10px] text-zinc-800">{record.candidateCode}</td>
+                                  <td className="px-3 py-2 font-bold text-zinc-900">{record.candidateName}<br/><span className="text-[9px] font-normal text-zinc-400">{record.month} {record.year}</span></td>
+                                  <td className="px-3 py-2 font-mono text-[10px] text-zinc-500">{record.beneficiaryId || '-'}</td>
+                                  <td className="px-3 py-2 font-mono text-[10px] text-zinc-500">{record.contractCode || '-'}</td>
+                                  <td className="px-3 py-2 font-mono text-[11px] text-right text-zinc-900">{record.contractStipend.toLocaleString()}</td>
+                                  <td className="px-3 py-2 font-mono text-[11px] text-center text-zinc-900">{record.courseEligibleDays === 0 && isClientPending ? '-' : record.courseEligibleDays}</td>
+                                  <td className="px-3 py-2 font-mono text-[11px] text-center text-emerald-700 font-bold">{record.presentDays === 0 && isClientPending ? '-' : record.presentDays}</td>
+                                  <td className="px-3 py-2 font-mono text-[11px] text-center text-rose-700">{record.absentDays === 0 && isClientPending ? '-' : record.absentDays}</td>
+                                  
+                                  <td className="px-3 py-2 text-right">
+                                    {isClientPending ? (
+                                      <span className="text-zinc-400">-</span>
+                                    ) : isRowEditing ? (
+                                      <input type="number" value={valPayable} onChange={e => handleAdminAttFieldChange(record.id, 'stipendPayable', Number(e.target.value))} className="w-16 sm:w-20 px-1.5 py-1 text-xs border border-zinc-300 rounded-lg text-center font-mono focus:ring-1 focus:ring-[#0a192f] focus:border-[#0a192f] outline-none" />
+                                    ) : (
+                                      <span className="font-mono text-[11px] text-zinc-900 font-bold">{record.stipendPayable.toLocaleString()}</span>
+                                    )}
+                                  </td>
+
+                                  <td className="px-3 py-2 text-right">
+                                    {isClientPending ? (
+                                      <span className="text-zinc-400">-</span>
+                                    ) : isRowEditing ? (
+                                      <input type="number" value={valContrib} onChange={e => handleAdminAttFieldChange(record.id, 'establishmentContribution', Number(e.target.value))} className="w-16 sm:w-20 px-1.5 py-1 text-xs border border-zinc-300 rounded-lg text-center font-mono focus:ring-1 focus:ring-[#0a192f] focus:border-[#0a192f] outline-none" />
+                                    ) : (
+                                      <span className="font-mono text-[11px] text-zinc-900 font-bold">{record.establishmentContribution.toLocaleString()}</span>
+                                    )}
+                                  </td>
+
+                                  <td className="px-3 py-2 text-right">
+                                    {isClientPending ? (
+                                      <span className="text-zinc-400">-</span>
+                                    ) : isRowEditing ? (
+                                      <input type="number" value={valDbt} onChange={e => handleAdminAttFieldChange(record.id, 'dbtAmount', Number(e.target.value))} className="w-16 sm:w-20 px-1.5 py-1 text-xs border border-zinc-300 rounded-lg text-center font-mono focus:ring-1 focus:ring-[#0a192f] focus:border-[#0a192f] outline-none" />
+                                    ) : (
+                                      <span className="font-mono text-[11px] text-zinc-900 font-bold">{record.dbtAmount.toLocaleString()}</span>
+                                    )}
+                                  </td>
+
+                                  <td className="px-3 py-2 text-center">
+                                    {record.status === 'PENDING_CLIENT' && <span className="px-2 py-0.5 rounded text-[9px] font-bold bg-amber-100 text-amber-800 border border-amber-200">Pending</span>}
+                                    {record.status === 'SUBMITTED' && <span className="px-2 py-0.5 rounded text-[9px] font-bold bg-blue-100 text-blue-800 border border-blue-200">Submitted</span>}
+                                    {record.status === 'REVIEWED' && <span className="px-2 py-0.5 rounded text-[9px] font-bold bg-purple-100 text-purple-800 border border-purple-200">Reviewed</span>}
+                                    {record.status === 'COMPLETED' && <span className="px-2 py-0.5 rounded text-[9px] font-bold bg-emerald-100 text-emerald-800 border border-emerald-200">Completed</span>}
+                                  </td>
+                                  
+                                  <td className="px-3 py-2 text-center">
+                                    {isClientPending && <span className="text-[9px] text-zinc-400 italic">Awaiting Client</span>}
+                                    {isSubmitted && (
+                                      <button onClick={() => handleAdminSaveAttRow(record)} disabled={adminAttSaving} className="px-2.5 py-1 bg-black text-white rounded-lg text-[10px] font-bold hover:bg-zinc-800 transition-colors disabled:opacity-50 cursor-pointer">
+                                        Review
+                                      </button>
+                                    )}
+                                    {(record.status === 'REVIEWED' || record.status === 'COMPLETED') && !editingAdminAttRows[record.id] && (
+                                      <div className="flex items-center justify-center gap-1.5">
+                                        <CheckCircle2 className="w-3.5 h-3.5 text-emerald-600" />
+                                        <button
+                                          type="button"
+                                          onClick={() => setEditingAdminAttRows(prev => ({
+                                            ...prev,
+                                            [record.id]: {
+                                              stipendPayable: record.stipendPayable,
+                                              establishmentContribution: record.establishmentContribution,
+                                              dbtAmount: record.dbtAmount
+                                            }
+                                          }))}
+                                          className="text-[10px] font-bold text-zinc-600 hover:text-black underline cursor-pointer"
+                                        >
+                                          Edit
+                                        </button>
+                                      </div>
+                                    )}
+                                    {editingAdminAttRows[record.id] && record.status !== 'SUBMITTED' && (
+                                      <div className="flex items-center justify-center gap-1">
+                                        <button onClick={() => handleAdminSaveAttRow(record)} disabled={adminAttSaving} className="px-2 py-0.5 bg-[#0a192f] text-white rounded text-[10px] font-bold hover:bg-zinc-800 transition-colors disabled:opacity-50 cursor-pointer">
+                                          Save
+                                        </button>
+                                        <button onClick={() => setEditingAdminAttRows(prev => { const cp = {...prev}; delete cp[record.id]; return cp; })} className="px-1.5 py-0.5 bg-zinc-100 text-zinc-600 rounded text-[10px] hover:bg-zinc-200 transition-colors cursor-pointer">
+                                          ✕
+                                        </button>
+                                      </div>
+                                    )}
+                                  </td>
+                                </tr>
+                              );
+                            })
+                          )}
+                        </tbody>
+                      </table>
+                    </div>
+                  </div>
                 </div>
               )}
 

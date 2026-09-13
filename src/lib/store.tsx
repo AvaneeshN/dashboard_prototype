@@ -18,6 +18,7 @@ import {
   ComplianceInvoiceRecord,
   ComplianceActionItem,
   StipendPaymentRecord,
+  MonthlyAttendanceRecord,
   NAPSEstablishmentDetails
 } from '@/types';
 import { INITIAL_PROFILES, INITIAL_SUBMISSIONS, INITIAL_LOGIN_LOGS } from './mock-data';
@@ -102,6 +103,11 @@ interface AuthState {
   addStipendPayment: (submissionId: string, record: Omit<StipendPaymentRecord, 'id'>) => Promise<StipendPaymentRecord>;
   updateStipendPayment: (submissionId: string, recordId: string, updates: Partial<StipendPaymentRecord>) => Promise<void>;
 
+  // Monthly Attendance Ledger (Client enters attendance, Admin fills financials)
+  addAttendanceRecord: (submissionId: string, record: Omit<MonthlyAttendanceRecord, 'id'>) => Promise<MonthlyAttendanceRecord>;
+  updateAttendanceRecord: (submissionId: string, recordId: string, updates: Partial<MonthlyAttendanceRecord>) => Promise<void>;
+  bulkCreateMonthlyAttendance: (submissionId: string, month: string, year: string) => Promise<MonthlyAttendanceRecord[]>;
+
   // Action Items (Both client and admin can add)
   addActionItem: (submissionId: string, item: Omit<ComplianceActionItem, 'id'>) => Promise<ComplianceActionItem>;
 
@@ -116,6 +122,7 @@ export const prepareSubmissionForSupabase = (sub: FormSubmission) => {
     establishment_details,
     nats_establishment_details,
     stipend_payments,
+    attendance_records,
     ...validColumns
   } = sub;
 
@@ -130,6 +137,9 @@ export const prepareSubmissionForSupabase = (sub: FormSubmission) => {
   }
   if (stipend_payments) {
     enrichedResponses.stipend_payments = stipend_payments;
+  }
+  if (attendance_records) {
+    enrichedResponses.attendance_records = attendance_records;
   }
 
   return {
@@ -175,7 +185,8 @@ export const parseSubmissionFromSupabase = (raw: any): FormSubmission => {
       }
     } : undefined),
     nats_establishment_details: raw.nats_establishment_details || resp.nats_establishment_details,
-    stipend_payments: raw.stipend_payments || resp.stipend_payments || []
+    stipend_payments: raw.stipend_payments || resp.stipend_payments || [],
+    attendance_records: raw.attendance_records || resp.attendance_records || []
   };
 };
 
@@ -1972,6 +1983,168 @@ export const StoreProvider: React.FC<{ children: React.ReactNode }> = ({ childre
     await persistSubmissionToSupabase(updatedSub);
   };
 
+  // ── Monthly Attendance Ledger ──
+  const addAttendanceRecord = async (
+    submissionId: string,
+    recordData: Omit<MonthlyAttendanceRecord, 'id'>
+  ): Promise<MonthlyAttendanceRecord> => {
+    const targetSub = submissions.find(s => s.id === submissionId);
+    if (!targetSub) throw new Error('Client submission record not found.');
+
+    const newRecord: MonthlyAttendanceRecord = {
+      ...recordData,
+      id: 'att-' + Date.now() + '-' + Math.random().toString(36).substring(2, 6)
+    };
+
+    const existingRecords = targetSub.attendance_records || [];
+    const updatedRecords = [newRecord, ...existingRecords];
+
+    const updatedSub: FormSubmission = {
+      ...targetSub,
+      attendance_records: updatedRecords,
+      last_active_at: new Date().toISOString()
+    };
+
+    const updatedSubmissions = submissions.map(s => s.id === submissionId ? updatedSub : s);
+    setSubmissions(updatedSubmissions);
+
+    if (user && (user.id === targetSub.client_id || user.email.toLowerCase() === targetSub.client_email.toLowerCase())) {
+      const updatedMetrics: ClientApprenticeMetrics = {
+        ...(user.apprenticeMetrics || {} as any),
+        attendanceRecords: updatedRecords
+      };
+      setUser({ ...user, apprenticeMetrics: updatedMetrics });
+    }
+
+    await persistSubmissionToSupabase(updatedSub);
+    return newRecord;
+  };
+
+  const updateAttendanceRecord = async (
+    submissionId: string,
+    recordId: string,
+    updates: Partial<MonthlyAttendanceRecord>
+  ): Promise<void> => {
+    const targetSub = submissions.find(s => s.id === submissionId);
+    if (!targetSub) return;
+
+    const existingRecords = targetSub.attendance_records || [];
+    const updatedRecords = existingRecords.map(r => r.id === recordId ? { ...r, ...updates } : r);
+
+    const updatedSub: FormSubmission = {
+      ...targetSub,
+      attendance_records: updatedRecords,
+      last_active_at: new Date().toISOString()
+    };
+
+    const updatedSubmissions = submissions.map(s => s.id === submissionId ? updatedSub : s);
+    setSubmissions(updatedSubmissions);
+
+    if (user && (user.id === targetSub.client_id || user.email.toLowerCase() === targetSub.client_email.toLowerCase())) {
+      const updatedMetrics: ClientApprenticeMetrics = {
+        ...(user.apprenticeMetrics || {} as any),
+        attendanceRecords: updatedRecords
+      };
+      setUser({ ...user, apprenticeMetrics: updatedMetrics });
+    }
+
+    await persistSubmissionToSupabase(updatedSub);
+  };
+
+  const bulkCreateMonthlyAttendance = async (
+    submissionId: string,
+    month: string,
+    year: string
+  ): Promise<MonthlyAttendanceRecord[]> => {
+    const targetSub = submissions.find(s => s.id === submissionId);
+    if (!targetSub) throw new Error('Client submission record not found.');
+
+    const candidates = targetSub.candidates || [];
+    const napsRecords = targetSub.naps_records || [];
+    const existingRecords = targetSub.attendance_records || [];
+
+    // Filter active, non-terminated candidates whose contract covers the given month/year
+    const monthUpper = month.toUpperCase();
+    const yearNum = parseInt(year, 10);
+    const monthIndex = MONTH_NAMES.indexOf(monthUpper.substring(0, 3));
+    const targetDate = monthIndex !== -1 ? new Date(yearNum, monthIndex, 15) : new Date(yearNum, 0, 15);
+
+    const activeCandidates = candidates.filter(c => {
+      if (c.status === 'Terminated' || c.contractStatus === 'Terminated') return false;
+      // Check contract date range
+      const startParsed = parseYearMonthFromDate(c.onboardingDate);
+      const endParsed = parseYearMonthFromDate(c.contractExpireDate);
+      if (startParsed) {
+        const startDate = new Date(startParsed.year, startParsed.monthIndex, 1);
+        if (targetDate < startDate) return false;
+      }
+      if (endParsed) {
+        const endDate = new Date(endParsed.year, endParsed.monthIndex + 1, 0);
+        if (targetDate > endDate) return false;
+      }
+      return true;
+    });
+
+    // Skip candidates that already have an attendance record for this month/year
+    const newRecords: MonthlyAttendanceRecord[] = [];
+    for (const candidate of activeCandidates) {
+      const alreadyExists = existingRecords.some(
+        r => r.candidateId === candidate.id && r.month === monthUpper && r.year === year
+      );
+      if (alreadyExists) continue;
+
+      // Find matching NAPS record for beneficiaryId
+      const napsMatch = napsRecords.find(
+        n => n.candidateId === candidate.id || n.candidateName === candidate.name
+      );
+
+      const newRecord: MonthlyAttendanceRecord = {
+        id: 'att-' + Date.now() + '-' + Math.random().toString(36).substring(2, 6) + '-' + newRecords.length,
+        candidateId: candidate.id,
+        candidateCode: candidate.apprenticeCode || candidate.id.substring(0, 8),
+        candidateName: candidate.name,
+        beneficiaryId: napsMatch?.beneficiaryId || '-',
+        contractCode: candidate.apprenticeCode || napsMatch?.apprenticeCode || '-',
+        month: monthUpper,
+        year: year,
+        contractStipend: candidate.stipendAmount || 0,
+        courseEligibleDays: 0,
+        presentDays: 0,
+        absentDays: 0,
+        stipendPayable: 0,
+        establishmentContribution: 0,
+        dbtAmount: 0,
+        submittedByClient: false,
+        reviewedByAdmin: false,
+        status: 'PENDING_CLIENT'
+      };
+      newRecords.push(newRecord);
+    }
+
+    if (newRecords.length === 0) return [];
+
+    const updatedRecords = [...newRecords, ...existingRecords];
+    const updatedSub: FormSubmission = {
+      ...targetSub,
+      attendance_records: updatedRecords,
+      last_active_at: new Date().toISOString()
+    };
+
+    const updatedSubmissions = submissions.map(s => s.id === submissionId ? updatedSub : s);
+    setSubmissions(updatedSubmissions);
+
+    if (user && (user.id === targetSub.client_id || user.email.toLowerCase() === targetSub.client_email.toLowerCase())) {
+      const updatedMetrics: ClientApprenticeMetrics = {
+        ...(user.apprenticeMetrics || {} as any),
+        attendanceRecords: updatedRecords
+      };
+      setUser({ ...user, apprenticeMetrics: updatedMetrics });
+    }
+
+    await persistSubmissionToSupabase(updatedSub);
+    return newRecords;
+  };
+
   const addActionItem = async (
     submissionId: string, 
     itemData: Omit<ComplianceActionItem, 'id'>
@@ -2199,6 +2372,9 @@ export const StoreProvider: React.FC<{ children: React.ReactNode }> = ({ childre
         syncAutoContinuedDbtRecords,
         addStipendPayment,
         updateStipendPayment,
+        addAttendanceRecord,
+        updateAttendanceRecord,
+        bulkCreateMonthlyAttendance,
         addActionItem,
         addInvoice,
         deleteInvoice
