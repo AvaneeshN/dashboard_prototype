@@ -23,6 +23,7 @@ import { useRouter } from 'next/navigation';
 import { motion, AnimatePresence } from 'framer-motion';
 
 import { NavyWaveBackground } from '@/components/ui/NavyWaveBackground';
+import { RotatingVault } from '@/components/ui/RotatingVault';
 
 export const AuthGateway: React.FC = () => {
   const { login, register, submissions } = useStore();
@@ -210,6 +211,11 @@ export const AuthGateway: React.FC = () => {
     <div className="relative min-h-[calc(100vh-4rem)] flex flex-col items-center justify-center p-4 sm:p-6 overflow-hidden bg-gradient-to-b from-[#f8fafc] via-[#f1f5f9] to-[#0a192f]/10 font-sans">
       <NavyWaveBackground intensity="standard" />
       <ParticleField />
+
+      {/* Top Right Rotating Security Vault (Below Navbar) */}
+      <div className="absolute top-4 right-4 sm:top-6 sm:right-8 z-20">
+        <RotatingVault size="md" showLabel={true} />
+      </div>
 
       <div className="relative z-10 w-full max-w-[440px] flex flex-col items-center">
         

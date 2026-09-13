@@ -46,6 +46,7 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { RequiredDocumentConfig, getAdminPermissions, isSeniorAdmin } from '@/types';
 import { AdminVisualAnalytics } from './AdminVisualAnalytics';
 import { AdminOverallDbtDashboard } from './AdminOverallDbtDashboard';
+import { RotatingVault } from '@/components/ui/RotatingVault';
 
 type AdminTab = 'analytics' | 'dbt_registry' | 'telemetry' | 'intakes' | 'requirements' | 'security';
 
@@ -337,6 +338,9 @@ export const AdminDashboard: React.FC = () => {
         </div>
 
         <div className="flex flex-wrap items-center gap-2.5">
+          {/* Top Right Rotating Security Vault (Below Navbar) */}
+          <RotatingVault size="sm" showLabel={true} />
+
           {/* Authenticated Clearance Badge (Immutable - strictly governed by login credentials) */}
           <div className="flex items-center gap-2 px-3.5 py-1.5 rounded-full bg-white border border-zinc-200 shadow-2xs">
             {isSenior ? (

@@ -64,3 +64,41 @@ code, kbd, samp, pre {
 .animate-shake {
   animation: shake 0.35s ease-in-out;
 }
+
+@keyframes vault-spin-slow {
+  from { transform: rotate(0deg); }
+  to { transform: rotate(360deg); }
+}
+
+@keyframes vault-spin-reverse {
+  from { transform: rotate(360deg); }
+  to { transform: rotate(0deg); }
+}
+
+@keyframes vault-pulse-glow {
+  0%, 100% {
+    box-shadow: 0 4px 20px -2px rgba(245, 158, 11, 0.2), 0 0 8px -2px rgba(245, 158, 11, 0.3);
+  }
+  50% {
+    box-shadow: 0 4px 26px 2px rgba(245, 158, 11, 0.35), 0 0 14px 1px rgba(245, 158, 11, 0.5);
+  }
+}
+
+.animate-vault-slow {
+  animation: vault-spin-slow 24s linear infinite;
+  transform-origin: center;
+}
+
+.animate-vault-reverse {
+  animation: vault-spin-reverse 32s linear infinite;
+  transform-origin: center;
+}
+
+.animate-vault-wheel {
+  animation: vault-spin-slow 16s linear infinite;
+  transform-origin: center;
+}
+
+.animate-vault-glow {
+  animation: vault-pulse-glow 4s ease-in-out infinite;
+}

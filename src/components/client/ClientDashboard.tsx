@@ -8,6 +8,7 @@ import { ClientIntakeWizard } from './ClientIntakeWizard';
 import { DocumentViewerModal } from '@/components/ui/DocumentViewerModal';
 import { processUploadedFile, downloadDocumentFile } from '@/lib/document-utils';
 import { NavyWaveBackground } from '@/components/ui/NavyWaveBackground';
+import { RotatingVault } from '@/components/ui/RotatingVault';
 import { 
   Users, 
   UserCheck, 
@@ -956,31 +957,36 @@ export const ClientDashboard: React.FC = () => {
           </p>
         </div>
 
-        {/* View Switcher Pill */}
-        <div className="flex items-center gap-1.5 p-1 rounded-full bg-zinc-200/80 border border-zinc-300 self-start md:self-auto">
-          <button
-            onClick={() => setActiveMainView('intake')}
-            className={`px-4 py-1.5 rounded-full text-xs font-bold flex items-center gap-1.5 transition-all cursor-pointer ${
-              activeMainView === 'intake'
-                ? 'bg-black text-white shadow-sm'
-                : 'text-zinc-600 hover:text-black'
-            }`}
-          >
-            <ClipboardList className="w-3.5 h-3.5" />
-            <span>Intake Application</span>
-          </button>
+        {/* Top Right Header Controls & Rotating Vault */}
+        <div className="flex flex-wrap items-center gap-3 self-start md:self-auto">
+          <RotatingVault size="sm" showLabel={true} />
 
-          <button
-            onClick={() => setActiveMainView('dashboard')}
-            className={`px-4 py-1.5 rounded-full text-xs font-bold flex items-center gap-1.5 transition-all cursor-pointer ${
-              activeMainView === 'dashboard'
-                ? 'bg-black text-white shadow-sm'
-                : 'text-zinc-600 hover:text-black'
-            }`}
-          >
-            <LayoutDashboard className="w-3.5 h-3.5" />
-            <span>Analytics Dashboard</span>
-          </button>
+          {/* View Switcher Pill */}
+          <div className="flex items-center gap-1.5 p-1 rounded-full bg-zinc-200/80 border border-zinc-300">
+            <button
+              onClick={() => setActiveMainView('intake')}
+              className={`px-4 py-1.5 rounded-full text-xs font-bold flex items-center gap-1.5 transition-all cursor-pointer ${
+                activeMainView === 'intake'
+                  ? 'bg-black text-white shadow-sm'
+                  : 'text-zinc-600 hover:text-black'
+              }`}
+            >
+              <ClipboardList className="w-3.5 h-3.5" />
+              <span>Intake Application</span>
+            </button>
+
+            <button
+              onClick={() => setActiveMainView('dashboard')}
+              className={`px-4 py-1.5 rounded-full text-xs font-bold flex items-center gap-1.5 transition-all cursor-pointer ${
+                activeMainView === 'dashboard'
+                  ? 'bg-black text-white shadow-sm'
+                  : 'text-zinc-600 hover:text-black'
+              }`}
+            >
+              <LayoutDashboard className="w-3.5 h-3.5" />
+              <span>Analytics Dashboard</span>
+            </button>
+          </div>
         </div>
       </div>
 
