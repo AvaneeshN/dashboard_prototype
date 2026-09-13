@@ -114,7 +114,7 @@ export const StoreProvider: React.FC<{ children: React.ReactNode }> = ({ childre
   const [user, setUser] = useState<UserProfile | null>(() => {
     if (typeof window !== 'undefined') {
       try {
-        const cachedAdmin = sessionStorage.getItem('portal_admin_session');
+        const cachedAdmin = sessionStorage.getItem('portal_admin_session') || localStorage.getItem('portal_admin_session');
         if (cachedAdmin) {
           const parsed = JSON.parse(cachedAdmin);
           if (parsed && (parsed.role === 'admin' || parsed.role === 'senior_admin' || parsed.role === 'junior_admin')) {
@@ -412,9 +412,13 @@ export const StoreProvider: React.FC<{ children: React.ReactNode }> = ({ childre
   const login = async (email: string, role: UserRole, password?: string): Promise<{ success: boolean; error?: string; submission?: FormSubmission }> => {
     const normalizedEmail = email.trim().toLowerCase();
 
-    // 1. Direct Administrator Passkey Authentication
-    if (role === 'admin' || role === 'senior_admin' || role === 'junior_admin') {
-      const submittedKey = (password || email || '').trim();
+    // 1. Direct Administrator Authentication (via Admin Terminal passkey or direct admin email)
+    const isExplicitAdminRole = role === 'admin' || role === 'senior_admin' || role === 'junior_admin';
+    const isAdminEmail = ['admin@company.com', 'junior.admin@company.com', 'admin', 'junior'].includes(normalizedEmail);
+    const submittedKey = (password || email || '').trim();
+    const isAdminPasskey = ['admin123', 'junior123', 'ADMIN-2026', 'senior123', 'admin', 'junior'].includes(submittedKey.toLowerCase());
+
+    if (isExplicitAdminRole || isAdminEmail || (isAdminPasskey && !role)) {
       const isJuniorAttempt = role === 'junior_admin' || 
         normalizedEmail.includes('junior') ||
         ['junior123', 'junior', 'junioradmin'].includes(submittedKey.toLowerCase());
@@ -441,6 +445,7 @@ export const StoreProvider: React.FC<{ children: React.ReactNode }> = ({ childre
         if (typeof window !== 'undefined') {
           try {
             sessionStorage.setItem('portal_admin_session', JSON.stringify(adminUser));
+            localStorage.setItem('portal_admin_session', JSON.stringify(adminUser));
           } catch (e) {}
         }
 
@@ -735,6 +740,7 @@ export const StoreProvider: React.FC<{ children: React.ReactNode }> = ({ childre
     if (typeof window !== 'undefined') {
       try {
         sessionStorage.removeItem('portal_admin_session');
+        localStorage.removeItem('portal_admin_session');
       } catch (e) {}
     }
     if (isSupabaseConfigured()) {

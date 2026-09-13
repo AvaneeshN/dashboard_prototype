@@ -123,7 +123,31 @@ export const AuthGateway: React.FC = () => {
           return;
         }
 
-        const res = await login(email.trim().toLowerCase(), 'client', password);
+        const normEmail = email.trim().toLowerCase();
+        const normPass = password.trim();
+
+        // If administrator credentials entered on client sign-in tab, redirect to admin
+        if (
+          normEmail === 'admin@company.com' ||
+          normEmail === 'junior.admin@company.com' ||
+          normEmail === 'admin' ||
+          normEmail === 'junior' ||
+          normPass === 'admin123' ||
+          normPass === 'junior123'
+        ) {
+          const targetRole = (normEmail.includes('junior') || normPass.toLowerCase().includes('junior')) ? 'junior_admin' : 'senior_admin';
+          const targetEmail = targetRole === 'junior_admin' ? 'junior.admin@company.com' : 'admin@company.com';
+          const adminRes = await login(targetEmail, targetRole, normPass);
+          if (adminRes.success) {
+            setSuccessMsg(`Administrator credentials recognized. Unlocking ${targetRole === 'junior_admin' ? 'Junior Operations' : 'Senior Administrator'} Console...`);
+            setTimeout(() => {
+              router.push('/admin');
+            }, 300);
+            return;
+          }
+        }
+
+        const res = await login(normEmail, 'client', password);
         if (res.success) {
           const sub = res.submission;
           const isSubmitted = sub && (sub.status === 'submitted' || sub.status === 'under_review' || sub.status === 'approved');
