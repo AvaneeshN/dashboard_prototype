@@ -102,3 +102,48 @@ code, kbd, samp, pre {
 .animate-vault-glow {
   animation: vault-pulse-glow 4s ease-in-out infinite;
 }
+
+/* ── Jarvis Arc Reactor Glowing Blue Movement ── */
+@keyframes arc-spin-cw {
+  from { transform: rotate(0deg); }
+  to { transform: rotate(360deg); }
+}
+
+@keyframes arc-spin-ccw {
+  from { transform: rotate(360deg); }
+  to { transform: rotate(0deg); }
+}
+
+@keyframes arc-pulse {
+  0%, 100% {
+    opacity: 0.88;
+    transform: scale(0.97);
+    filter: drop-shadow(0 0 6px rgba(0, 240, 255, 0.7));
+  }
+  50% {
+    opacity: 1;
+    transform: scale(1.03);
+    filter: drop-shadow(0 0 14px rgba(0, 240, 255, 1)) drop-shadow(0 0 24px rgba(56, 189, 248, 0.6));
+  }
+}
+
+.animate-arc-cw-slow {
+  animation: arc-spin-cw 26s linear infinite;
+  transform-origin: 50px 50px;
+}
+
+.animate-arc-ccw-medium {
+  animation: arc-spin-ccw 16s linear infinite;
+  transform-origin: 50px 50px;
+}
+
+.animate-arc-cw-fast {
+  animation: arc-spin-cw 8s linear infinite;
+  transform-origin: 50px 50px;
+}
+
+.animate-arc-pulse {
+  animation: arc-pulse 2.2s ease-in-out infinite;
+  transform-origin: 50px 50px;
+}
+

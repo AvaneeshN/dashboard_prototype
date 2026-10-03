@@ -46,7 +46,7 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { RequiredDocumentConfig, getAdminPermissions, isSeniorAdmin } from '@/types';
 import { AdminVisualAnalytics } from './AdminVisualAnalytics';
 import { AdminOverallDbtDashboard } from './AdminOverallDbtDashboard';
-import { RotatingVault } from '@/components/ui/RotatingVault';
+import { ArcReactor } from '@/components/ui/ArcReactor';
 
 type AdminTab = 'analytics' | 'dbt_registry' | 'telemetry' | 'intakes' | 'requirements' | 'security';
 
@@ -390,9 +390,9 @@ export const AdminDashboard: React.FC = () => {
           )}
           </div>
 
-          {/* Top Right Rotating Security Vault (Positioned at Far Right Corner) */}
+          {/* Top Right Glowing Blue Jarvis Arc Reactor (Positioned at Far Right Corner) */}
           <div className="hidden sm:flex items-center pl-3.5 border-l border-zinc-200 shrink-0">
-            <RotatingVault size="md" />
+            <ArcReactor size="md" />
           </div>
         </div>
       </div>

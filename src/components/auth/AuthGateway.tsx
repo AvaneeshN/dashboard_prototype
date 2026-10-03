@@ -23,7 +23,7 @@ import { useRouter } from 'next/navigation';
 import { motion, AnimatePresence } from 'framer-motion';
 
 import { NavyWaveBackground } from '@/components/ui/NavyWaveBackground';
-import { RotatingVault } from '@/components/ui/RotatingVault';
+import { ArcReactor } from '@/components/ui/ArcReactor';
 
 export const AuthGateway: React.FC = () => {
   const { login, register, submissions } = useStore();
@@ -212,9 +212,9 @@ export const AuthGateway: React.FC = () => {
       <NavyWaveBackground intensity="standard" />
       <ParticleField />
 
-      {/* Top Right Rotating Security Vault (Below Navbar) */}
+      {/* Top Right Glowing Blue Jarvis Arc Reactor (Below Navbar) */}
       <div className="absolute top-4 right-4 sm:top-6 sm:right-8 z-20">
-        <RotatingVault size="md" />
+        <ArcReactor size="md" />
       </div>
 
       <div className="relative z-10 w-full max-w-[440px] flex flex-col items-center">

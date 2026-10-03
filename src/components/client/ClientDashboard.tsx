@@ -8,7 +8,7 @@ import { ClientIntakeWizard } from './ClientIntakeWizard';
 import { DocumentViewerModal } from '@/components/ui/DocumentViewerModal';
 import { processUploadedFile, downloadDocumentFile } from '@/lib/document-utils';
 import { NavyWaveBackground } from '@/components/ui/NavyWaveBackground';
-import { RotatingVault } from '@/components/ui/RotatingVault';
+import { ArcReactor } from '@/components/ui/ArcReactor';
 import { 
   Users, 
   UserCheck, 
@@ -1156,9 +1156,9 @@ export const ClientDashboard: React.FC = () => {
             </button>
           </div>
 
-          {/* Top Right Rotating Security Vault (Positioned at Far Right Corner) */}
+          {/* Top Right Glowing Blue Jarvis Arc Reactor (Positioned at Far Right Corner) */}
           <div className="hidden sm:flex items-center pl-3.5 border-l border-zinc-200 shrink-0">
-            <RotatingVault size="md" />
+            <ArcReactor size="md" />
           </div>
         </div>
       </div>
