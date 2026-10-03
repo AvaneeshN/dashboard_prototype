@@ -24,6 +24,7 @@ import { motion, AnimatePresence } from 'framer-motion';
 
 import { NavyWaveBackground } from '@/components/ui/NavyWaveBackground';
 import { ArcReactor } from '@/components/ui/ArcReactor';
+import { TurnstileWidget } from '@/components/ui/TurnstileWidget';
 
 export const AuthGateway: React.FC = () => {
   const { login, register, submissions } = useStore();
@@ -40,6 +41,7 @@ export const AuthGateway: React.FC = () => {
   const [fullName, setFullName] = useState('');
   const [companyName, setCompanyName] = useState('');
   const [phone, setPhone] = useState('');
+  const [turnstileToken, setTurnstileToken] = useState<string | null>(null);
   
   // Admin Passkey State
   const [adminPasskey, setAdminPasskey] = useState('');
@@ -55,6 +57,7 @@ export const AuthGateway: React.FC = () => {
     setPortalType(type);
     setErrorMsg(null);
     setSuccessMsg(null);
+    setTurnstileToken(null);
   };
 
   const handleActionSwitch = (action: 'signin' | 'register') => {
@@ -63,6 +66,7 @@ export const AuthGateway: React.FC = () => {
     setAuthAction(action);
     setErrorMsg(null);
     setSuccessMsg(null);
+    setTurnstileToken(null);
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -96,6 +100,33 @@ export const AuthGateway: React.FC = () => {
         // Client Registration
         if (!fullName.trim() || !companyName.trim() || !email.trim() || !phone.trim()) {
           setErrorMsg('Please enter your full name, company / legal entity name, work email address, and contact phone number.');
+          setIsLoading(false);
+          return;
+        }
+
+        // Verify Cloudflare Turnstile token
+        if (!turnstileToken) {
+          setErrorMsg('Please complete the security verification check before registering.');
+          setIsLoading(false);
+          return;
+        }
+
+        try {
+          const verifyRes = await fetch('/api/auth/verify-turnstile', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ token: turnstileToken }),
+          });
+          const verifyData = await verifyRes.json();
+          if (!verifyData.success) {
+            setErrorMsg(verifyData.error || 'Security verification failed. Please try again.');
+            setTurnstileToken(null);
+            setIsLoading(false);
+            return;
+          }
+        } catch (err: any) {
+          console.error('Turnstile verification error:', err);
+          setErrorMsg('Security check service could not be contacted. Please try again.');
           setIsLoading(false);
           return;
         }
@@ -491,6 +522,23 @@ export const AuthGateway: React.FC = () => {
                         </button>
                       </div>
                     </div>
+
+                    {authAction === 'register' && (
+                      <div className="pt-1">
+                        <div className="flex items-center justify-between mb-1">
+                          <label className="block text-[11px] font-bold text-zinc-600">Bot Verification</label>
+                          <span className="text-[10px] text-zinc-400 font-mono flex items-center gap-1">
+                            <Shield className="w-3 h-3 text-cyan-600" />
+                            Cloudflare Turnstile
+                          </span>
+                        </div>
+                        <TurnstileWidget
+                          onSuccess={(token) => setTurnstileToken(token)}
+                          onError={() => setTurnstileToken(null)}
+                          onExpire={() => setTurnstileToken(null)}
+                        />
+                      </div>
+                    )}
 
                     <button
                       type="submit"
