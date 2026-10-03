@@ -33,7 +33,7 @@ interface TurnstileWidgetProps {
   theme?: 'light' | 'dark' | 'auto';
 }
 
-const DEFAULT_SITE_KEY = '0x4AAAAAAFM0qJe7JBMC1FLO';
+const DEFAULT_SITE_KEY = '0x4AAAAAAFM0qJe7JBMClFLO';
 const TEST_SITE_KEY = '1x00000000000000000000AA';
 
 export const TurnstileWidget: React.FC<TurnstileWidgetProps> = ({
