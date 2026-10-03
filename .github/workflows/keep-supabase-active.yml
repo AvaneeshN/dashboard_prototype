@@ -1,0 +1,35 @@
+name: Keep Supabase Database Active
+
+on:
+  schedule:
+    # Runs at 06:00 UTC every 3 days (well within Supabase's 7-day inactivity limit)
+    - cron: '0 6 */3 * *'
+  workflow_dispatch: # Allows manual trigger from the GitHub Actions tab anytime
+
+jobs:
+  ping-supabase:
+    name: Ping Supabase Database
+    runs-on: ubuntu-latest
+    steps:
+      - name: Send Keep-Alive Query to Supabase
+        env:
+          SUPABASE_URL: ${{ secrets.NEXT_PUBLIC_SUPABASE_URL || 'https://budhnvdyzrmoubuwjonc.supabase.co' }}
+          SUPABASE_KEY: ${{ secrets.NEXT_PUBLIC_SUPABASE_ANON_KEY || 'sb_publishable_bP73jhmdP0sMFLczy7HLbQ_Zk1G2TOR' }}
+        run: |
+          echo "Sending keep-alive query to Supabase REST API..."
+          STATUS_CODE=$(curl -s -o response.json -w "%{http_code}" \
+            -H "apikey: $SUPABASE_KEY" \
+            -H "Authorization: Bearer $SUPABASE_KEY" \
+            -H "Content-Type: application/json" \
+            "$SUPABASE_URL/rest/v1/form_submissions?select=id&limit=1")
+
+          echo "Supabase HTTP Response Code: $STATUS_CODE"
+          cat response.json
+          echo ""
+
+          if [ "$STATUS_CODE" -ge 200 ] && [ "$STATUS_CODE" -lt 300 ]; then
+            echo "SUCCESS: Supabase database pinged successfully. 7-day inactivity timer reset!"
+          else
+            echo "WARNING: Unexpected HTTP status code: $STATUS_CODE"
+            exit 1
+          fi
