@@ -910,33 +910,57 @@ export const StoreProvider: React.FC<{ children: React.ReactNode }> = ({ childre
       return '10000000-1000-4000-8000-' + Date.now().toString(16).padStart(12, '0').slice(-12);
     };
 
-    // 1. Check if email already exists in profiles table
+    // 1. Check if email already exists (Strict Single Account Per Email Policy)
     if (isSupabaseConfigured()) {
       try {
         const supabase = createClient();
-        const { data: existingProfile } = await supabase
+        
+        // A. Check profiles table (case-insensitive)
+        const { data: existingProfiles } = await supabase
           .from('profiles')
           .select('id, email')
-          .eq('email', normalizedEmail)
-          .maybeSingle();
+          .ilike('email', normalizedEmail);
 
-        if (existingProfile) {
+        if (existingProfiles && existingProfiles.length > 0) {
           return { 
             success: false, 
             error: 'An account linked with this email address already exists. Please sign in instead.' 
           };
         }
+
+        // B. Check existing submissions for duplicate client email registration
+        const { data: existingSubs } = await supabase
+          .from('form_submissions')
+          .select('id, client_email')
+          .ilike('client_email', normalizedEmail)
+          .limit(1);
+
+        if (existingSubs && existingSubs.length > 0) {
+          // If a client already submitted an intake under this email, prevent creating a secondary account
+          const { data: anyProfile } = await supabase
+            .from('profiles')
+            .select('id')
+            .eq('id', existingSubs[0].id)
+            .maybeSingle();
+
+          if (anyProfile) {
+            return {
+              success: false,
+              error: 'An account linked with this email address already exists. Please sign in instead.'
+            };
+          }
+        }
       } catch (checkErr) {
         console.warn('Pre-registration profile check notice:', checkErr);
       }
-    } else {
-      const localExisting = profiles.find(p => p.email.toLowerCase() === normalizedEmail);
-      if (localExisting) {
-        return { 
-          success: false, 
-          error: 'An account linked with this email address already exists. Please sign in instead.' 
-        };
-      }
+    }
+
+    const localExisting = profiles.find(p => (p.email || '').trim().toLowerCase() === normalizedEmail);
+    if (localExisting) {
+      return { 
+        success: false, 
+        error: 'An account linked with this email address already exists. Please sign in instead.' 
+      };
     }
 
     // 2. Perform Supabase Auth Sign Up
