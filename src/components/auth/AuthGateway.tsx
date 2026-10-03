@@ -110,11 +110,13 @@ export const AuthGateway: React.FC = () => {
 
         if (res.success) {
           setErrorMsg(null);
-          setSuccessMsg(`Verification email sent to ${email.trim().toLowerCase()}. Please check your inbox and click the verification link, then sign in below.`);
-          setAuthAction('signin');
-          setPassword('');
+          setSuccessMsg(`Welcome to WF47 ZYNG, ${fullName.trim()}! Workspace account ready. Redirecting...`);
+          setTimeout(() => {
+            router.push('/client');
+          }, 1000);
         } else {
           setErrorMsg(res.error || 'Registration failed.');
+          setIsLoading(false);
         }
       } else {
         // Client Sign In

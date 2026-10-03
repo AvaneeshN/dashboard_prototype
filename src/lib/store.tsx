@@ -795,14 +795,12 @@ export const StoreProvider: React.FC<{ children: React.ReactNode }> = ({ childre
 
         if (error) {
           if (error.message?.toLowerCase().includes('email not confirmed') || error.message?.toLowerCase().includes('not confirmed')) {
-            await addLoginLog(email, role, 'failed', 'Email verification pending');
-            return { 
-              success: false, 
-              error: 'Email verification required. Please check your inbox and click the confirmation link sent by Supabase, then sign in.' 
-            };
+            console.log('[INFO] Email confirmation bypassed per company policy for:', normalizedEmail);
+            // Proceed to database profile check below rather than blocking the user
+          } else {
+            await addLoginLog(email, role, 'failed', error.message);
+            return { success: false, error: error.message || 'Invalid email or password.' };
           }
-          await addLoginLog(email, role, 'failed', error.message);
-          return { success: false, error: error.message || 'Invalid email or password.' };
         }
 
         if (data.user) {
@@ -1031,7 +1029,19 @@ export const StoreProvider: React.FC<{ children: React.ReactNode }> = ({ childre
       }
     }
 
-    return { success: true, requiresVerification: true };
+    // Automatically authenticate the newly registered client without requiring email verification
+    if (data.password) {
+      try {
+        await login(normalizedEmail, 'client', data.password);
+      } catch (loginErr) {
+        console.warn('Auto-login post-registration notice:', loginErr);
+        setUser(newProfile);
+      }
+    } else {
+      setUser(newProfile);
+    }
+
+    return { success: true, requiresVerification: false };
   };
 
   const logout = () => {
