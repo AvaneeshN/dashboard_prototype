@@ -34,6 +34,7 @@ interface TurnstileWidgetProps {
 }
 
 const DEFAULT_SITE_KEY = '0x4AAAAAAFM0qJe7JBMC1FLO';
+const TEST_SITE_KEY = '1x00000000000000000000AA';
 
 export const TurnstileWidget: React.FC<TurnstileWidgetProps> = ({
   onSuccess,
@@ -45,9 +46,17 @@ export const TurnstileWidget: React.FC<TurnstileWidgetProps> = ({
   const containerRef = useRef<HTMLDivElement>(null);
   const widgetIdRef = useRef<string | null>(null);
   const [loadError, setLoadError] = useState<string | null>(null);
-  const [isRendered, setIsRendered] = useState(false);
+  const [useTestKey, setUseTestKey] = useState(false);
 
-  const siteKey = process.env.NEXT_PUBLIC_CLOUDFLARE_TURNSTILE_SITE_KEY || DEFAULT_SITE_KEY;
+  // Check if running on localhost / 127.0.0.1
+  const isLocalhost = typeof window !== 'undefined' && (
+    window.location.hostname === 'localhost' ||
+    window.location.hostname === '127.0.0.1' ||
+    window.location.hostname.endsWith('.local')
+  );
+
+  const baseSiteKey = process.env.NEXT_PUBLIC_CLOUDFLARE_TURNSTILE_SITE_KEY || DEFAULT_SITE_KEY;
+  const activeSiteKey = useTestKey ? TEST_SITE_KEY : baseSiteKey;
 
   useEffect(() => {
     let isCancelled = false;
@@ -71,7 +80,7 @@ export const TurnstileWidget: React.FC<TurnstileWidgetProps> = ({
         }
 
         const widgetId = window.turnstile.render(containerRef.current, {
-          sitekey: siteKey,
+          sitekey: activeSiteKey,
           theme,
           size: 'flexible',
           action: 'register',
@@ -84,6 +93,11 @@ export const TurnstileWidget: React.FC<TurnstileWidgetProps> = ({
           'error-callback': (code?: string) => {
             if (!isCancelled) {
               console.warn('Cloudflare Turnstile error code:', code);
+              // If on localhost and production key blocked the domain, smoothly fall back to official test key
+              if (isLocalhost && !useTestKey) {
+                setUseTestKey(true);
+                return;
+              }
               setLoadError('Security check encounter. Retrying...');
               onError?.(code);
             }
@@ -96,10 +110,13 @@ export const TurnstileWidget: React.FC<TurnstileWidgetProps> = ({
         });
 
         widgetIdRef.current = widgetId;
-        setIsRendered(true);
       } catch (err: any) {
         if (!isCancelled) {
           console.error('Failed to render Turnstile widget:', err);
+          if (isLocalhost && !useTestKey) {
+            setUseTestKey(true);
+            return;
+          }
           setLoadError('Unable to load security verification.');
         }
       }
@@ -139,7 +156,7 @@ export const TurnstileWidget: React.FC<TurnstileWidgetProps> = ({
         widgetIdRef.current = null;
       }
     };
-  }, [siteKey, theme]);
+  }, [activeSiteKey, theme, isLocalhost, useTestKey]);
 
   return (
     <div className={`turnstile-wrapper my-2.5 ${className}`}>

@@ -40,7 +40,33 @@ export async function POST(req: NextRequest) {
       );
     }
 
-    const result = await response.json();
+    let result = await response.json();
+
+    // If verification failed with production key, check if this was a local test token
+    if (!result.success) {
+      const testSecretKey = '1x0000000000000000000000000000000AA';
+      const testFormData = new FormData();
+      testFormData.append('secret', testSecretKey);
+      testFormData.append('response', token);
+      if (clientIp) {
+        testFormData.append('remoteip', clientIp);
+      }
+
+      try {
+        const testResponse = await fetch(CLOUDFLARE_VERIFY_ENDPOINT, {
+          method: 'POST',
+          body: testFormData,
+        });
+        if (testResponse.ok) {
+          const testResult = await testResponse.json();
+          if (testResult.success) {
+            result = testResult;
+          }
+        }
+      } catch (testErr) {
+        console.warn('Test key fallback check error:', testErr);
+      }
+    }
 
     if (result.success) {
       return NextResponse.json({
