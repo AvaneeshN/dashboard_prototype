@@ -47,6 +47,7 @@ import { RequiredDocumentConfig, getAdminPermissions, isSeniorAdmin } from '@/ty
 import { AdminVisualAnalytics } from './AdminVisualAnalytics';
 import { AdminOverallDbtDashboard } from './AdminOverallDbtDashboard';
 import { ArcReactor } from '@/components/ui/ArcReactor';
+import { AdminBulkTimelineExportModal } from './AdminBulkTimelineExportModal';
 
 type AdminTab = 'analytics' | 'dbt_registry' | 'telemetry' | 'intakes' | 'requirements' | 'security';
 
@@ -70,6 +71,7 @@ export const AdminDashboard: React.FC = () => {
   const [logFilter, setLogFilter] = useState<'all' | 'failed' | 'success'>('all');
   const [isSyncing, setIsSyncing] = useState(false);
   const [syncFeedback, setSyncFeedback] = useState<{ success: boolean; message: string } | null>(null);
+  const [showTimelineExportModal, setShowTimelineExportModal] = useState(false);
 
   // Dedicated Admin Organization SPOC State & Modal
   const [showAdminSpocModal, setShowAdminSpocModal] = useState(false);
@@ -370,6 +372,17 @@ export const AdminDashboard: React.FC = () => {
             <Sparkles className="w-3.5 h-3.5 text-zinc-500" />
             <span>{isSyncing ? 'Syncing...' : 'Sync Database'}</span>
           </button>
+
+          {permissions.canExportCSV && (
+            <button
+              onClick={() => setShowTimelineExportModal(true)}
+              className="px-4 py-2 rounded-full bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold flex items-center gap-1.5 transition-all cursor-pointer shadow-sm active:scale-[0.98]"
+              title="Parse and export entire cross-establishment data for any timeline as an Excel workbook"
+            >
+              <FileSpreadsheet className="w-3.5 h-3.5" />
+              <span>Bulk Timeline Excel (.xlsx)</span>
+            </button>
+          )}
 
           {permissions.canExportCSV ? (
             <button
@@ -1227,6 +1240,14 @@ export const AdminDashboard: React.FC = () => {
           </div>
         )}
       </AnimatePresence>
+
+      {/* Senior Admin Bulk Timeline Excel Parser Modal */}
+      <AdminBulkTimelineExportModal
+        isOpen={showTimelineExportModal}
+        onClose={() => setShowTimelineExportModal(false)}
+        submissions={submissions}
+        seniorAdminName={user?.full_name || 'Senior Administrator'}
+      />
 
     </div>
   );

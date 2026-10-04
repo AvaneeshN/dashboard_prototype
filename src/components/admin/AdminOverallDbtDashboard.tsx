@@ -1,8 +1,8 @@
 'use client';
 
 import React, { useState, useMemo } from 'react';
-import { FormSubmission, ApprenticeRecord, NAPSPortalRecord } from '@/types';
-import { generateAutoContinuedDbtRecords } from '@/lib/store';
+import { FormSubmission, ApprenticeRecord, NAPSPortalRecord, isSeniorAdmin } from '@/types';
+import { generateAutoContinuedDbtRecords, useStore } from '@/lib/store';
 import { GlassCard } from '@/components/ui/GlassCard';
 import { 
   Search, 
@@ -18,9 +18,11 @@ import {
   UserCheck,
   CreditCard,
   FileSpreadsheet,
-  Coins
+  Coins,
+  Lock
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
+import { AdminBulkTimelineExportModal } from './AdminBulkTimelineExportModal';
 
 export interface AdminOverallDbtDashboardProps {
   submissions: FormSubmission[];
@@ -88,6 +90,9 @@ export const AdminOverallDbtDashboard: React.FC<AdminOverallDbtDashboardProps> =
   submissions,
   onInspectSubmission
 }) => {
+  const { user } = useStore();
+  const isSenior = isSeniorAdmin(user?.role);
+
   // Filter States
   const [selectedMonth, setSelectedMonth] = useState<string>('all');
   const [selectedYear, setSelectedYear] = useState<string>('all');
@@ -96,6 +101,9 @@ export const AdminOverallDbtDashboard: React.FC<AdminOverallDbtDashboardProps> =
   const [filterApCode, setFilterApCode] = useState<string>('');
   const [filterDbtStatus, setFilterDbtStatus] = useState<string>('all');
   const [searchQuery, setSearchQuery] = useState<string>('');
+
+  // Bulk Timeline Excel Export Modal State
+  const [showExportModal, setShowExportModal] = useState<boolean>(false);
 
   // Selected Detail Modal State
   const [inspectedRow, setInspectedRow] = useState<AggregatedDbtRow | null>(null);
@@ -436,14 +444,33 @@ export const AdminOverallDbtDashboard: React.FC<AdminOverallDbtDashboardProps> =
             </p>
           </div>
 
-          <div className="flex items-center gap-2 self-start md:self-auto">
+          <div className="flex flex-wrap items-center gap-2 self-start md:self-auto">
+            {isSenior ? (
+              <button
+                type="button"
+                onClick={() => setShowExportModal(true)}
+                className="px-4 py-2 rounded-full bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold flex items-center gap-1.5 transition-all cursor-pointer shadow-sm active:scale-[0.98]"
+              >
+                <FileSpreadsheet className="w-3.5 h-3.5" />
+                <span>Bulk Timeline Excel (.xlsx)</span>
+              </button>
+            ) : (
+              <div 
+                className="px-3.5 py-2 rounded-full bg-zinc-100 text-zinc-400 border border-zinc-200 text-xs font-medium flex items-center gap-1.5 cursor-not-allowed"
+                title="Bulk timeline Excel parsing is restricted to Senior Admin"
+              >
+                <Lock className="w-3 h-3 text-zinc-400" />
+                <span>Bulk Excel (Senior Only)</span>
+              </div>
+            )}
+
             <button
               type="button"
               onClick={handleExportCSV}
               className="px-4 py-2 rounded-full bg-black text-white hover:bg-zinc-800 text-xs font-bold flex items-center gap-1.5 transition-all cursor-pointer shadow-xs"
             >
               <Download className="w-3.5 h-3.5" />
-              <span>Export Overall DBT CSV</span>
+              <span>Export Filtered CSV</span>
             </button>
           </div>
         </div>
@@ -1079,6 +1106,14 @@ export const AdminOverallDbtDashboard: React.FC<AdminOverallDbtDashboardProps> =
           </div>
         )}
       </AnimatePresence>
+
+      {/* Senior Admin Bulk Timeline Excel Parser Modal */}
+      <AdminBulkTimelineExportModal
+        isOpen={showExportModal}
+        onClose={() => setShowExportModal(false)}
+        submissions={submissions}
+        seniorAdminName={user?.full_name || 'Senior Administrator'}
+      />
 
     </div>
   );
