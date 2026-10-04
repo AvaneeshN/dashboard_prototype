@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 
 const CLOUDFLARE_VERIFY_ENDPOINT = 'https://challenges.cloudflare.com/turnstile/v0/siteverify';
-const FALLBACK_SECRET_KEY = '0x4AAAAAAFM0qEXs_upZhrUiHnSXxKWPIGE';
+const TEST_SECRET_KEY = '1x0000000000000000000000000000000AA';
 
 export async function POST(req: NextRequest) {
   try {
@@ -15,7 +15,7 @@ export async function POST(req: NextRequest) {
       );
     }
 
-    const secretKey = process.env.CLOUDFLARE_TURNSTILE_SECRET_KEY || FALLBACK_SECRET_KEY;
+    const secretKey = process.env.CLOUDFLARE_TURNSTILE_SECRET_KEY || TEST_SECRET_KEY;
     const clientIp = 
       req.headers.get('cf-connecting-ip') || 
       req.headers.get('x-forwarded-for')?.split(',')[0].trim() || 
