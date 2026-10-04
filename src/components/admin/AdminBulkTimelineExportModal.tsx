@@ -1,6 +1,7 @@
 'use client';
 
-import React, { useState, useMemo } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
+import { createPortal } from 'react-dom';
 import { FormSubmission } from '@/types';
 import { 
   X, 
@@ -62,6 +63,22 @@ export const AdminBulkTimelineExportModal: React.FC<AdminBulkTimelineExportModal
   // UI state
   const [isExporting, setIsExporting] = useState<boolean>(false);
   const [exportFeedback, setExportFeedback] = useState<{ fileName: string; rowCount: number } | null>(null);
+  const [mounted, setMounted] = useState(false);
+
+  useEffect(() => {
+    setMounted(true);
+  }, []);
+
+  useEffect(() => {
+    if (isOpen) {
+      document.body.style.overflow = 'hidden';
+    } else {
+      document.body.style.overflow = '';
+    }
+    return () => {
+      document.body.style.overflow = '';
+    };
+  }, [isOpen]);
 
   // Build options object
   const exportOptions: TimelineExportOptions = useMemo(() => {
@@ -111,20 +128,20 @@ export const AdminBulkTimelineExportModal: React.FC<AdminBulkTimelineExportModal
     }, 250);
   };
 
-  if (!isOpen) return null;
+  if (!isOpen || !mounted) return null;
 
-  return (
+  return createPortal(
     <AnimatePresence>
-      <div className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-4 bg-black/60 backdrop-blur-sm overflow-y-auto">
+      <div className="fixed inset-0 z-[100] flex items-center justify-center p-3 sm:p-6 bg-black/75 backdrop-blur-md overflow-y-auto">
         <motion.div
           initial={{ opacity: 0, scale: 0.96, y: 15 }}
           animate={{ opacity: 1, scale: 1, y: 0 }}
           exit={{ opacity: 0, scale: 0.96, y: 15 }}
           transition={{ duration: 0.2 }}
-          className="relative w-full max-w-2xl bg-white border border-zinc-200/90 rounded-3xl shadow-2xl p-6 sm:p-7 overflow-hidden text-zinc-900"
+          className="relative w-full max-w-2xl bg-white border border-zinc-200/90 rounded-3xl shadow-2xl p-6 sm:p-7 text-zinc-900 my-auto max-h-[calc(100vh-4rem)] flex flex-col overflow-hidden"
         >
           {/* Header */}
-          <div className="flex items-start justify-between pb-4 border-b border-zinc-100">
+          <div className="flex items-start justify-between pb-4 border-b border-zinc-100 shrink-0">
             <div className="flex items-center gap-3">
               <div className="w-11 h-11 rounded-2xl bg-emerald-500/10 border border-emerald-500/30 flex items-center justify-center text-emerald-600 shadow-xs">
                 <FileSpreadsheet className="w-6 h-6" />
@@ -154,7 +171,7 @@ export const AdminBulkTimelineExportModal: React.FC<AdminBulkTimelineExportModal
             </button>
           </div>
 
-          <div className="mt-5 space-y-5">
+          <div className="mt-5 space-y-5 overflow-y-auto flex-1 pr-1.5">
             {/* Step 1: Mode Selection Pills */}
             <div>
               <label className="block text-[11px] font-bold uppercase tracking-wider text-zinc-500 mb-2 font-mono">
@@ -413,7 +430,7 @@ export const AdminBulkTimelineExportModal: React.FC<AdminBulkTimelineExportModal
           </div>
 
           {/* Footer Action Buttons */}
-          <div className="mt-6 pt-4 border-t border-zinc-100 flex items-center justify-end gap-2.5">
+          <div className="mt-6 pt-4 border-t border-zinc-100 flex items-center justify-end gap-2.5 shrink-0">
             <button
               type="button"
               onClick={onClose}
@@ -444,6 +461,7 @@ export const AdminBulkTimelineExportModal: React.FC<AdminBulkTimelineExportModal
           </div>
         </motion.div>
       </div>
-    </AnimatePresence>
+    </AnimatePresence>,
+    document.body
   );
 };
