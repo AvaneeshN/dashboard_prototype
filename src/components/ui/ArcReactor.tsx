@@ -5,11 +5,13 @@ import React, { useState } from 'react';
 export interface ArcReactorProps {
   size?: 'sm' | 'md' | 'lg';
   className?: string;
+  title?: string;
 }
 
 export const ArcReactor: React.FC<ArcReactorProps> = ({
   size = 'md',
-  className = ''
+  className = '',
+  title
 }) => {
   const [isHovered, setIsHovered] = useState(false);
 
@@ -31,7 +33,7 @@ export const ArcReactor: React.FC<ArcReactorProps> = ({
       className={`relative inline-flex items-center justify-center select-none cursor-pointer transition-all duration-300 ${className}`}
       onMouseEnter={() => setIsHovered(true)}
       onMouseLeave={() => setIsHovered(false)}
-      title="JARVIS Arc Reactor • Core Active"
+      title={title}
       style={{
         width: dimensions.width,
         height: dimensions.height
